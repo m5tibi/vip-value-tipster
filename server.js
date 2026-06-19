@@ -54,7 +54,7 @@ async function fetchAndProcess() {
       const games = await r.json();
       console.log(`${sportKey}: ${games.length} meccs`);
 
-      for (const game of games.slice(0, 8)) {
+      for (const game of games.slice(0, 15)) {
         const start = new Date(game.commence_time);
         const live  = start <= now && (now - start) < 2 * 3600 * 1000;
 
@@ -83,7 +83,7 @@ async function fetchAndProcess() {
           const trueProb = (1 / sharpO.price) / overround;
           const fairOdds = parseFloat((1 / trueProb).toFixed(2));
           const value    = parseFloat(((odds / fairOdds - 1) * 100).toFixed(1));
-          if (value < 3) continue;
+          if (value < 2) continue;
 
           allTips.push({
             id: `${game.id}-${sharpO.name}`,
