@@ -54,9 +54,12 @@ async function fetchAndProcess() {
       const games = await r.json();
       console.log(`${sportKey}: ${games.length} meccs`);
 
-      for (const game of games.slice(0, 15)) {
+      for (const game of games) {
         const start = new Date(game.commence_time);
-        const live  = start <= now && (now - start) < 2 * 3600 * 1000;
+
+        // Csak a következő 24 óra meccsei
+        const hoursUntilStart = (start - now) / 3600000;
+        if (hoursUntilStart < 0 || hoursUntilStart > 24) continue;
 
         const validBMs = (game.bookmakers || []).filter(bm =>
           !EXCLUDED_BM.includes(bm.key) &&
