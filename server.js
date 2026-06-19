@@ -73,14 +73,9 @@ async function fetchAndProcess() {
           !EXCLUDED_BM.includes(bm.key) &&
           bm.markets?.[0]?.outcomes?.every(o => o.price > 1.05 && o.price < 50)
         );
-        if (validBMs.length < 2) {
-          console.log(`    ✗ Kizárva: csak ${validBMs.length} valid bookmaker (összes: ${game.bookmakers?.length || 0})`);
-          continue;
-        }
-
-        const pinnacle    = validBMs.find(bm => bm.key === "pinnacle");
-        const sharpBM     = pinnacle || validBMs[0];
-        console.log(`    ✓ Sharp BM: ${sharpBM.title}, valid BM-ek: ${validBMs.length}`);
+        if (validBMs.length < 2) continue;
+        const pinnacle = validBMs.find(bm => bm.key === "pinnacle");
+        const sharpBM  = pinnacle || validBMs[0];
         const sharpOutcomes = sharpBM.markets[0].outcomes;
         const overround   = sharpOutcomes.reduce((s, o) => s + 1 / o.price, 0);
 
@@ -97,8 +92,7 @@ async function fetchAndProcess() {
 
           const trueProb = (1 / sharpO.price) / overround;
           const fairOdds = parseFloat((1 / trueProb).toFixed(2));
-          const value    = parseFloat(((odds / fairOdds - 1) * 100).toFixed(1));
-          console.log(`      ${sharpO.name}: odds=${odds} fair=${fairOdds} value=${value}%`);
+          const value = parseFloat(((odds / fairOdds - 1) * 100).toFixed(1));
           if (value < 2) continue;
 
           allTips.push({
@@ -137,6 +131,8 @@ async function fetchAndProcess() {
       msg += "\n\n";
     });
     await sendTelegram(msg);
+  } else {
+    await sendTelegram(`🔍 <b>VIP Value Tipster – ${new Date().toLocaleString("hu-HU")}</b>\n\nNincs value tipp a következő 24 órában.`);
   }
 
   console.log(`[${new Date().toLocaleTimeString("hu-HU")}] Frissítve – ${latestTips.length} value tipp`);
