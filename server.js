@@ -12,15 +12,19 @@ const TG_CHAT_ID   = process.env.TG_CHAT_ID;
 const EOD_HOUR     = 23;
 
 const SPORT_MAP = {
+  "soccer_fifa_world_cup":      { sport: "soccer",     label: "⚽ FIFA VB 2026" },
   "soccer_uefa_champs_league":  { sport: "soccer",     label: "⚽ BL" },
   "soccer_epl":                 { sport: "soccer",     label: "⚽ Premier League" },
   "soccer_germany_bundesliga":  { sport: "soccer",     label: "⚽ Bundesliga" },
   "soccer_spain_la_liga":       { sport: "soccer",     label: "⚽ La Liga" },
   "soccer_italy_serie_a":       { sport: "soccer",     label: "⚽ Serie A" },
   "soccer_france_ligue_one":    { sport: "soccer",     label: "⚽ Ligue 1" },
+  "soccer_conmebol_copa_libertadores": { sport: "soccer", label: "⚽ Copa Libertadores" },
   "basketball_nba":             { sport: "basketball", label: "🏀 NBA" },
+  "basketball_wnba":            { sport: "basketball", label: "🏀 WNBA" },
   "basketball_euroleague":      { sport: "basketball", label: "🏀 Euroleague" },
   "icehockey_nhl":              { sport: "hockey",     label: "🏒 NHL" },
+  "icehockey_ahl":              { sport: "hockey",     label: "🏒 AHL" },
 };
 
 const EXCLUDED_BM = ["betfair_ex_eu", "betfair_ex_uk", "matchbook"];
@@ -59,7 +63,11 @@ async function fetchAndProcess() {
 
         // Csak a következő 24 óra meccsei
         const hoursUntilStart = (start - now) / 3600000;
-        if (hoursUntilStart < 0 || hoursUntilStart > 24) continue;
+        if (hoursUntilStart < -2 || hoursUntilStart > 24) {
+          // csak logolás az első futásnál ne árasszon el
+          continue;
+        }
+        console.log(`  → ${game.home_team} vs ${game.away_team} (${hoursUntilStart.toFixed(1)}h)`);
 
         const validBMs = (game.bookmakers || []).filter(bm =>
           !EXCLUDED_BM.includes(bm.key) &&
