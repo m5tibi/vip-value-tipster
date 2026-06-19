@@ -43,39 +43,69 @@ async function fetchAndProcess() {
   const allTips = [];
   const now = new Date();
 
+  // Kizárt bookmaker-ek (tőzsde jellegű, torzított odds-ok)
+  const EXCLUDED_BM = ["betfair_ex_eu", "betfair_ex_uk", "matchbook"];
+
   for (const [sportKey, meta] of Object.entries(SPORT_MAP)) {
     try {
       const url = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h&oddsFormat=decimal&dateFormat=iso`;
       const r = await fetch(url);
-      if (!r.ok) continue;
+      if (!r.ok) { console.log(`${sportKey}: HTTP ${r.status}`); continue; }
       const games = await r.json();
+      console.log(`${sportKey}: ${games.length} meccs`);
 
-      for (const game of games.slice(0, 6)) {
-        const bm       = game.bookmakers?.[0];
-        const outcomes = bm?.markets?.[0]?.outcomes || [];
-        if (!outcomes.length) continue;
-        const start    = new Date(game.commence_time);
-        const live     = start <= now && (now - start) < 2 * 3600 * 1000;
-        const overround = outcomes.reduce((s, o) => s + 1 / o.price, 0);
+      for (const game of games.slice(0, 8)) {
+        const start = new Date(game.commence_time);
+        const live  = start <= now && (now - start) < 2 * 3600 * 1000;
 
-        for (const o of outcomes) {
-          const odds = parseFloat(o.price.toFixed(2));
+        // Csak megbízható bookmaker-ek
+        const validBMs = (game.bookmakers || []).filter(bm =>
+          !EXCLUDED_BM.includes(bm.key) &&
+          bm.markets?.[0]?.outcomes?.every(o => o.price > 1.05 && o.price < 50)
+        );
+        if (validBMs.length < 2) continue;
+
+        // Pinnacle legyen az első ha elérhető (legélesebb piaci odds)
+        const pinnacle = validBMs.find(bm => bm.key === "pinnacle");
+        const sharpBM  = pinnacle || validBMs[0];
+        const sharpOutcomes = sharpBM.markets[0].outcomes;
+
+        // Fair odds = Pinnacle/sharp odds overround nélkül
+        const overround = sharpOutcomes.reduce((s, o) => s + 1 / o.price, 0);
+
+        // Legjobb elérhető odds minden kimenetelre (max odds a bookmaker-ek között)
+        const outcomeNames = sharpOutcomes.map(o => o.name);
+        for (const name of outcomeNames) {
+          // Legjobb odds keresése az összes valid BM-ben
+          let bestOdds = 0;
+          let bestBM   = "";
+          for (const bm of validBMs) {
+            const o = bm.markets[0]?.outcomes?.find(x => x.name === name);
+            if (o && o.price > bestOdds) { bestOdds = o.price; bestBM = bm.title; }
+          }
+          if (!bestOdds) continue;
+
+          const sharpO   = sharpOutcomes.find(o => o.name === name);
+          if (!sharpO) continue;
+
+          const odds     = parseFloat(bestOdds.toFixed(2));
           if (odds < 1.3 || odds > 6.0) continue;
-          const trueProb = (1 / odds) / overround;
+
+          const trueProb = (1 / sharpO.price) / overround;
           const fairOdds = parseFloat((1 / trueProb).toFixed(2));
           const value    = parseFloat(((odds / fairOdds - 1) * 100).toFixed(1));
           if (value < 3) continue;
 
           allTips.push({
-            id: `${game.id}-${o.name}`,
+            id: `${game.id}-${name}`,
             sport: meta.sport, sportLabel: meta.label,
             match: `${game.home_team} vs ${game.away_team}`,
-            market: "1X2", pick: o.name,
+            market: "1X2", pick: name,
             odds, fairOdds,
             prob: Math.round(trueProb * 100), value,
             live, minute: null,
             confidence: value >= 12 ? 2 : value >= 6 ? 1 : 0,
-            note: `${bm?.title || "Bookmaker"} – becsült valós valószínűség: ${Math.round(trueProb * 100)}%`,
+            note: `Legjobb odds: ${bestBM} | Fair odds (${sharpBM.title} alapján): ${fairOdds}`,
             addedAt: new Date().toLocaleString("hu-HU"),
             result: "pending"
           });
