@@ -69,7 +69,8 @@
       <div class="sub" id="today"></div>
     </div>
     <div class="header-right">
-      <div class="cd">⏱ <b id="countdown">15:00</b></div>
+      <div class="cd">⏱ Következő: <b id="countdown">–</b></div>
+      <div class="cd" id="fetch-schedule" style="font-size:10px"></div>
     </div>
   </div>
 
@@ -258,14 +259,27 @@ function toggleLive() {
   renderTips();
 }
 
-// Countdown
+// Visszaszámláló a szerver alapján
+let msRemaining = 0;
+async function loadStatus() {
+  const r = await fetch("/api/status");
+  const d = await r.json();
+  msRemaining = d.nextFetchMs;
+  const hours = d.fetchHours.join(":00, ") + ":00";
+  document.getElementById("fetch-schedule").textContent = `Mai lekérések: ${hours}`;
+}
+
 setInterval(() => {
-  countdown--;
-  if (countdown <= 0) { countdown = 15*60; loadTips(); }
-  const m = Math.floor(countdown/60), s = countdown%60;
-  document.getElementById("countdown").textContent = `${m}:${String(s).padStart(2,"0")}`;
+  msRemaining = Math.max(0, msRemaining - 1000);
+  const totalSec = Math.floor(msRemaining / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  document.getElementById("countdown").textContent =
+    h > 0 ? `${h}ó ${m}p` : `${m}:${String(s).padStart(2,"0")}`;
 }, 1000);
 
+loadStatus();
 loadTips();
 </script>
 </body>
