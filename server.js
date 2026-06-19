@@ -67,7 +67,7 @@ async function fetchAndProcess() {
           // csak logolás az első futásnál ne árasszon el
           continue;
         }
-        console.log(`  → ${game.home_team} vs ${game.away_team} (${hoursUntilStart.toFixed(1)}h)`);
+        const live  = hoursUntilStart < 0;
 
         const validBMs = (game.bookmakers || []).filter(bm =>
           !EXCLUDED_BM.includes(bm.key) &&
