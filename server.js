@@ -9,8 +9,43 @@ app.use(express.static(path.join(__dirname, "public")));
 const ODDS_API_KEY  = process.env.ODDS_API_KEY;
 const TG_BOT_TOKEN  = process.env.TG_BOT_TOKEN;
 const TG_CHAT_ID    = process.env.TG_CHAT_ID;
-const AUTO_INTERVAL = 15 * 60 * 1000;
-const EOD_HOUR      = 23;
+const EOD_HOUR = 23;
+
+// Okos ütemező: hétvégén 3x, hétköznap 1x fut naponta
+function scheduleNextFetch() {
+  const now  = new Date();
+  const day  = now.getDay(); // 0=vasárnap, 5=péntek, 6=szombat
+  const isWeekend = day === 0 || day === 5 || day === 6;
+
+  // Hétvégén: 10:00, 15:00, 19:00 | Hétköznap: 15:00
+  const fetchHours = isWeekend ? [10, 15, 19] : [15];
+  const currentH   = now.getHours();
+  const currentM   = now.getMinutes();
+
+  // Következő ütemezett óra megkeresése
+  let nextH = fetchHours.find(h => h > currentH || (h === currentH && currentM === 0));
+
+  let msUntilNext;
+  if (nextH !== undefined) {
+    // Ma még van ütemezett futás
+    const next = new Date(now);
+    next.setHours(nextH, 0, 0, 0);
+    msUntilNext = next - now;
+  } else {
+    // Holnap első futás
+    const tomorrow  = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowDay = tomorrow.getDay();
+    const isWeekendTomorrow = tomorrowDay === 0 || tomorrowDay === 5 || tomorrowDay === 6;
+    const tomorrowHours = isWeekendTomorrow ? [10, 15, 19] : [15];
+    tomorrow.setHours(tomorrowHours[0], 0, 0, 0);
+    msUntilNext = tomorrow - now;
+  }
+
+  const mins = Math.round(msUntilNext / 60000);
+  console.log(`Következő lekérés: ${mins} perc múlva`);
+  setTimeout(() => { fetchAndProcess(); scheduleNextFetch(); }, msUntilNext);
+}
 
 const SPORT_MAP = {
   "soccer_uefa_champs_league":  { sport: "soccer",     label: "⚽ BL" },
@@ -156,7 +191,30 @@ setInterval(() => {
 }, 60000);
 
 // ── API végpontok ─────────────────────────────────────────
-app.get("/api/tips",    (req, res) => res.json(latestTips));
+app.get("/api/status", (req, res) => {
+  const now = new Date();
+  const day = now.getDay();
+  const isWeekend = day === 0 || day === 5 || day === 6;
+  const fetchHours = isWeekend ? [10, 15, 19] : [15];
+  const currentH = now.getHours();
+  let nextH = fetchHours.find(h => h > currentH);
+  let nextFetch;
+  if (nextH !== undefined) {
+    nextFetch = new Date(now); nextFetch.setHours(nextH, 0, 0, 0);
+  } else {
+    nextFetch = new Date(now); nextFetch.setDate(nextFetch.getDate() + 1);
+    const tDay = nextFetch.getDay();
+    const isWE = tDay === 0 || tDay === 5 || tDay === 6;
+    nextFetch.setHours(isWE ? 10 : 15, 0, 0, 0);
+  }
+  res.json({
+    tipsCount: latestTips.length,
+    lastUpdate: latestTips[0]?.addedAt || null,
+    nextFetchMs: nextFetch - now,
+    isWeekend,
+    fetchHours
+  });
+});
 app.get("/api/history", (req, res) => res.json(history));
 
 app.post("/api/refresh", async (req, res) => {
