@@ -118,6 +118,7 @@ async function fetchValueTips() {
             type: "value",
             sport: meta.sport, sportLabel: meta.label,
             match: `${game.home_team} vs ${game.away_team}`,
+            commence: new Date(game.commence_time).toLocaleString("hu-HU", { timeZone: "Europe/Budapest", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }),
             market: "1X2", pick: sharpO.name,
             odds, fairOdds,
             prob: Math.round(trueProb * 100), value,
@@ -165,6 +166,7 @@ Válaszolj KIZÁRÓLAG JSON tömbként, semmi más szöveg nélkül:
     "match": "Csapat A vs Csapat B",
     "sport": "soccer",
     "sportLabel": "⚽ FIFA VB 2026",
+    "commence": "06.20. 20:00",
     "market": "pl. Over 2.5 gól",
     "pick": "konkrét tipp neve",
     "odds": 1.85,
@@ -194,6 +196,7 @@ Válaszolj KIZÁRÓLAG JSON tömbként, semmi más szöveg nélkül:
       sport: t.sport,
       sportLabel: t.sportLabel,
       match: t.match,
+      commence: t.commence || null,
       market: t.market,
       pick: t.pick,
       odds: t.odds,
@@ -288,7 +291,7 @@ async function fetchAndProcess() {
         matchList.push({
           sport: meta.label,
           match: `${game.home_team} vs ${game.away_team}`,
-          commence: start.toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })
+          commence: new Date(game.commence_time).toLocaleString("hu-HU", { timeZone: "Europe/Budapest", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
         });
       }
     } catch {}
