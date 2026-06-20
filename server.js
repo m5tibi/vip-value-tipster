@@ -55,9 +55,10 @@ console.log(`History betöltve: ${history.length} tipp`);
 
 // ── Magyar idő ────────────────────────────────────────────
 function getHungarianTime() {
-  const hu = new Date().toLocaleString("en-US", { timeZone: "Europe/Budapest" });
-  const d  = new Date(hu);
-  return { hour: d.getHours(), minute: d.getMinutes(), day: d.getDay() };
+  const now = new Date();
+  const huStr = now.toLocaleString("en-US", { timeZone: "Europe/Budapest", hour12: false });
+  const hu = new Date(huStr);
+  return { hour: hu.getHours(), minute: hu.getMinutes(), day: hu.getDay() };
 }
 
 function huTime(isoDate) {
