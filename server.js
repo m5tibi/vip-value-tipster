@@ -349,18 +349,26 @@ function scheduleNextFetch() {
   const { hour, minute, day } = getHungarianTime();
   const isWeekend  = day === 0 || day === 5 || day === 6;
   const fetchHours = isWeekend ? [10, 15, 19] : [15];
-  let msUntilNext  = null;
+
+  // Percek száma a következő ütemezett futásig
+  let minsUntilNext = null;
   for (const h of fetchHours) {
-    const minsLeft = (h - hour) * 60 - minute;
-    if (minsLeft > 0) { msUntilNext = minsLeft * 60 * 1000; break; }
+    const diff = (h - hour) * 60 - minute;
+    if (diff > 0) { minsUntilNext = diff; break; }
   }
-  if (!msUntilNext) {
+
+  // Ha ma nincs több – holnap első futás
+  if (!minsUntilNext) {
     const minsToMidnight = (24 - hour) * 60 - minute;
     const tomorrowDay    = (day + 1) % 7;
     const isWE           = tomorrowDay === 0 || tomorrowDay === 5 || tomorrowDay === 6;
-    msUntilNext          = (minsToMidnight + (isWE ? 10 : 15) * 60) * 60 * 1000;
+    minsUntilNext        = minsToMidnight + (isWE ? 10 : 15) * 60;
   }
-  console.log(`Következő lekérés: ${Math.round(msUntilNext / 60000)} perc múlva (magyar idő)`);
+
+  const msUntilNext = minsUntilNext * 60 * 1000;
+  const h = Math.floor(minsUntilNext / 60);
+  const m = minsUntilNext % 60;
+  console.log(`Következő lekérés: ${h} óra ${m} perc múlva (magyar idő)`);
   setTimeout(() => { fetchAndProcess(); scheduleNextFetch(); }, msUntilNext);
 }
 
@@ -384,18 +392,18 @@ app.get("/api/status", (req, res) => {
   const { hour, minute, day } = getHungarianTime();
   const isWeekend  = day === 0 || day === 5 || day === 6;
   const fetchHours = isWeekend ? [10, 15, 19] : [15];
-  let msUntilNext  = null;
+  let minsUntilNext = null;
   for (const h of fetchHours) {
-    const minsLeft = (h - hour) * 60 - minute;
-    if (minsLeft > 0) { msUntilNext = minsLeft * 60 * 1000; break; }
+    const diff = (h - hour) * 60 - minute;
+    if (diff > 0) { minsUntilNext = diff; break; }
   }
-  if (!msUntilNext) {
+  if (!minsUntilNext) {
     const minsToMidnight = (24 - hour) * 60 - minute;
     const tomorrowDay    = (day + 1) % 7;
     const isWE           = tomorrowDay === 0 || tomorrowDay === 5 || tomorrowDay === 6;
-    msUntilNext          = (minsToMidnight + (isWE ? 10 : 15) * 60) * 60 * 1000;
+    minsUntilNext        = minsToMidnight + (isWE ? 10 : 15) * 60;
   }
-  res.json({ valueTipsCount: latestTips.length, aiTipsCount: aiTips.length, lastUpdate: history[0]?.addedAt || null, nextFetchMs: msUntilNext, isWeekend, fetchHours });
+  res.json({ valueTipsCount: latestTips.length, aiTipsCount: aiTips.length, lastUpdate: history[0]?.addedAt || null, nextFetchMs: minsUntilNext * 60 * 1000, isWeekend, fetchHours });
 });
 
 app.post("/api/refresh", async (req, res) => {
