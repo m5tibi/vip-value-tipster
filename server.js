@@ -35,14 +35,27 @@ let history    = [];
 
 // ── Telegram ──────────────────────────────────────────────
 async function sendTelegram(text) {
-  if (!TG_BOT_TOKEN || !TG_CHAT_ID) return;
+  if (!TG_BOT_TOKEN || !TG_CHAT_ID) {
+    console.log("Telegram: hiányzó TOKEN vagy CHAT_ID");
+    return;
+  }
   try {
-    await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+    const url = `https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`;
+    console.log(`Telegram küldés → chat: ${TG_CHAT_ID}`);
+    const r = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ chat_id: TG_CHAT_ID, text, parse_mode: "HTML" })
     });
-  } catch (e) { console.error("Telegram hiba:", e.message); }
+    const data = await r.json();
+    if (!data.ok) {
+      console.error(`Telegram hiba: ${JSON.stringify(data)}`);
+    } else {
+      console.log("Telegram: üzenet elküldve ✓");
+    }
+  } catch (e) {
+    console.error("Telegram fetch hiba:", e.message);
+  }
 }
 
 // ── Odds API + Value számítás ─────────────────────────────
