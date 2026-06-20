@@ -77,7 +77,16 @@ async function fetchAndProcess() {
         const pinnacle = validBMs.find(bm => bm.key === "pinnacle");
         const sharpBM  = pinnacle || validBMs[0];
         const sharpOutcomes = sharpBM.markets[0].outcomes;
-        const overround   = sharpOutcomes.reduce((s, o) => s + 1 / o.price, 0);
+
+        // Ellenőrzés: minden kimenetelnek kell lennie a sharp BM-ben
+        if (sharpOutcomes.length < 2) continue;
+        const overround = sharpOutcomes.reduce((s, o) => s + 1 / o.price, 0);
+
+        // Overround sanity check: 1.0 és 1.15 közé kell esnie
+        if (overround < 1.0 || overround > 1.15) {
+          console.log(`    ✗ Hibás overround: ${overround.toFixed(3)} – kihagyva`);
+          continue;
+        }
 
         for (const sharpO of sharpOutcomes) {
           let bestOdds = 0, bestBM = "";
