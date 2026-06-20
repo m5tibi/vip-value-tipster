@@ -209,7 +209,63 @@ Válaszolj KIZÁRÓLAG JSON tömbként, semmi más szöveg nélkül:
   } catch (e) { console.error("AI tipp hiba:", e.message); return []; }
 }
 
-// ── Fő frissítő függvény ──────────────────────────────────
+// ── Automatikus eredményjelölés ───────────────────────────
+async function checkResults() {
+  if (!history.filter(t => t.result === "pending").length) return;
+  console.log("Eredmények ellenőrzése...");
+
+  for (const sportKey of Object.keys(SPORT_MAP)) {
+    try {
+      const url = `https://api.the-odds-api.com/v4/sports/${sportKey}/scores/?apiKey=${ODDS_API_KEY}&daysFrom=2`;
+      const r   = await fetch(url);
+      if (!r.ok) continue;
+      const games = await r.json();
+
+      for (const game of games) {
+        if (!game.completed || !game.scores) continue;
+
+        // Megkeressük a pending tippeket ehhez a meccshez
+        const pending = history.filter(t =>
+          t.result === "pending" &&
+          t.matchId === game.id
+        );
+        if (!pending.length) continue;
+
+        const homeTeam = game.home_team;
+        const awayTeam = game.away_team;
+        const homeScore = parseInt(game.scores.find(s => s.name === homeTeam)?.score || 0);
+        const awayScore = parseInt(game.scores.find(s => s.name === awayTeam)?.score || 0);
+
+        for (const tip of pending) {
+          let result = "lost";
+
+          if (tip.market === "1X2") {
+            if (tip.pick === homeTeam && homeScore > awayScore) result = "won";
+            else if (tip.pick === awayTeam && awayScore > homeScore) result = "won";
+            else if (tip.pick === "Draw" && homeScore === awayScore) result = "won";
+          } else if (tip.market.includes("Over") && tip.market.includes("gól")) {
+            const totalGoals = homeScore + awayScore;
+            const line = parseFloat(tip.market.match(/[\d.]+/)?.[0] || 0);
+            if (totalGoals > line) result = "won";
+          } else if (tip.market.includes("BTTS") || tip.market.includes("Mindkét")) {
+            if (homeScore > 0 && awayScore > 0) result = "won";
+          } else if (tip.market.includes("hendikep") || tip.market.includes("Hendikep")) {
+            const line = parseFloat(tip.pick.match(/-?[\d.]+/)?.[0] || 0);
+            if (tip.pick.includes(homeTeam) && (homeScore + line) > awayScore) result = "won";
+            else if (tip.pick.includes(awayTeam) && (awayScore + line) > homeScore) result = "won";
+          }
+          // Gólszerzős és egyéb AI tippek – manuális marad
+          else { continue; }
+
+          console.log(`  ${game.home_team} vs ${game.away_team}: ${tip.pick} → ${result} (${homeScore}-${awayScore})`);
+          history    = history.map(t => t.id === tip.id ? { ...t, result } : t);
+          latestTips = latestTips.map(t => t.id === tip.id ? { ...t, result } : t);
+          aiTips     = aiTips.map(t => t.id === tip.id ? { ...t, result } : t);
+        }
+      }
+    } catch (e) { console.error(`Scores hiba (${sportKey}):`, e.message); }
+  }
+}
 async function fetchAndProcess() {
   const now = new Date();
 
@@ -359,5 +415,10 @@ app.post("/api/stats/send", async (req, res) => {
 // ── Indítás ───────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`VIP Tipster fut: http://localhost:${PORT}`));
+
 fetchAndProcess();
 scheduleNextFetch();
+
+// Eredmények ellenőrzése óránként
+setInterval(checkResults, 60 * 60 * 1000);
+checkResults();
