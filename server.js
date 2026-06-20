@@ -327,6 +327,7 @@ async function fetchAndProcess() {
     msg += `<i>Forma és statisztika alapú javaslatok</i>\n\n`;
     newAiTips.forEach(t => {
       msg += `${t.sportLabel} <b>${t.match}</b>\n`;
+      if (t.commence) msg += `🕐 ${t.commence} (magyar idő)\n`;
       msg += `📌 ${t.market} → <b>${t.pick}</b>\n`;
       msg += `💰 Odds: ${t.odds}\n`;
       msg += `💡 ${t.note}\n\n`;
