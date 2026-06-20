@@ -99,7 +99,13 @@ async function fetchValueTips() {
         const hoursUntil = (start - now) / 3600000;
         if (hoursUntil < 0 || hoursUntil > 24) continue;
 
-        const alreadyTipped = new Set(history.filter(t => t.type === "value").map(t => t.matchId));
+        // Kizárjuk ha már adtunk value tippet erre a meccsre ma
+        const todayStr = new Date().toLocaleDateString("hu-HU");
+        const alreadyTipped = new Set(
+          history
+            .filter(t => t.type === "value" && t.addedAt?.startsWith(todayStr))
+            .map(t => t.matchId)
+        );
         if (alreadyTipped.has(game.id)) continue;
 
         const validBMs = (game.bookmakers || []).filter(bm =>
@@ -241,10 +247,19 @@ async function fetchAndProcess() {
   }
 
   const newAiTips = await fetchAiTips(matchList);
-  aiTips = newAiTips;
+
+  // AI duplikáció szűrő – ne adjon ma már tippelt meccsre új tippet
+  const todayStr = new Date().toLocaleDateString("hu-HU");
+  const todayAiMatches = new Set(
+    history
+      .filter(t => t.type === "ai" && t.addedAt?.startsWith(todayStr))
+      .map(t => t.match)
+  );
+  const filteredAiTips = newAiTips.filter(t => !todayAiMatches.has(t.match));
+  aiTips = filteredAiTips;
 
   const existingIds = new Set(history.map(t => t.id));
-  const fresh = [...valueTips, ...newAiTips].filter(t => !existingIds.has(t.id));
+  const fresh = [...valueTips, ...filteredAiTips].filter(t => !existingIds.has(t.id));
   if (fresh.length) { history = [...fresh, ...history]; saveHistory(); }
 
   let msg = `🏆 <b>VIP Value Tipster – ${new Date().toLocaleString("hu-HU")}</b>\n\n`;
@@ -262,9 +277,9 @@ async function fetchAndProcess() {
     msg += `📊 <b>VALUE TIPPEK</b>\nMa nincs +6% feletti value lehetőség.\n\n`;
   }
 
-  if (newAiTips.length) {
+  if (filteredAiTips.length) {
     msg += `🤖 <b>AI ELEMZETT TIPPEK</b>\n<i>Web keresés alapú, forma és statisztika elemzéssel</i>\n\n`;
-    newAiTips.forEach(t => {
+    filteredAiTips.forEach(t => {
       msg += `${t.sportLabel} <b>${t.match}</b>\n`;
       if (t.commence) msg += `🕐 ${t.commence} (magyar idő)\n`;
       msg += `📌 ${t.market} → <b>${t.pick}</b>\n`;
