@@ -7,58 +7,62 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #07111d; color: #e0f7fa; font-family: sans-serif; padding: 18px 14px; }
-  .wrap { max-width: 700px; margin: 0 auto; }
+  .wrap { max-width: 720px; margin: 0 auto; }
   .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
   .title { font-size: 20px; font-weight: 700; color: #00e676; }
   .sub { font-size: 11px; color: #546e7a; }
   .header-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .cd { font-size: 12px; color: #546e7a; background: #0d1b2a; border: 1px solid #1e3a2f; border-radius: 8px; padding: 4px 10px; }
   .cd b { color: #ffe082; }
-  button { cursor: pointer; font-family: sans-serif; }
-  .btn-icon { background: #0d1b2a; color: #80cbc4; border: 1px solid #1e3a2f; border-radius: 8px; padding: 6px 12px; font-size: 13px; }
-  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
-  .tab { background: #0d1b2a; color: #80cbc4; border: 1px solid #1e3a2f; border-radius: 8px; padding: 7px 18px; font-weight: 700; font-size: 14px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tab { background: #0d1b2a; color: #80cbc4; border: 1px solid #1e3a2f; border-radius: 8px; padding: 7px 18px; font-weight: 700; font-size: 14px; cursor: pointer; }
   .tab.active { background: #00e676; color: #07111d; border-color: #00e676; }
-  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
   .last-update { font-size: 12px; color: #546e7a; }
-  .btn-refresh { background: #00e676; color: #07111d; border: none; border-radius: 10px; padding: 9px 20px; font-weight: 700; font-size: 14px; }
+  .btn-refresh { background: #00e676; color: #07111d; border: none; border-radius: 10px; padding: 9px 20px; font-weight: 700; font-size: 14px; cursor: pointer; }
   .btn-refresh:disabled { background: #1b3a2a; color: #80cbc4; cursor: not-allowed; }
-  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .section-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .section-sub { font-size: 11px; color: #546e7a; margin-bottom: 12px; }
+  .divider { border: none; border-top: 1px solid #1e3a2f; margin: 20px 0; }
+  /* Stats grid */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 16px; }
   .stat-card { background: #0d1b2a; border: 1px solid #1e3a2f; border-radius: 10px; padding: 10px 8px; text-align: center; }
   .stat-label { font-size: 11px; color: #546e7a; }
   .stat-value { font-size: 20px; font-weight: 700; color: #00e676; }
-  .filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
-  .filter-btn { background: #0d1b2a; color: #80cbc4; border: 1px solid #1e3a2f; border-radius: 8px; padding: 4px 12px; font-weight: 600; font-size: 12px; }
-  .filter-btn.active { background: #00e676; color: #07111d; }
-  .filter-live { background: #0d1b2a; color: #ef9a9a; border: 1px solid #3a1a1a; border-radius: 8px; padding: 4px 12px; font-weight: 600; font-size: 12px; }
-  .filter-live.active { background: #e53935; color: #fff; }
-  .tip-card { background: linear-gradient(135deg,#0d1b2a 80%,#0a2a1a 100%); border: 1px solid #1e3a2f; border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
+  /* Tip cards */
+  .tip-card { border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
+  .tip-card.value { background: linear-gradient(135deg,#0d1b2a 80%,#0a2a1a 100%); border: 1px solid #1e3a2f; }
+  .tip-card.ai    { background: linear-gradient(135deg,#0d1b2a 80%,#1a1a2a 100%); border: 1px solid #2a1e3f; }
   .tip-top { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
-  .sport-label { font-size: 14px; color: #80cbc4; }
   .tip-match { color: #e0f7fa; font-weight: 700; font-size: 15px; margin-bottom: 4px; }
   .tip-market { background: #1b3a3a; border-radius: 6px; padding: 2px 9px; margin-right: 6px; color: #80cbc4; font-size: 13px; }
   .tip-pick { color: #b2dfdb; font-size: 13px; }
-  .tip-odds { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: #90a4ae; margin: 6px 0; }
-  .tip-note { color: #546e7a; font-size: 11px; margin-top: 4px; }
+  .tip-odds-row { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: #90a4ae; margin: 6px 0; }
+  .tip-note { color: #78909c; font-size: 12px; margin-top: 6px; line-height: 1.5; }
+  .tip-kelly { font-size: 12px; color: #ffe082; margin-top: 4px; }
   .tip-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  /* Badges */
   .bdg { border-radius: 6px; font-weight: 700; font-size: 12px; padding: 2px 9px; display: inline-block; }
-  .bdg-live { background: #e53935; color: #fff; }
-  .bdg-pre  { background: #1565c0; color: #90caf9; }
-  .bdg-v    { color: #0a2a1a; }
-  .bdg-c0   { background: #37474f; color: #b0bec5; }
-  .bdg-c1   { background: #e65100; color: #ffe082; }
-  .bdg-c2   { background: #1b5e20; color: #69f0ae; }
-  .bdg-won  { background: #1b5e20; color: #69f0ae; }
-  .bdg-lost { background: #7f0000; color: #ef9a9a; }
-  .bdg-pend { background: #263238; color: #78909c; }
-  .btn-won  { background: #1b5e20; color: #69f0ae; border: none; border-radius: 6px; padding: 3px 12px; font-size: 12px; font-weight: 600; }
-  .btn-lost { background: #7f0000; color: #ef9a9a; border: none; border-radius: 6px; padding: 3px 12px; font-size: 12px; font-weight: 600; }
-  .empty { text-align: center; color: #37474f; padding: 50px; }
+  .bdg-value { background: #1b3a2a; color: #00e676; }
+  .bdg-ai    { background: #2a1e3f; color: #b39ddb; }
+  .bdg-pre   { background: #1565c0; color: #90caf9; }
+  .bdg-live  { background: #e53935; color: #fff; }
+  .bdg-won   { background: #1b5e20; color: #69f0ae; }
+  .bdg-lost  { background: #7f0000; color: #ef9a9a; }
+  .bdg-pend  { background: #263238; color: #78909c; }
+  .bdg-v     { color: #0a2a1a; }
+  .bdg-c0    { background: #37474f; color: #b0bec5; }
+  .bdg-c1    { background: #e65100; color: #ffe082; }
+  .bdg-c2    { background: #1b5e20; color: #69f0ae; }
+  /* Buttons */
+  .btn-won  { background: #1b5e20; color: #69f0ae; border: none; border-radius: 6px; padding: 3px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .btn-lost { background: #7f0000; color: #ef9a9a; border: none; border-radius: 6px; padding: 3px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .btn-send { background: #1e3a2f; color: #00e676; border: 1px solid #00e676; border-radius: 8px; padding: 6px 14px; font-weight: 600; font-size: 13px; cursor: pointer; }
+  .empty { text-align: center; color: #37474f; padding: 30px; font-size: 14px; }
+  .no-value { background: #0d1b2a; border: 1px solid #1e3a2f; border-radius: 10px; padding: 14px 16px; color: #546e7a; font-size: 13px; margin-bottom: 12px; }
   .tg-status { background: #0d1b2a; border: 1px solid #1e3a2f; border-radius: 8px; padding: 8px 14px; margin-bottom: 12px; font-size: 13px; color: #00e676; }
-  .day-header { color: #546e7a; font-size: 12px; margin-bottom: 6px; border-bottom: 1px solid #1e3a2f; padding-bottom: 4px; margin-top: 8px; }
+  .day-header { color: #546e7a; font-size: 12px; margin-bottom: 6px; border-bottom: 1px solid #1e3a2f; padding-bottom: 4px; margin-top: 12px; }
   .stats-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
-  .stats-title { font-weight: 700; color: #00e676; font-size: 16px; }
-  .btn-send { background: #1e3a2f; color: #00e676; border: 1px solid #00e676; border-radius: 8px; padding: 6px 14px; font-weight: 600; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -69,8 +73,8 @@
       <div class="sub" id="today"></div>
     </div>
     <div class="header-right">
-      <div class="cd">⏱ Következő: <b id="countdown">–</b></div>
-      <div class="cd" id="fetch-schedule" style="font-size:10px"></div>
+      <div class="cd">⏱ <b id="countdown">–</b></div>
+      <div class="cd" id="fetch-schedule" style="font-size:10px;color:#546e7a"></div>
     </div>
   </div>
 
@@ -78,7 +82,7 @@
 
   <div class="tabs">
     <button class="tab active" onclick="switchTab('tips')">📊 Mai tippek</button>
-    <button class="tab" onclick="switchTab('history')" id="tab-history">📁 Előzmények</button>
+    <button class="tab" onclick="switchTab('history')">📁 Előzmények</button>
   </div>
 
   <!-- TIPS TAB -->
@@ -87,26 +91,24 @@
       <div class="last-update" id="last-update">Még nem futott elemzés</div>
       <button class="btn-refresh" id="btn-refresh" onclick="refresh()">🔄 Frissítés most</button>
     </div>
-    <div class="stats-grid" id="tip-stats" style="display:none">
-      <div class="stat-card"><div class="stat-label">Összes</div><div class="stat-value" id="s-total">0</div></div>
-      <div class="stat-card"><div class="stat-label">Élő</div><div class="stat-value" id="s-live">0</div></div>
-      <div class="stat-card"><div class="stat-label">Átl. value</div><div class="stat-value" id="s-avg">–</div></div>
-      <div class="stat-card"><div class="stat-label">Magas biz.</div><div class="stat-value" id="s-high">0</div></div>
-    </div>
-    <div class="filters">
-      <button class="filter-btn active" onclick="setFilter('all',this)">Mind</button>
-      <button class="filter-btn" onclick="setFilter('soccer',this)">⚽ Foci</button>
-      <button class="filter-btn" onclick="setFilter('basketball',this)">🏀 Kosár</button>
-      <button class="filter-btn" onclick="setFilter('hockey',this)">🏒 Jégkorong</button>
-      <button class="filter-live" id="btn-live" onclick="toggleLive()">● Csak élő</button>
-    </div>
-    <div id="tips-list"><div class="empty">Kattints a "Frissítés most" gombra.</div></div>
+
+    <!-- VALUE szekció -->
+    <div class="section-title" style="color:#00e676">📊 Value tippek</div>
+    <div class="section-sub">Pinnacle-alapú matematikai piaci előny (+6% felett)</div>
+    <div id="value-list"><div class="no-value">Kattints a frissítésre...</div></div>
+
+    <hr class="divider">
+
+    <!-- AI szekció -->
+    <div class="section-title" style="color:#b39ddb">🤖 AI elemzett tippek</div>
+    <div class="section-sub">Valós web keresés alapján, forma és statisztika elemzéssel</div>
+    <div id="ai-list"><div class="no-value">Kattints a frissítésre...</div></div>
   </div>
 
   <!-- HISTORY TAB -->
   <div id="tab-history-panel" style="display:none">
     <div class="stats-header">
-      <div class="stats-title">📊 Előzmény & statisztika</div>
+      <div style="font-weight:700;color:#00e676;font-size:16px">📊 Előzmény & statisztika</div>
       <button class="btn-send" onclick="sendStats()">📲 Küldés Telegramon</button>
     </div>
     <div class="stats-grid">
@@ -114,7 +116,7 @@
       <div class="stat-card"><div class="stat-label">Nyert</div><div class="stat-value" style="color:#69f0ae" id="h-won">0</div></div>
       <div class="stat-card"><div class="stat-label">Vesztett</div><div class="stat-value" style="color:#ef9a9a" id="h-lost">0</div></div>
       <div class="stat-card"><div class="stat-label">Folyamatban</div><div class="stat-value" style="color:#90caf9" id="h-pend">0</div></div>
-      <div class="stat-card"><div class="stat-label">Átl. value</div><div class="stat-value" style="color:#ffe082" id="h-avg">–</div></div>
+      <div class="stat-card"><div class="stat-label">Value átlag</div><div class="stat-value" style="color:#ffe082" id="h-avg">–</div></div>
       <div class="stat-card"><div class="stat-label">Win %</div><div class="stat-value" style="color:#a5d6a7" id="h-wr">–</div></div>
     </div>
     <div id="history-list"><div class="empty">Még nincsenek rögzített tippek.</div></div>
@@ -122,8 +124,8 @@
 </div>
 
 <script>
-let tips = [], history = [], filterSport = "all", liveOnly = false;
-let countdown = 15 * 60;
+let valueTips = [], aiTips = [], history = [];
+let msRemaining = 0;
 
 document.getElementById("today").textContent = new Date().toLocaleDateString("hu-HU", { year:"numeric", month:"long", day:"numeric" });
 
@@ -134,30 +136,106 @@ function showStatus(msg) {
 }
 
 function switchTab(t) {
-  document.getElementById("tab-tips").style.display           = t === "tips" ? "" : "none";
-  document.getElementById("tab-history-panel").style.display  = t === "history" ? "" : "none";
-  document.querySelectorAll(".tab").forEach((b,i) => b.classList.toggle("active", (i===0) === (t==="tips")));
+  document.getElementById("tab-tips").style.display          = t === "tips" ? "" : "none";
+  document.getElementById("tab-history-panel").style.display = t === "history" ? "" : "none";
+  document.querySelectorAll(".tab").forEach((b,i) => b.classList.toggle("active", (i===0)===(t==="tips")));
   if (t === "history") loadHistory();
+}
+
+function valueBg(v) { return v >= 15 ? "#00e676" : v >= 8 ? "#69f0ae" : "#b9f6ca"; }
+function confCls(c) { return ["bdg-c0","bdg-c1","bdg-c2"][c] || "bdg-c0"; }
+function confLabel(c) { return ["Alacsony","Közepes","Magas"][c] || ""; }
+
+function resBadge(r) {
+  if (!r || r==="pending") return `<span class="bdg bdg-pend">⏳ Folyamatban</span>`;
+  return r==="won" ? `<span class="bdg bdg-won">✅ Nyert</span>` : `<span class="bdg bdg-lost">❌ Vesztett</span>`;
+}
+
+function valueTipHTML(t, showResult) {
+  return `
+  <div class="tip-card value">
+    <div class="tip-top">
+      <span class="bdg bdg-value">📊 VALUE</span>
+      <span style="font-size:13px;color:#80cbc4">${t.sportLabel}</span>
+      <span class="bdg ${confCls(t.confidence)}">${confLabel(t.confidence)}</span>
+      <span class="bdg bdg-v" style="background:${valueBg(t.value)};margin-left:auto">+${t.value.toFixed(1)}%</span>
+    </div>
+    <div class="tip-match">${t.match}</div>
+    <div style="margin-bottom:6px"><span class="tip-market">${t.market}</span><span class="tip-pick">${t.pick}</span></div>
+    <div class="tip-odds-row">
+      <span>Odds: <b style="color:#00e676">${t.odds}</b></span>
+      <span>Fair: <b style="color:#fff">${t.fairOdds}</b></span>
+      <span>Valószínűség: <b style="color:#fff">${t.prob}%</b></span>
+    </div>
+    ${t.kelly ? `<div class="tip-kelly">📐 Kelly tét: <b>${t.kelly}%</b> a bankrollból</div>` : ""}
+    <div class="tip-note">${t.note}</div>
+    ${showResult ? `<div class="tip-actions">${resBadge(t.result)}${(!t.result||t.result==="pending")?`
+      <button class="btn-won" onclick="setResult('${t.id}','won')">✅ Nyert</button>
+      <button class="btn-lost" onclick="setResult('${t.id}','lost')">❌ Vesztett</button>`:""}</div>` : ""}
+  </div>`;
+}
+
+function aiTipHTML(t, showResult) {
+  return `
+  <div class="tip-card ai">
+    <div class="tip-top">
+      <span class="bdg bdg-ai">🤖 AI</span>
+      <span style="font-size:13px;color:#b39ddb">${t.sportLabel}</span>
+      <span class="bdg bdg-pre" style="margin-left:auto">PRE-MATCH</span>
+    </div>
+    <div class="tip-match">${t.match}</div>
+    <div style="margin-bottom:6px"><span class="tip-market">${t.market}</span><span class="tip-pick">${t.pick}</span></div>
+    <div class="tip-odds-row">
+      <span>Odds: <b style="color:#b39ddb">${t.odds}</b></span>
+    </div>
+    <div class="tip-note">💡 ${t.note}</div>
+    ${showResult ? `<div class="tip-actions">${resBadge(t.result)}${(!t.result||t.result==="pending")?`
+      <button class="btn-won" onclick="setResult('${t.id}','won')">✅ Nyert</button>
+      <button class="btn-lost" onclick="setResult('${t.id}','lost')">❌ Vesztett</button>`:""}</div>` : ""}
+  </div>`;
+}
+
+function renderTips() {
+  const vEl = document.getElementById("value-list");
+  const aEl = document.getElementById("ai-list");
+
+  vEl.innerHTML = valueTips.length
+    ? valueTips.map(t => valueTipHTML(t, false)).join("")
+    : `<div class="no-value">📭 Ma nincs +6% feletti value lehetőség. A piac hatékonyan áraz.</div>`;
+
+  aEl.innerHTML = aiTips.length
+    ? aiTips.map(t => aiTipHTML(t, false)).join("")
+    : `<div class="no-value">🤖 AI elemzés folyamatban...</div>`;
 }
 
 async function refresh() {
   const btn = document.getElementById("btn-refresh");
-  btn.disabled = true; btn.textContent = "Keresés...";
+  btn.disabled = true; btn.textContent = "Elemzés folyamatban...";
   try {
     const r = await fetch("/api/refresh", { method: "POST" });
     const d = await r.json();
-    showStatus(d.count > 0 ? `✅ ${d.count} value tipp találva, Telegram elküldve` : "🔍 Nincs value tipp most");
+    showStatus(`✅ ${d.valueTips} value + ${d.aiTips} AI tipp`);
     await loadTips();
   } catch(e) { showStatus("⚠️ Hiba: " + e.message); }
   btn.disabled = false; btn.textContent = "🔄 Frissítés most";
-  countdown = 15 * 60;
+  msRemaining = 0;
 }
 
 async function loadTips() {
   const r = await fetch("/api/tips");
-  tips = await r.json();
+  const d = await r.json();
+  valueTips = d.valueTips || [];
+  aiTips    = d.aiTips || [];
   document.getElementById("last-update").textContent = "Frissítve: " + new Date().toLocaleTimeString("hu-HU");
   renderTips();
+}
+
+async function loadStatus() {
+  const r = await fetch("/api/status");
+  const d = await r.json();
+  msRemaining = d.nextFetchMs;
+  const hours = d.fetchHours.join(":00, ") + ":00";
+  document.getElementById("fetch-schedule").textContent = `Mai lekérések: ${hours}`;
 }
 
 async function loadHistory() {
@@ -166,59 +244,12 @@ async function loadHistory() {
   renderHistory();
 }
 
-function valueBg(v) { return v >= 15 ? "#00e676" : v >= 8 ? "#69f0ae" : "#b9f6ca"; }
-
-function tipCardHTML(t, showResult) {
-  const conf = ["Alacsony","Közepes","Magas"][t.confidence];
-  const confCls = ["bdg-c0","bdg-c1","bdg-c2"][t.confidence];
-  const resBadge = !t.result || t.result==="pending"
-    ? `<span class="bdg bdg-pend">⏳ Folyamatban</span>`
-    : t.result==="won" ? `<span class="bdg bdg-won">✅ Nyert</span>` : `<span class="bdg bdg-lost">❌ Vesztett</span>`;
-  const actions = showResult && (!t.result || t.result==="pending")
-    ? `<button class="btn-won" onclick="setResult('${t.id}','won')">✅ Nyert</button>
-       <button class="btn-lost" onclick="setResult('${t.id}','lost')">❌ Vesztett</button>`
-    : "";
-  return `
-  <div class="tip-card">
-    <div class="tip-top">
-      <span class="sport-label">${t.sportLabel}</span>
-      <span class="bdg ${t.live ? "bdg-live" : "bdg-pre"}">${t.live ? "● ÉLŐ" : "PRE-MATCH"}</span>
-      <span class="bdg ${confCls}">${conf}</span>
-      <span class="bdg bdg-v" style="background:${valueBg(t.value)};margin-left:auto">+${t.value.toFixed(1)}% value</span>
-    </div>
-    <div class="tip-match">${t.match}</div>
-    <div style="margin-bottom:8px"><span class="tip-market">${t.market}</span><span class="tip-pick">${t.pick}</span></div>
-    <div class="tip-odds">
-      <span>Odds: <b style="color:#00e676">${t.odds}</b></span>
-      <span>Fair: <b style="color:#fff">${t.fairOdds}</b></span>
-      <span>Valószínűség: <b style="color:#fff">${t.prob}%</b></span>
-    </div>
-    <div class="tip-note">${t.note}</div>
-    ${showResult ? `<div class="tip-actions">${resBadge}${actions}</div>` : ""}
-  </div>`;
-}
-
-function renderTips() {
-  const filtered = tips.filter(t => (filterSport==="all"||t.sport===filterSport) && (!liveOnly||t.live));
-  const el = document.getElementById("tips-list");
-  if (!filtered.length) { el.innerHTML = '<div class="empty">Nincs találat a szűrőknek megfelelően.</div>'; }
-  else el.innerHTML = filtered.map(t => tipCardHTML(t, false)).join("");
-
-  const statEl = document.getElementById("tip-stats");
-  if (tips.length) {
-    statEl.style.display = "";
-    document.getElementById("s-total").textContent = tips.length;
-    document.getElementById("s-live").textContent  = tips.filter(t=>t.live).length;
-    document.getElementById("s-avg").textContent   = (tips.reduce((s,t)=>s+t.value,0)/tips.length).toFixed(1)+"%";
-    document.getElementById("s-high").textContent  = tips.filter(t=>t.confidence===2).length;
-  } else statEl.style.display = "none";
-}
-
 function renderHistory() {
-  const won  = history.filter(t=>t.result==="won").length;
-  const lost = history.filter(t=>t.result==="lost").length;
-  const pend = history.filter(t=>!t.result||t.result==="pending").length;
-  const avg  = history.length ? (history.reduce((s,t)=>s+t.value,0)/history.length).toFixed(1) : "–";
+  const won  = history.filter(t => t.result==="won").length;
+  const lost = history.filter(t => t.result==="lost").length;
+  const pend = history.filter(t => !t.result||t.result==="pending").length;
+  const vTips = history.filter(t => t.value);
+  const avg  = vTips.length ? (vTips.reduce((s,t)=>s+t.value,0)/vTips.length).toFixed(1) : "–";
   const wr   = (won+lost) ? ((won/(won+lost))*100).toFixed(0)+"%" : "–";
   document.getElementById("h-total").textContent = history.length;
   document.getElementById("h-won").textContent   = won;
@@ -232,7 +263,7 @@ function renderHistory() {
   const el = document.getElementById("history-list");
   if (!history.length) { el.innerHTML = '<div class="empty">Még nincsenek rögzített tippek.</div>'; return; }
   el.innerHTML = Object.keys(byDay).sort((a,b)=>b.localeCompare(a)).map(day =>
-    `<div class="day-header">${day}</div>${byDay[day].map(t=>tipCardHTML(t,true)).join("")}`
+    `<div class="day-header">${day}</div>${byDay[day].map(t => t.type==="ai" ? aiTipHTML(t,true) : valueTipHTML(t,true)).join("")}`
   ).join("");
 }
 
@@ -246,37 +277,12 @@ async function sendStats() {
   showStatus("✅ Statisztika elküldve Telegramon");
 }
 
-function setFilter(sport, btn) {
-  filterSport = sport;
-  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  renderTips();
-}
-
-function toggleLive() {
-  liveOnly = !liveOnly;
-  document.getElementById("btn-live").classList.toggle("active", liveOnly);
-  renderTips();
-}
-
-// Visszaszámláló a szerver alapján
-let msRemaining = 0;
-async function loadStatus() {
-  const r = await fetch("/api/status");
-  const d = await r.json();
-  msRemaining = d.nextFetchMs;
-  const hours = d.fetchHours.join(":00, ") + ":00";
-  document.getElementById("fetch-schedule").textContent = `Mai lekérések: ${hours}`;
-}
-
+// Visszaszámláló
 setInterval(() => {
   msRemaining = Math.max(0, msRemaining - 1000);
-  const totalSec = Math.floor(msRemaining / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  document.getElementById("countdown").textContent =
-    h > 0 ? `${h}ó ${m}p` : `${m}:${String(s).padStart(2,"0")}`;
+  const s = Math.floor(msRemaining/1000);
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  document.getElementById("countdown").textContent = h > 0 ? `${h}ó ${m}p` : `${m}:${String(sec).padStart(2,"0")}`;
 }, 1000);
 
 loadStatus();
