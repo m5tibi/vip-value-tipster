@@ -41,7 +41,11 @@ let db         = null;
 // ── MongoDB kapcsolat ─────────────────────────────────────
 async function connectDB() {
   try {
-    const client = new MongoClient(MONGODB_URI);
+    const client = new MongoClient(MONGODB_URI, {
+      tls: true,
+      tlsAllowInvalidCertificates: false,
+      serverSelectionTimeoutMS: 10000,
+    });
     await client.connect();
     db = client.db("tipster");
     console.log("MongoDB kapcsolódva ✓");
@@ -49,6 +53,7 @@ async function connectDB() {
     console.log(`History betöltve: ${history.length} tipp`);
   } catch (e) {
     console.error("MongoDB hiba:", e.message);
+    console.log("Folytatás MongoDB nélkül – history nem perzisztens");
   }
 }
 
@@ -208,12 +213,14 @@ Válaszolj KIZÁRÓLAG JSON tömbként:
         messages: [{ role: "user", content: prompt }]
       })
     });
-    const data  = await r.json();
-    const block = data.content?.find(b => b.type === "text");
+    const data   = await r.json();
+    // Az utolsó text blokkot keressük (web search után ez tartalmazza a JSON-t)
+    const blocks = data.content?.filter(b => b.type === "text") || [];
+    const block  = blocks[blocks.length - 1];
     if (!block) { console.log("AI: nincs text blokk"); return []; }
-    const match = block.text.match(/\[[\s\S]*\]/);
-    if (!match) { console.log("AI: nem sikerült JSON-t kinyerni"); return []; }
-    return JSON.parse(match[0]).map(t => ({
+    const found = block.text.match(/\[[\s\S]*\]/);
+    if (!found) { console.log("AI: nem sikerült JSON-t kinyerni\n" + block.text.slice(0, 300)); return []; }
+    return JSON.parse(found[0]).map(t => ({
       id: `ai-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
       type: "ai", sport: t.sport, sportLabel: t.sportLabel,
       match: t.match, commence: t.commence || null,
