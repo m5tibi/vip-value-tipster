@@ -2,6 +2,9 @@ const express = require("express");
 const fetch   = require("node-fetch");
 const path    = require("path");
 
+const fs   = require("fs");
+const path = require("path");
+
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
@@ -11,6 +14,22 @@ const TG_BOT_TOKEN  = process.env.TG_BOT_TOKEN;
 const TG_CHAT_ID    = process.env.TG_CHAT_ID;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const EOD_HOUR      = 23;
+const DATA_FILE     = path.join(__dirname, "data", "history.json");
+
+// ── Perzisztens tárolás ───────────────────────────────────
+function loadHistory() {
+  try {
+    if (!fs.existsSync(path.dirname(DATA_FILE))) fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
+    if (!fs.existsSync(DATA_FILE)) return [];
+    return JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+  } catch (e) { console.error("History betöltési hiba:", e.message); return []; }
+}
+
+function saveHistory() {
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(history, null, 2), "utf8");
+  } catch (e) { console.error("History mentési hiba:", e.message); }
+}
 
 const SPORT_MAP = {
   "soccer_fifa_world_cup":             { sport: "soccer",     label: "⚽ FIFA VB 2026",      minValue: 6 },
@@ -31,9 +50,10 @@ const SPORT_MAP = {
 
 const EXCLUDED_BM = ["betfair_ex_eu", "betfair_ex_uk", "matchbook"];
 
-let latestTips   = [];
-let aiTips       = [];
-let history      = [];
+let latestTips = [];
+let aiTips     = [];
+let history    = loadHistory();
+console.log(`History betöltve: ${history.length} tipp`);
 
 // ── Magyar idő ────────────────────────────────────────────
 function getHungarianTime() {
@@ -264,6 +284,7 @@ async function checkResults() {
           history    = history.map(t => t.id === tip.id ? { ...t, result } : t);
           latestTips = latestTips.map(t => t.id === tip.id ? { ...t, result } : t);
           aiTips     = aiTips.map(t => t.id === tip.id ? { ...t, result } : t);
+          saveHistory();
         }
       }
     } catch (e) { console.error(`Scores hiba (${sportKey}):`, e.message); }
@@ -321,10 +342,9 @@ async function fetchAndProcess() {
   const newAiTips = await fetchAiTips(matchList);
   aiTips = newAiTips;
 
-  // 4. History frissítés
-  const allNew = [...valueTips, ...newAiTips];
   const existingIds = new Set(history.map(t => t.id));
-  history = [...allNew.filter(t => !existingIds.has(t.id)), ...history];
+  const fresh = [...valueTips, ...newAiTips].filter(t => !existingIds.has(t.id));
+  if (fresh.length) { history = [...fresh, ...history]; saveHistory(); }
 
   // 5. Telegram üzenet
   let msg = `🏆 <b>VIP Value Tipster – ${new Date().toLocaleString("hu-HU")}</b>\n\n`;
@@ -423,6 +443,7 @@ app.patch("/api/history/:id", (req, res) => {
   history    = history.map(t => t.id === req.params.id ? { ...t, result } : t);
   latestTips = latestTips.map(t => t.id === req.params.id ? { ...t, result } : t);
   aiTips     = aiTips.map(t => t.id === req.params.id ? { ...t, result } : t);
+  saveHistory();
   res.json({ ok: true });
 });
 
