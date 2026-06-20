@@ -193,9 +193,8 @@ function scheduleNextFetch() {
 
 // ── Napi 23:00 statisztika ────────────────────────────────
 setInterval(() => {
-  const huHour = hungarianHour();
-  const huMin  = parseInt(new Date().toLocaleString("en-US", { timeZone: "Europe/Budapest", minute: "numeric" }));
-  if (huHour === EOD_HOUR && huMin === 0) {
+  const { hour, minute } = getHungarianTime();
+  if (hour === EOD_HOUR && minute === 0) {
     const won  = history.filter(t => t.result === "won").length;
     const lost = history.filter(t => t.result === "lost").length;
     const avg  = history.length ? (history.reduce((s,t) => s+t.value,0)/history.length).toFixed(1) : 0;
