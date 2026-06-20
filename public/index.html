@@ -161,6 +161,7 @@ function valueTipHTML(t, showResult) {
       <span class="bdg bdg-v" style="background:${valueBg(t.value)};margin-left:auto">+${t.value.toFixed(1)}%</span>
     </div>
     <div class="tip-match">${t.match}</div>
+    ${t.commence ? `<div style="font-size:11px;color:#546e7a;margin-bottom:6px">🕐 ${t.commence} (magyar idő)</div>` : ""}
     <div style="margin-bottom:6px"><span class="tip-market">${t.market}</span><span class="tip-pick">${t.pick}</span></div>
     <div class="tip-odds-row">
       <span>Odds: <b style="color:#00e676">${t.odds}</b></span>
@@ -184,6 +185,7 @@ function aiTipHTML(t, showResult) {
       <span class="bdg bdg-pre" style="margin-left:auto">PRE-MATCH</span>
     </div>
     <div class="tip-match">${t.match}</div>
+    ${t.commence ? `<div style="font-size:11px;color:#546e7a;margin-bottom:6px">🕐 ${t.commence} (magyar idő)</div>` : ""}
     <div style="margin-bottom:6px"><span class="tip-market">${t.market}</span><span class="tip-pick">${t.pick}</span></div>
     <div class="tip-odds-row">
       <span>Odds: <b style="color:#b39ddb">${t.odds}</b></span>
