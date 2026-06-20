@@ -143,28 +143,32 @@ async function fetchAiTips(matchList) {
     `- ${m.sport} | ${m.match} | Kezdés: ${m.commence}`
   ).join("\n");
 
-  const prompt = `Te egy profi sportfogadási elemző vagy. Az alábbi mai meccsekre adj 2-3 konkrét fogadási tippet elemzés alapján.
+  const prompt = `Te egy profi sportfogadási elemző vagy. Használj web keresést hogy megtudd az aktuális formát, sérüléseket, és keretinformációkat az alábbi mai meccsekre, majd adj 2-3 konkrét fogadási tippet.
 
 Mai meccsek:
 ${matchText}
 
+Lépések:
+1. Keress rá minden meccsre hogy megtudd az aktuális keretet, sérüléseket, formát
+2. Az információk alapján adj megalapozott tippeket
+
 Szabályok:
-- Csak OVER típusú vagy pozitív kimenetelű tippek (pl. over gólok, szögletek, lapok, gólszerzők, hendikep, győzelem)
+- Csak OVER típusú vagy pozitív kimenetelű tippek (over gólok, szögletek, lapszám, gólszerzők, hendikep győzelem)
 - NE adj under típusú tippet
 - Reális odds tartomány: 1.50 - 4.00
-- Adj rövid (2-3 mondatos) magyar nyelvű indoklást minden tipphez
-- Csak olyan piacokat javasolj, ami logikus az adott meccshez
+- Adj rövid (2-3 mondatos) magyar nyelvű indoklást VALÓS adatok alapján
+- Csak olyan piacokat javasolj ami logikus az adott meccshez
 
-Válaszolj KIZÁRÓLAG JSON tömbként:
+Válaszolj KIZÁRÓLAG JSON tömbként, semmi más szöveg nélkül:
 [
   {
     "match": "Csapat A vs Csapat B",
     "sport": "soccer",
     "sportLabel": "⚽ FIFA VB 2026",
-    "market": "pl. Over 2.5 gól / Szögletek Over 9.5 / Hazai győzelem -1 hendikep",
+    "market": "pl. Over 2.5 gól",
     "pick": "konkrét tipp neve",
     "odds": 1.85,
-    "note": "Magyar indoklás 2-3 mondatban."
+    "note": "Magyar indoklás 2-3 mondatban, valós adatokra hivatkozva."
   }
 ]`;
 
@@ -174,7 +178,8 @@ Válaszolj KIZÁRÓLAG JSON tömbként:
       headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 2000,
+        max_tokens: 4000,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
         messages: [{ role: "user", content: prompt }]
       })
     });
