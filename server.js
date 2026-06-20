@@ -12,19 +12,23 @@ const TG_CHAT_ID   = process.env.TG_CHAT_ID;
 const EOD_HOUR     = 23;
 
 const SPORT_MAP = {
-  "soccer_fifa_world_cup":      { sport: "soccer",     label: "⚽ FIFA VB 2026" },
-  "soccer_uefa_champs_league":  { sport: "soccer",     label: "⚽ BL" },
-  "soccer_epl":                 { sport: "soccer",     label: "⚽ Premier League" },
-  "soccer_germany_bundesliga":  { sport: "soccer",     label: "⚽ Bundesliga" },
-  "soccer_spain_la_liga":       { sport: "soccer",     label: "⚽ La Liga" },
-  "soccer_italy_serie_a":       { sport: "soccer",     label: "⚽ Serie A" },
-  "soccer_france_ligue_one":    { sport: "soccer",     label: "⚽ Ligue 1" },
-  "soccer_conmebol_copa_libertadores": { sport: "soccer", label: "⚽ Copa Libertadores" },
-  "basketball_nba":             { sport: "basketball", label: "🏀 NBA" },
-  "basketball_wnba":            { sport: "basketball", label: "🏀 WNBA" },
-  "basketball_euroleague":      { sport: "basketball", label: "🏀 Euroleague" },
-  "icehockey_nhl":              { sport: "hockey",     label: "🏒 NHL" },
-  "icehockey_ahl":              { sport: "hockey",     label: "🏒 AHL" },
+  // Mély, megbízható piacok – alacsonyabb küszöb
+  "soccer_fifa_world_cup":             { sport: "soccer",     label: "⚽ FIFA VB 2026",       minValue: 3 },
+  "soccer_uefa_champs_league":         { sport: "soccer",     label: "⚽ BL",                  minValue: 3 },
+  "soccer_epl":                        { sport: "soccer",     label: "⚽ Premier League",       minValue: 3.5 },
+  "soccer_germany_bundesliga":         { sport: "soccer",     label: "⚽ Bundesliga",           minValue: 3.5 },
+  "soccer_spain_la_liga":              { sport: "soccer",     label: "⚽ La Liga",              minValue: 3.5 },
+  "soccer_italy_serie_a":              { sport: "soccer",     label: "⚽ Serie A",              minValue: 3.5 },
+  "soccer_france_ligue_one":           { sport: "soccer",     label: "⚽ Ligue 1",              minValue: 3.5 },
+  // Közepes piacok
+  "soccer_conmebol_copa_libertadores": { sport: "soccer",     label: "⚽ Copa Libertadores",    minValue: 5 },
+  "basketball_nba":                    { sport: "basketball", label: "🏀 NBA",                  minValue: 4 },
+  "icehockey_nhl":                     { sport: "hockey",     label: "🏒 NHL",                  minValue: 4 },
+  // Vékony piacok – magasabb küszöb
+  "basketball_wnba":                   { sport: "basketball", label: "🏀 WNBA",                 minValue: 7 },
+  "basketball_euroleague":             { sport: "basketball", label: "🏀 Euroleague",            minValue: 6 },
+  "icehockey_ahl":                     { sport: "hockey",     label: "🏒 AHL",                  minValue: 7 },
+  "soccer_conmebol_copa_sudamericana": { sport: "soccer",     label: "⚽ Copa Sudamericana",    minValue: 6 },
 };
 
 const EXCLUDED_BM = ["betfair_ex_eu", "betfair_ex_uk", "matchbook"];
@@ -115,7 +119,7 @@ async function fetchAndProcess() {
           const trueProb = (1 / sharpO.price) / overround;
           const fairOdds = parseFloat((1 / trueProb).toFixed(2));
           const value = parseFloat(((odds / fairOdds - 1) * 100).toFixed(1));
-          if (value < 2) continue;
+          if (value < meta.minValue) continue;
 
           allTips.push({
             id: `${game.id}-${sharpO.name}`,
