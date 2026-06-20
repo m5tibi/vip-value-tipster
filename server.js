@@ -43,10 +43,7 @@ async function connectDB() {
   try {
     const client = new MongoClient(MONGODB_URI, {
       serverSelectionTimeoutMS: 10000,
-      ssl: true,
-      tls: true,
-      tlsInsecure: false,
-      minPoolSize: 1,
+      tlsAllowInvalidCertificates: true,
     });
     await client.connect();
     await client.db("admin").command({ ping: 1 });
