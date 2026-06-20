@@ -226,7 +226,7 @@ async function fetchAndProcess() {
   const matchList = [];
   for (const [sportKey, meta] of Object.entries(SPORT_MAP)) {
     try {
-      const url   = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h,totals&oddsFormat=decimal&dateFormat=iso`;
+      const url   = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h,totals,spreads&oddsFormat=decimal&dateFormat=iso`;
       const r     = await fetch(url);
       if (!r.ok) continue;
       const games = await r.json();
@@ -264,7 +264,21 @@ async function fetchAndProcess() {
           totalsOdds.push(...Object.values(best));
         }
 
-        const allOdds = [...h2hOdds, ...totalsOdds];
+        const spreadsOdds = [];
+        const spreadsBMs  = validBMs.filter(bm => bm.markets.find(m => m.key === "spreads"));
+        if (spreadsBMs.length) {
+          const bestSpreads = {};
+          for (const bm of spreadsBMs) {
+            for (const o of bm.markets.find(m => m.key === "spreads")?.outcomes || []) {
+              const key = `${o.name}_${o.point}`;
+              if (!bestSpreads[key] || o.price > bestSpreads[key].odds)
+                bestSpreads[key] = { market: `Hendikep ${o.point > 0 ? "+" : ""}${o.point}`, name: `${o.name} ${o.point > 0 ? "+" : ""}${o.point}`, odds: parseFloat(o.price.toFixed(2)), bookmaker: bm.title };
+            }
+          }
+          spreadsOdds.push(...Object.values(bestSpreads));
+        }
+
+        const allOdds = [...h2hOdds, ...totalsOdds, ...spreadsOdds];
         if (allOdds.length) matchList.push({ sport: meta.label, match: `${game.home_team} vs ${game.away_team}`, commence: huTime(game.commence_time), odds: allOdds });
       }
     } catch {}
