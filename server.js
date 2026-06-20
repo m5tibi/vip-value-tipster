@@ -250,14 +250,14 @@ async function fetchAndProcess() {
   const newAiTips = await fetchAiTips(matchList);
 
   // AI duplikáció szűrő – ne adjon ma már tippelt meccsre új tippet
-  const todayStr = new Date().toLocaleDateString("hu-HU");
+  const todayStr = new Date().toLocaleString("hu-HU").split(" ")[0];
   const todayAiMatches = new Set(
     history
       .filter(t => t.type === "ai" && t.addedAt?.startsWith(todayStr))
       .map(t => t.match)
   );
   const filteredAiTips = newAiTips.filter(t => !todayAiMatches.has(t.match));
-  aiTips = filteredAiTips;
+  aiTips = filteredAiTips.length > 0 ? filteredAiTips : newAiTips;
 
   const existingIds = new Set(history.map(t => t.id));
   const fresh = [...valueTips, ...filteredAiTips].filter(t => !existingIds.has(t.id));
