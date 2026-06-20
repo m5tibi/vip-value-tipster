@@ -193,8 +193,9 @@ function scheduleNextFetch() {
 
 // ── Napi 23:00 statisztika ────────────────────────────────
 setInterval(() => {
-  const h = new Date().getHours(), m = new Date().getMinutes();
-  if (h === EOD_HOUR && m === 0) {
+  const huHour = hungarianHour();
+  const huMin  = parseInt(new Date().toLocaleString("en-US", { timeZone: "Europe/Budapest", minute: "numeric" }));
+  if (huHour === EOD_HOUR && huMin === 0) {
     const won  = history.filter(t => t.result === "won").length;
     const lost = history.filter(t => t.result === "lost").length;
     const avg  = history.length ? (history.reduce((s,t) => s+t.value,0)/history.length).toFixed(1) : 0;
@@ -207,19 +208,25 @@ app.get("/api/tips",    (req, res) => res.json(latestTips));
 app.get("/api/history", (req, res) => res.json(history));
 
 app.get("/api/status", (req, res) => {
-  const now = new Date();
-  const day = now.getDay();
-  const isWeekend = day === 0 || day === 5 || day === 6;
+  const now    = new Date();
+  const huDate = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Budapest" }));
+  const huDay  = huDate.getDay();
+  const huHour = huDate.getHours();
+  const isWeekend  = huDay === 0 || huDay === 5 || huDay === 6;
   const fetchHours = isWeekend ? [10, 15, 19] : [15];
-  const currentH   = now.getHours();
-  let nextH = fetchHours.find(h => h > currentH);
+  let nextH = fetchHours.find(h => h > huHour);
   let nextFetch;
   if (nextH !== undefined) {
-    nextFetch = new Date(now); nextFetch.setHours(nextH, 0, 0, 0);
+    const diff = (nextH - huHour) * 3600000 - huDate.getMinutes() * 60000 - huDate.getSeconds() * 1000;
+    nextFetch = new Date(now.getTime() + diff);
   } else {
-    nextFetch = new Date(now); nextFetch.setDate(nextFetch.getDate() + 1);
-    const tDay = nextFetch.getDay();
-    nextFetch.setHours((tDay === 0 || tDay === 5 || tDay === 6) ? 10 : 15, 0, 0, 0);
+    const tomorrow = new Date(huDate);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tDay = tomorrow.getDay();
+    const isWE = tDay === 0 || tDay === 5 || tDay === 6;
+    const firstH = isWE ? 10 : 15;
+    const diff = (24 - huHour + firstH) * 3600000 - huDate.getMinutes() * 60000 - huDate.getSeconds() * 1000;
+    nextFetch = new Date(now.getTime() + diff);
   }
   res.json({ tipsCount: latestTips.length, lastUpdate: latestTips[0]?.addedAt || null, nextFetchMs: nextFetch - now, isWeekend, fetchHours });
 });
