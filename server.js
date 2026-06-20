@@ -1,7 +1,7 @@
-const express   = require("express");
-const fetch     = require("node-fetch");
-const path      = require("path");
-const { MongoClient } = require("mongodb");
+const express = require("express");
+const fetch   = require("node-fetch");
+const fs      = require("fs");
+const path    = require("path");
 
 const app = express();
 app.use(express.json());
@@ -11,10 +11,23 @@ const ODDS_API_KEY  = process.env.ODDS_API_KEY;
 const TG_BOT_TOKEN  = process.env.TG_BOT_TOKEN;
 const TG_CHAT_ID    = process.env.TG_CHAT_ID;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
-const MONGODB_URI   = process.env.MONGODB_URI;
 const EOD_HOUR      = 23;
+const DATA_FILE     = "/data/history.json";
 
-const SPORT_MAP = {
+// ── Perzisztens tárolás (Render Disk) ────────────────────
+function loadHistory() {
+  try {
+    if (!fs.existsSync("/data")) fs.mkdirSync("/data", { recursive: true });
+    if (!fs.existsSync(DATA_FILE)) return [];
+    return JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+  } catch (e) { console.error("History betöltési hiba:", e.message); return []; }
+}
+
+function saveHistory() {
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(history, null, 2), "utf8");
+  } catch (e) { console.error("History mentési hiba:", e.message); }
+}
   "soccer_fifa_world_cup":             { sport: "soccer",     label: "⚽ FIFA VB 2026",      minValue: 6 },
   "soccer_uefa_champs_league":         { sport: "soccer",     label: "⚽ BL",                 minValue: 6 },
   "soccer_epl":                        { sport: "soccer",     label: "⚽ Premier League",      minValue: 6 },
@@ -35,8 +48,8 @@ const EXCLUDED_BM = ["betfair_ex_eu", "betfair_ex_uk", "matchbook"];
 
 let latestTips = [];
 let aiTips     = [];
-let history    = [];
-let db         = null;
+let history    = loadHistory();
+console.log(`History betöltve: ${history.length} tipp`);
 
 // ── MongoDB kapcsolat ─────────────────────────────────────
 async function connectDB() {
@@ -299,7 +312,7 @@ async function fetchAndProcess() {
 
   const existingIds = new Set(history.map(t => t.id));
   const fresh = [...valueTips, ...aiTips].filter(t => !existingIds.has(t.id));
-  if (fresh.length) { history = [...fresh, ...history]; await saveHistory(); }
+  if (fresh.length) { history = [...fresh, ...history]; saveHistory(); }
 
   let msg = `🏆 <b>VIP Value Tipster – ${new Date().toLocaleString("hu-HU")}</b>\n\n`;
   if (valueTips.length) {
@@ -360,7 +373,7 @@ async function checkResults() {
           history    = history.map(t => t.id === tip.id ? { ...t, result } : t);
           latestTips = latestTips.map(t => t.id === tip.id ? { ...t, result } : t);
           aiTips     = aiTips.map(t => t.id === tip.id ? { ...t, result } : t);
-          await updateTipResult(tip.id, result);
+          saveHistory();
           changed = true;
         }
       }
@@ -432,7 +445,7 @@ app.patch("/api/history/:id", async (req, res) => {
   history    = history.map(t => t.id === req.params.id ? { ...t, result } : t);
   latestTips = latestTips.map(t => t.id === req.params.id ? { ...t, result } : t);
   aiTips     = aiTips.map(t => t.id === req.params.id ? { ...t, result } : t);
-  await updateTipResult(req.params.id, result);
+  saveHistory();
   res.json({ ok: true });
 });
 
@@ -449,9 +462,7 @@ app.post("/api/stats/send", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`VIP Tipster fut: http://localhost:${PORT}`));
 
-connectDB().then(() => {
-  fetchAndProcess();
-  scheduleNextFetch();
-  setInterval(checkResults, 60 * 60 * 1000);
-  checkResults();
-});
+fetchAndProcess();
+scheduleNextFetch();
+setInterval(checkResults, 60 * 60 * 1000);
+checkResults();
