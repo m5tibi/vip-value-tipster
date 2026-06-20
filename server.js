@@ -42,11 +42,14 @@ let db         = null;
 async function connectDB() {
   try {
     const client = new MongoClient(MONGODB_URI, {
-      tls: true,
-      tlsAllowInvalidCertificates: false,
       serverSelectionTimeoutMS: 10000,
+      ssl: true,
+      tls: true,
+      tlsInsecure: false,
+      minPoolSize: 1,
     });
     await client.connect();
+    await client.db("admin").command({ ping: 1 });
     db = client.db("tipster");
     console.log("MongoDB kapcsolódva ✓");
     history = await db.collection("history").find({}).sort({ addedAt: -1 }).toArray();
@@ -219,7 +222,11 @@ Válaszolj KIZÁRÓLAG JSON tömbként:
     const block  = blocks[blocks.length - 1];
     if (!block) { console.log("AI: nincs text blokk"); return []; }
     const found = block.text.match(/\[[\s\S]*\]/);
-    if (!found) { console.log("AI: nem sikerült JSON-t kinyerni\n" + block.text.slice(0, 300)); return []; }
+    if (!found) {
+      console.log("AI: nem sikerült JSON-t kinyerni");
+      console.log("AI válasz:", block.text.slice(0, 500));
+      return [];
+    }
     return JSON.parse(found[0]).map(t => ({
       id: `ai-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
       type: "ai", sport: t.sport, sportLabel: t.sportLabel,
