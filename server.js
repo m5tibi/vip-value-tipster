@@ -141,7 +141,7 @@ async function fetchAiTips(matchList) {
   console.log(`AI elemzés: ${matchList.length} meccs`);
 
   const matchText = matchList.map(m =>
-    `- ${m.sport} | ${m.match} | Kezdés: ${m.commence}`
+    `- ${m.sport} | ${m.match} | Kezdés: ${m.commence}\n  Valós odds: ${m.odds.map(o => `${o.name}: ${o.odds} (${o.bookmaker})`).join(", ")}`
   ).join("\n");
 
   const prompt = `Te egy profi sportfogadási elemző vagy. Használj web keresést hogy megtudd az aktuális formát, sérüléseket, és keretinformációkat az alábbi mai meccsekre, majd adj 2-3 konkrét fogadási tippet.
@@ -276,7 +276,7 @@ async function fetchAndProcess() {
   const valueTips = await fetchValueTips();
   latestTips = valueTips;
 
-  // 2. AI elemzéshez meccs lista összegyűjtése
+  // 2. AI elemzéshez meccs lista összegyűjtése valós oddsokkal
   const matchList = [];
   for (const [sportKey, meta] of Object.entries(SPORT_MAP)) {
     try {
@@ -285,13 +285,33 @@ async function fetchAndProcess() {
       if (!r.ok) continue;
       const games = await r.json();
       for (const game of games) {
-        const start    = new Date(game.commence_time);
+        const start      = new Date(game.commence_time);
         const hoursUntil = (start - now) / 3600000;
         if (hoursUntil < 0 || hoursUntil > 24) continue;
+
+        // Valós oddsok összegyűjtése bookmaker-enként
+        const validBMs = (game.bookmakers || []).filter(bm =>
+          !EXCLUDED_BM.includes(bm.key) &&
+          bm.markets?.[0]?.outcomes?.every(o => o.price > 1.05 && o.price < 50)
+        );
+        if (validBMs.length < 2) continue;
+
+        // Legjobb elérhető odds minden kimenetelre
+        const outcomes = validBMs[0].markets[0].outcomes.map(o => o.name);
+        const bestOdds = outcomes.map(name => {
+          let best = 0, bestBM = "";
+          for (const bm of validBMs) {
+            const o = bm.markets[0]?.outcomes?.find(x => x.name === name);
+            if (o && o.price > best) { best = o.price; bestBM = bm.title; }
+          }
+          return { name, odds: parseFloat(best.toFixed(2)), bookmaker: bestBM };
+        });
+
         matchList.push({
           sport: meta.label,
           match: `${game.home_team} vs ${game.away_team}`,
-          commence: new Date(game.commence_time).toLocaleString("hu-HU", { timeZone: "Europe/Budapest", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+          commence: new Date(game.commence_time).toLocaleString("hu-HU", { timeZone: "Europe/Budapest", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }),
+          odds: bestOdds
         });
       }
     } catch {}
