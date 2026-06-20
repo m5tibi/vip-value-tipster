@@ -28,6 +28,8 @@ function saveHistory() {
     fs.writeFileSync(DATA_FILE, JSON.stringify(history, null, 2), "utf8");
   } catch (e) { console.error("History mentési hiba:", e.message); }
 }
+
+const SPORT_MAP = {
   "soccer_fifa_world_cup":             { sport: "soccer",     label: "⚽ FIFA VB 2026",      minValue: 6 },
   "soccer_uefa_champs_league":         { sport: "soccer",     label: "⚽ BL",                 minValue: 6 },
   "soccer_epl":                        { sport: "soccer",     label: "⚽ Premier League",      minValue: 6 },
@@ -50,42 +52,6 @@ let latestTips = [];
 let aiTips     = [];
 let history    = loadHistory();
 console.log(`History betöltve: ${history.length} tipp`);
-
-// ── MongoDB kapcsolat ─────────────────────────────────────
-async function connectDB() {
-  try {
-    const client = new MongoClient(MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000,
-      tlsAllowInvalidCertificates: true,
-    });
-    await client.connect();
-    await client.db("admin").command({ ping: 1 });
-    db = client.db("tipster");
-    console.log("MongoDB kapcsolódva ✓");
-    history = await db.collection("history").find({}).sort({ addedAt: -1 }).toArray();
-    console.log(`History betöltve: ${history.length} tipp`);
-  } catch (e) {
-    console.error("MongoDB hiba:", e.message);
-    console.log("Folytatás MongoDB nélkül – history nem perzisztens");
-  }
-}
-
-async function saveHistory() {
-  if (!db) return;
-  try {
-    // Csak az újakat mentjük
-    const existingIds = new Set((await db.collection("history").find({}, { projection: { id: 1 } }).toArray()).map(t => t.id));
-    const fresh = history.filter(t => !existingIds.has(t.id));
-    if (fresh.length) await db.collection("history").insertMany(fresh);
-  } catch (e) { console.error("MongoDB mentési hiba:", e.message); }
-}
-
-async function updateTipResult(id, result) {
-  if (!db) return;
-  try {
-    await db.collection("history").updateOne({ id }, { $set: { result } });
-  } catch (e) { console.error("MongoDB update hiba:", e.message); }
-}
 
 // ── Magyar idő ────────────────────────────────────────────
 function getHungarianTime() {
@@ -118,8 +84,8 @@ async function sendTelegram(text) {
 
 // ── Value tippek ──────────────────────────────────────────
 async function fetchValueTips() {
-  const allTips = [];
-  const now     = new Date();
+  const allTips  = [];
+  const now      = new Date();
   const todayStr = new Date().toLocaleString("hu-HU").split(" ")[0];
 
   for (const [sportKey, meta] of Object.entries(SPORT_MAP)) {
@@ -213,7 +179,7 @@ Szabályok:
 - KÖTELEZŐ: az odds mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd be
 - Adj rövid (2-3 mondatos) magyar nyelvű indoklást VALÓS adatok alapján
 
-Válaszolj KIZÁRÓLAG JSON tömbként:
+Válaszolj KIZÁRÓLAG JSON tömbként, semmi más szöveg nélkül:
 [{"match":"...","sport":"soccer","sportLabel":"⚽ FIFA VB 2026","commence":"06.20. 20:00","market":"1X2","pick":"...","odds":1.85,"note":"..."}]`;
 
   try {
@@ -227,7 +193,6 @@ Válaszolj KIZÁRÓLAG JSON tömbként:
       })
     });
     const data   = await r.json();
-    // Az utolsó text blokkot keressük (web search után ez tartalmazza a JSON-t)
     const blocks = data.content?.filter(b => b.type === "text") || [];
     const block  = blocks[blocks.length - 1];
     if (!block) { console.log("AI: nincs text blokk"); return []; }
@@ -238,7 +203,7 @@ Válaszolj KIZÁRÓLAG JSON tömbként:
       return [];
     }
     return JSON.parse(found[0]).map(t => ({
-      id: `ai-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
+      id: `ai-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: "ai", sport: t.sport, sportLabel: t.sportLabel,
       match: t.match, commence: t.commence || null,
       market: t.market, pick: t.pick, odds: t.odds,
@@ -274,8 +239,8 @@ async function fetchAndProcess() {
         const h2hOdds = [];
         const h2hBMs  = validBMs.filter(bm => bm.markets.find(m => m.key === "h2h"));
         if (h2hBMs.length) {
-          const outcomes = h2hBMs[0].markets.find(m => m.key === "h2h").outcomes.map(o => o.name);
-          outcomes.forEach(name => {
+          const names = h2hBMs[0].markets.find(m => m.key === "h2h").outcomes.map(o => o.name);
+          names.forEach(name => {
             let best = 0, bestBM = "";
             for (const bm of h2hBMs) {
               const o = bm.markets.find(m => m.key === "h2h")?.outcomes?.find(x => x.name === name);
@@ -288,15 +253,15 @@ async function fetchAndProcess() {
         const totalsOdds = [];
         const totalsBMs  = validBMs.filter(bm => bm.markets.find(m => m.key === "totals"));
         if (totalsBMs.length) {
-          const allTotals = {};
+          const best = {};
           for (const bm of totalsBMs) {
             for (const o of bm.markets.find(m => m.key === "totals")?.outcomes || []) {
               if (o.name !== "Over") continue;
-              if (!allTotals[o.point] || o.price > allTotals[o.point].odds)
-                allTotals[o.point] = { market: `Over ${o.point}`, name: `Over ${o.point}`, odds: parseFloat(o.price.toFixed(2)), bookmaker: bm.title };
+              if (!best[o.point] || o.price > best[o.point].odds)
+                best[o.point] = { market: `Over ${o.point}`, name: `Over ${o.point}`, odds: parseFloat(o.price.toFixed(2)), bookmaker: bm.title };
             }
           }
-          totalsOdds.push(...Object.values(allTotals));
+          totalsOdds.push(...Object.values(best));
         }
 
         const allOdds = [...h2hOdds, ...totalsOdds];
@@ -305,10 +270,10 @@ async function fetchAndProcess() {
     } catch {}
   }
 
-  const newAiTips = await fetchAiTips(matchList);
+  const newAiTips      = await fetchAiTips(matchList);
   const todayAiMatches = new Set(history.filter(t => t.type === "ai" && t.addedAt?.startsWith(todayStr)).map(t => t.match));
-  const filteredAiTips = newAiTips.filter(t => !todayAiMatches.has(t.match));
-  aiTips = filteredAiTips.length > 0 ? filteredAiTips : newAiTips;
+  const filteredAi     = newAiTips.filter(t => !todayAiMatches.has(t.match));
+  aiTips = filteredAi.length > 0 ? filteredAi : newAiTips;
 
   const existingIds = new Set(history.map(t => t.id));
   const fresh = [...valueTips, ...aiTips].filter(t => !existingIds.has(t.id));
@@ -373,13 +338,12 @@ async function checkResults() {
           history    = history.map(t => t.id === tip.id ? { ...t, result } : t);
           latestTips = latestTips.map(t => t.id === tip.id ? { ...t, result } : t);
           aiTips     = aiTips.map(t => t.id === tip.id ? { ...t, result } : t);
-          saveHistory();
-          changed = true;
+          changed    = true;
         }
       }
     } catch (e) { console.error(`Scores hiba (${sportKey}):`, e.message); }
   }
-  if (changed) console.log("Eredmények frissítve ✓");
+  if (changed) { saveHistory(); console.log("Eredmények mentve ✓"); }
 }
 
 // ── Ütemező ───────────────────────────────────────────────
@@ -409,7 +373,7 @@ setInterval(() => {
     const won   = history.filter(t => t.result === "won").length;
     const lost  = history.filter(t => t.result === "lost").length;
     const vTips = history.filter(t => t.value);
-    const avg   = vTips.length ? (vTips.reduce((s,t) => s+t.value,0)/vTips.length).toFixed(1) : "–";
+    const avg   = vTips.length ? (vTips.reduce((s, t) => s + t.value, 0) / vTips.length).toFixed(1) : "–";
     sendTelegram(`📈 <b>Napi stat – ${new Date().toLocaleDateString("hu-HU")}</b>\n\nÖsszes: ${history.length}\n✅ Nyert: ${won}\n❌ Vesztett: ${lost}\n📊 Átl. value: +${avg}%`);
   }
 }, 60000);
@@ -440,7 +404,7 @@ app.post("/api/refresh", async (req, res) => {
   res.json({ ok: true, valueTips: latestTips.length, aiTips: aiTips.length });
 });
 
-app.patch("/api/history/:id", async (req, res) => {
+app.patch("/api/history/:id", (req, res) => {
   const { result } = req.body;
   history    = history.map(t => t.id === req.params.id ? { ...t, result } : t);
   latestTips = latestTips.map(t => t.id === req.params.id ? { ...t, result } : t);
@@ -453,7 +417,7 @@ app.post("/api/stats/send", async (req, res) => {
   const won   = history.filter(t => t.result === "won").length;
   const lost  = history.filter(t => t.result === "lost").length;
   const vTips = history.filter(t => t.value);
-  const avg   = vTips.length ? (vTips.reduce((s,t) => s+t.value,0)/vTips.length).toFixed(1) : "–";
+  const avg   = vTips.length ? (vTips.reduce((s, t) => s + t.value, 0) / vTips.length).toFixed(1) : "–";
   await sendTelegram(`📈 <b>Napi stat – ${new Date().toLocaleDateString("hu-HU")}</b>\n\nÖsszes: ${history.length}\n✅ Nyert: ${won}\n❌ Vesztett: ${lost}\n📊 Átl. value: +${avg}%`);
   res.json({ ok: true });
 });
