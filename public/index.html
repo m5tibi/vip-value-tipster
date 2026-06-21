@@ -147,11 +147,24 @@ function valueBg(v) { return v >= 15 ? "#00e676" : v >= 8 ? "#69f0ae" : "#b9f6ca
 function confCls(c) { return ["bdg-c0","bdg-c1","bdg-c2"][c] || "bdg-c0"; }
 function confLabel(c) { return ["Alacsony","Közepes","Magas"][c] || ""; }
 
+function needsPush(t) {
+  const m = (t.market || "").toLowerCase();
+  return m.includes("hendikep") || m.includes("spread") || m.includes("over");
+}
+
 function resBadge(r) {
   if (!r || r==="pending") return `<span class="bdg bdg-pend">⏳ Folyamatban</span>`;
   if (r==="won")  return `<span class="bdg bdg-won">✅ Nyert</span>`;
   if (r==="push") return `<span class="bdg bdg-push">↩️ Visszajár</span>`;
   return `<span class="bdg bdg-lost">❌ Vesztett</span>`;
+}
+
+function actionBtns(t) {
+  if (t.result && t.result !== "pending") return "";
+  const pushBtn = needsPush(t) ? `<button class="btn-push" onclick="setResult('${t.id}','push')">↩️ Visszajár</button>` : "";
+  return `<button class="btn-won" onclick="setResult('${t.id}','won')">✅ Nyert</button>
+          <button class="btn-lost" onclick="setResult('${t.id}','lost')">❌ Vesztett</button>
+          ${pushBtn}`;
 }
 
 function valueTipHTML(t, showResult) {
@@ -205,12 +218,25 @@ function renderTips() {
   const vEl = document.getElementById("value-list");
   const aEl = document.getElementById("ai-list");
 
-  vEl.innerHTML = valueTips.length
-    ? valueTips.map(t => valueTipHTML(t, false)).join("")
-    : `<div class="no-value">📭 Ma nincs +6% feletti value lehetőség. A piac hatékonyan áraz.</div>`;
+  // Összes tipp dátum szerint rendezve
+  const allTips = [
+    ...valueTips.map(t => ({ ...t, _type: "value" })),
+    ...aiTips.map(t => ({ ...t, _type: "ai" }))
+  ].sort((a, b) => {
+    const pa = a.commence || "99.99. 99:99";
+    const pb = b.commence || "99.99. 99:99";
+    return pa.localeCompare(pb);
+  });
 
-  aEl.innerHTML = aiTips.length
-    ? aiTips.map(t => aiTipHTML(t, false)).join("")
+  const sortedValue = allTips.filter(t => t._type === "value");
+  const sortedAi    = allTips.filter(t => t._type === "ai");
+
+  vEl.innerHTML = sortedValue.length
+    ? sortedValue.map(t => valueTipHTML(t, false)).join("")
+    : `<div class="no-value">📭 Ma nincs +6% feletti value lehetőség.</div>`;
+
+  aEl.innerHTML = sortedAi.length
+    ? sortedAi.map(t => aiTipHTML(t, false)).join("")
     : `<div class="no-value">🤖 AI elemzés folyamatban...</div>`;
 }
 
@@ -268,9 +294,10 @@ function renderHistory() {
   history.forEach(t => { const d = t.addedAt?.split(" ")[0]||"–"; if(!byDay[d]) byDay[d]=[]; byDay[d].push(t); });
   const el = document.getElementById("history-list");
   if (!history.length) { el.innerHTML = '<div class="empty">Még nincsenek rögzített tippek.</div>'; return; }
-  el.innerHTML = Object.keys(byDay).sort((a,b)=>b.localeCompare(a)).map(day =>
-    `<div class="day-header">${day}</div>${byDay[day].map(t => t.type==="ai" ? aiTipHTML(t,true) : valueTipHTML(t,true)).join("")}`
-  ).join("");
+  el.innerHTML = Object.keys(byDay).sort((a,b)=>b.localeCompare(a)).map(day => {
+    const sorted = byDay[day].sort((a,b) => (a.commence||"99:99").localeCompare(b.commence||"99:99"));
+    return `<div class="day-header">${day}</div>${sorted.map(t => t.type==="ai" ? aiTipHTML(t,true) : valueTipHTML(t,true)).join("")}`;
+  }).join("");
 }
 
 async function setResult(id, result) {
