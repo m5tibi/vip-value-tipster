@@ -214,22 +214,20 @@ function aiTipHTML(t, showResult) {
   </div>`;
 }
 
+function parseCommence(c) {
+  if (!c) return 9999999;
+  // Format: "06. 21. 13:00" → sortable number
+  const m = c.match(/(\d+)\.\s*(\d+)\.\s*(\d+):(\d+)/);
+  if (!m) return 9999999;
+  return parseInt(m[1]) * 1000000 + parseInt(m[2]) * 10000 + parseInt(m[3]) * 100 + parseInt(m[4]);
+}
+
 function renderTips() {
   const vEl = document.getElementById("value-list");
   const aEl = document.getElementById("ai-list");
 
-  // Összes tipp dátum szerint rendezve
-  const allTips = [
-    ...valueTips.map(t => ({ ...t, _type: "value" })),
-    ...aiTips.map(t => ({ ...t, _type: "ai" }))
-  ].sort((a, b) => {
-    const pa = a.commence || "99.99. 99:99";
-    const pb = b.commence || "99.99. 99:99";
-    return pa.localeCompare(pb);
-  });
-
-  const sortedValue = allTips.filter(t => t._type === "value");
-  const sortedAi    = allTips.filter(t => t._type === "ai");
+  const sortedValue = [...valueTips].sort((a, b) => parseCommence(a.commence) - parseCommence(b.commence));
+  const sortedAi    = [...aiTips].sort((a, b) => parseCommence(a.commence) - parseCommence(b.commence));
 
   vEl.innerHTML = sortedValue.length
     ? sortedValue.map(t => valueTipHTML(t, false)).join("")
@@ -254,12 +252,17 @@ async function refresh() {
 }
 
 async function loadTips() {
-  const r = await fetch("/api/tips");
-  const d = await r.json();
-  valueTips = d.valueTips || [];
-  aiTips    = d.aiTips || [];
-  document.getElementById("last-update").textContent = "Frissítve: " + new Date().toLocaleTimeString("hu-HU");
-  renderTips();
+  try {
+    const r = await fetch("/api/tips");
+    const d = await r.json();
+    console.log("API válasz:", JSON.stringify(d).slice(0, 300));
+    valueTips = Array.isArray(d.valueTips) ? d.valueTips : [];
+    aiTips    = Array.isArray(d.aiTips)    ? d.aiTips    : [];
+    document.getElementById("last-update").textContent = "Frissítve: " + new Date().toLocaleTimeString("hu-HU");
+    renderTips();
+  } catch(e) {
+    console.error("loadTips hiba:", e);
+  }
 }
 
 async function loadStatus() {
