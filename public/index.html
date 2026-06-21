@@ -110,7 +110,10 @@
   <div id="tab-history-panel" style="display:none">
     <div class="stats-header">
       <div style="font-weight:700;color:#00e676;font-size:16px">📊 Előzmény & statisztika</div>
-      <button class="btn-send" onclick="sendStats()">📲 Küldés Telegramon</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-send" onclick="sendStats()">📲 Küldés Telegramon</button>
+        <button onclick="clearHistory()" style="background:#1a0808;color:#ef9a9a;border:1px solid #7f0000;border-radius:8px;padding:6px 14px;font-weight:600;font-size:13px;cursor:pointer">🗑️ Törlés</button>
+      </div>
     </div>
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-label">Összes</div><div class="stat-value" id="h-total">0</div></div>
@@ -306,6 +309,14 @@ function renderHistory() {
 async function setResult(id, result) {
   await fetch(`/api/history/${id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify({result}) });
   await loadHistory();
+}
+
+async function clearHistory() {
+  if (!confirm("Biztosan törlöd az összes előzményt? Ez nem visszavonható!")) return;
+  await fetch("/api/history", { method: "DELETE" });
+  history = [];
+  renderHistory();
+  showStatus("🗑️ Előzmények törölve");
 }
 
 async function sendStats() {
