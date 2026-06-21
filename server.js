@@ -481,7 +481,14 @@ app.patch("/api/history/:id", (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/stats/send", async (req, res) => {
+app.delete("/api/history", (req, res) => {
+  history    = [];
+  latestTips = [];
+  aiTips     = [];
+  saveHistory();
+  console.log("History törölve ✓");
+  res.json({ ok: true });
+}); async (req, res) => {
   const won   = history.filter(t => t.result === "won").length;
   const lost  = history.filter(t => t.result === "lost").length;
   const push  = history.filter(t => t.result === "push").length;
