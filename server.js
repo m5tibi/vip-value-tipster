@@ -29,7 +29,6 @@ function saveHistory() {
   catch (e) { console.error("History mentési hiba:", e.message); }
 }
 
-// Utolsó futás időpontja – deploy után ne fusson újra
 function loadLastRun() {
   try {
     if (!fs.existsSync(SCHEDULE_FILE)) return null;
@@ -42,6 +41,7 @@ function saveLastRun() {
   catch (e) { console.error("LastRun mentési hiba:", e.message); }
 }
 
+// ── Sport térkép ──────────────────────────────────────────
 const SPORT_MAP = {
   "soccer_fifa_world_cup":             { sport: "soccer",     label: "⚽ FIFA VB 2026",      minValue: 6 },
   "soccer_uefa_champs_league":         { sport: "soccer",     label: "⚽ BL",                 minValue: 6 },
@@ -59,14 +59,8 @@ const SPORT_MAP = {
   "icehockey_ahl":                     { sport: "hockey",     label: "🏒 AHL",                 minValue: 9 },
 };
 
-// Megbízható bookmaker-ek listája (tőzsdék és problémás BM-ek kizárva)
-const EXCLUDED_BM = [
-  "betfair_ex_eu", "betfair_ex_uk", "matchbook",
-  "betfair_sb_uk", "betfair_sb_au", "smarkets"
-];
-
-// Csak ezekből számítunk fair odds-ot (sharp bookmaker-ek)
-const SHARP_BMS = ["pinnacle", "pinnacle_au", "betsson", "nordicbet"];
+const EXCLUDED_BM = ["betfair_ex_eu", "betfair_ex_uk", "matchbook", "betfair_sb_uk", "smarkets"];
+const SHARP_BMS   = ["pinnacle", "pinnacle_au", "betsson", "nordicbet"];
 
 let latestTips = [];
 let aiTips     = [];
@@ -107,11 +101,9 @@ async function sendTelegram(text) {
 
 // ── Value tippek ──────────────────────────────────────────
 async function fetchValueTips() {
-  const allTips  = [];
-  const now      = new Date();
-  const today    = todayHU();
-
-  // Mai már tippelt meccsek
+  const allTips = [];
+  const now     = new Date();
+  const today   = todayHU();
   const alreadyTipped = new Set(
     history.filter(t => t.type === "value" && t.addedAt?.startsWith(today)).map(t => t.matchId)
   );
@@ -125,19 +117,16 @@ async function fetchValueTips() {
       console.log(`${sportKey}: ${games.length} meccs`);
 
       for (const game of games) {
-        const start      = new Date(game.commence_time);
-        const hoursUntil = (start - now) / 3600000;
+        const hoursUntil = (new Date(game.commence_time) - now) / 3600000;
         if (hoursUntil < 0 || hoursUntil > 24) continue;
         if (alreadyTipped.has(game.id)) continue;
 
-        // Csak sharp bookmaker-ek a fair odds számításhoz
         const sharpBMs = (game.bookmakers || []).filter(bm =>
           SHARP_BMS.includes(bm.key) &&
           bm.markets?.[0]?.outcomes?.every(o => o.price > 1.05 && o.price < 30)
         );
         if (!sharpBMs.length) continue;
 
-        // Soft bookmaker-ek a legjobb odds kereséséhez
         const softBMs = (game.bookmakers || []).filter(bm =>
           !EXCLUDED_BM.includes(bm.key) &&
           !SHARP_BMS.includes(bm.key) &&
@@ -145,19 +134,14 @@ async function fetchValueTips() {
         );
         if (!softBMs.length) continue;
 
-        const sharpBM       = sharpBMs[0]; // Pinnacle elsőbbség
+        const sharpBM       = sharpBMs[0];
         const sharpOutcomes = sharpBM.markets[0].outcomes;
         if (sharpOutcomes.length < 2) continue;
 
-        // Overround sanity check
         const overround = sharpOutcomes.reduce((s, o) => s + 1 / o.price, 0);
-        if (overround < 1.0 || overround > 1.12) {
-          console.log(`  ✗ ${game.home_team} vs ${game.away_team}: hibás overround ${overround.toFixed(3)}`);
-          continue;
-        }
+        if (overround < 1.0 || overround > 1.12) continue;
 
         for (const sharpO of sharpOutcomes) {
-          // Legjobb odds csak soft BM-eknél
           let bestOdds = 0, bestBM = "";
           for (const bm of softBMs) {
             const o = bm.markets[0]?.outcomes?.find(x => x.name === sharpO.name);
@@ -171,8 +155,6 @@ async function fetchValueTips() {
           const trueProb = (1 / sharpO.price) / overround;
           const fairOdds = parseFloat((1 / trueProb).toFixed(2));
           const value    = parseFloat(((odds / fairOdds - 1) * 100).toFixed(1));
-
-          // Sanity check: value nem lehet >30% valós meccseken
           if (value < meta.minValue || value > 30) continue;
 
           const kelly = parseFloat((((trueProb * odds - 1) / (odds - 1)) * 0.25 * 100).toFixed(1));
@@ -216,7 +198,7 @@ ${matchText}
 Szabályok:
 - Csak OVER típusú vagy pozitív kimenetelű tippek (over gólok, hendikep győzelem, csapat győzelme)
 - NE adj under típusú tippet
-- KÖTELEZŐ: az odds mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd be – ne találj ki oddsot!
+- KÖTELEZŐ: az odds mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd be
 - Adj rövid (2-3 mondatos) magyar nyelvű indoklást VALÓS adatok alapján
 
 Válaszolj KIZÁRÓLAG JSON tömbként, semmi más szöveg nélkül:
@@ -260,7 +242,6 @@ async function fetchAndProcess() {
   const valueTips = await fetchValueTips();
   latestTips = valueTips;
 
-  // Mai AI tippelt meccsek
   const todayAiMatches = new Set(
     history.filter(t => t.type === "ai" && t.addedAt?.startsWith(today)).map(t => t.match)
   );
@@ -328,13 +309,12 @@ async function fetchAndProcess() {
     } catch {}
   }
 
-  const newAiTips  = await fetchAiTips(matchList);
+  const newAiTips = await fetchAiTips(matchList);
   aiTips = newAiTips;
 
   const existingIds = new Set(history.map(t => t.id));
   const fresh = [...valueTips, ...aiTips].filter(t => !existingIds.has(t.id));
   if (fresh.length) { history = [...fresh, ...history]; saveHistory(); }
-
   saveLastRun();
 
   let msg = `🏆 <b>VIP Value Tipster – ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</b>\n\n`;
@@ -390,10 +370,10 @@ async function checkResults() {
             const total = homeScore + awayScore;
             result = total > line ? "won" : total === line ? "push" : "lost";
           } else if (tip.market.toLowerCase().includes("hendikep")) {
-            const handicapMatch = tip.pick.match(/-?[\d.]+$/);
-            if (!handicapMatch) continue;
-            const line = parseFloat(handicapMatch[0]);
-            const isHome = tip.pick.includes(game.home_team);
+            const lineMatch = tip.pick.match(/-?[\d.]+$/);
+            if (!lineMatch) continue;
+            const line     = parseFloat(lineMatch[0]);
+            const isHome   = tip.pick.includes(game.home_team);
             const adjScore = isHome ? homeScore + line : awayScore + line;
             const oppScore = isHome ? awayScore : homeScore;
             result = adjScore > oppScore ? "won" : adjScore === oppScore ? "push" : "lost";
@@ -413,7 +393,7 @@ async function checkResults() {
   if (changed) { saveHistory(); console.log("Eredmények mentve ✓"); }
 }
 
-// ── Ütemező – deploy után NE fusson újra ─────────────────
+// ── Ütemező ───────────────────────────────────────────────
 function scheduleNextFetch() {
   const { hour, minute, day } = getHungarianTime();
   const isWeekend  = day === 0 || day === 5 || day === 6;
@@ -488,7 +468,9 @@ app.delete("/api/history", (req, res) => {
   saveHistory();
   console.log("History törölve ✓");
   res.json({ ok: true });
-}); async (req, res) => {
+});
+
+app.post("/api/stats/send", async (req, res) => {
   const won   = history.filter(t => t.result === "won").length;
   const lost  = history.filter(t => t.result === "lost").length;
   const push  = history.filter(t => t.result === "push").length;
@@ -502,14 +484,9 @@ app.delete("/api/history", (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`VIP Tipster fut: http://localhost:${PORT}`));
 
-// Deploy után NE fusson azonnal – csak az ütemező szerint!
 const lastRun = loadLastRun();
-if (lastRun) {
-  const minsSinceRun = (Date.now() - new Date(lastRun).getTime()) / 60000;
-  console.log(`Utolsó futás: ${Math.round(minsSinceRun)} perce`);
-}
-scheduleNextFetch();
+if (lastRun) console.log(`Utolsó futás: ${Math.round((Date.now() - new Date(lastRun).getTime()) / 60000)} perce`);
 
-// Eredmények ellenőrzése óránként
+scheduleNextFetch();
 setInterval(checkResults, 60 * 60 * 1000);
-setTimeout(checkResults, 30000); // 30 másodperc után első ellenőrzés
+setTimeout(checkResults, 30000);
