@@ -229,8 +229,8 @@ function renderTips() {
   const vEl = document.getElementById("value-list");
   const aEl = document.getElementById("ai-list");
 
-  const sv = [...valueTips].sort((a,b) => parseCommence(a.commence) - parseCommence(b.commence));
-  const sa = [...aiTips].sort((a,b) => parseCommence(a.commence) - parseCommence(b.commence));
+  const sv = [...valueTips].filter(t => !t.result || t.result === "pending").sort((a,b) => parseCommence(a.commence) - parseCommence(b.commence));
+  const sa = [...aiTips].filter(t => !t.result || t.result === "pending").sort((a,b) => parseCommence(a.commence) - parseCommence(b.commence));
 
   vEl.innerHTML = sv.length
     ? sv.map(t => valueTipHTML(t, false)).join("")
