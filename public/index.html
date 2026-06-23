@@ -121,6 +121,8 @@
       <div class="stat-card"><div class="stat-label">Visszajár</div><div class="stat-value" style="color:#90caf9" id="h-push">0</div></div>
       <div class="stat-card"><div class="stat-label">Value átlag</div><div class="stat-value" style="color:#ffe082" id="h-avg">–</div></div>
       <div class="stat-card"><div class="stat-label">Win %</div><div class="stat-value" style="color:#a5d6a7" id="h-wr">–</div></div>
+      <div class="stat-card"><div class="stat-label">Profit (e.)</div><div class="stat-value" id="h-profit">–</div></div>
+      <div class="stat-card"><div class="stat-label">ROI</div><div class="stat-value" id="h-roi">–</div></div>
     </div>
     <div id="history-list"><div class="empty">Még nincsenek rögzített tippek.</div></div>
   </div>
@@ -250,12 +252,27 @@ function renderHistory() {
   const avg  = vT.length ? (vT.reduce((s,t) => s+t.value,0)/vT.length).toFixed(1) : "–";
   const wr   = (won+lost) ? ((won/(won+lost))*100).toFixed(0)+"%" : "–";
 
-  document.getElementById("h-total").textContent = history.length;
-  document.getElementById("h-won").textContent   = won;
-  document.getElementById("h-lost").textContent  = lost;
-  document.getElementById("h-push").textContent  = push;
-  document.getElementById("h-avg").textContent   = avg !== "–" ? avg+"%" : "–";
-  document.getElementById("h-wr").textContent    = wr;
+  // ROI számítás: 1 egység/tipp, lezárt meccsek alapján
+  const closed = history.filter(t => t.result === "won" || t.result === "lost" || t.result === "push");
+  let profit = 0;
+  closed.forEach(t => {
+    if (t.result === "won")  profit += (parseFloat(t.odds) - 1);
+    if (t.result === "lost") profit -= 1;
+    if (t.result === "push") profit += 0;
+  });
+  const roi    = closed.length ? ((profit / closed.length) * 100).toFixed(1) : "–";
+  const roiCol = profit > 0 ? "#69f0ae" : profit < 0 ? "#ef9a9a" : "#90a4ae";
+
+  document.getElementById("h-total").textContent  = history.length;
+  document.getElementById("h-won").textContent    = won;
+  document.getElementById("h-lost").textContent   = lost;
+  document.getElementById("h-push").textContent   = push;
+  document.getElementById("h-avg").textContent    = avg !== "–" ? avg+"%" : "–";
+  document.getElementById("h-wr").textContent     = wr;
+  document.getElementById("h-profit").textContent = closed.length ? (profit >= 0 ? "+" : "") + profit.toFixed(2) : "–";
+  document.getElementById("h-profit").style.color = roiCol;
+  document.getElementById("h-roi").textContent    = roi !== "–" ? (profit >= 0 ? "+" : "") + roi + "%" : "–";
+  document.getElementById("h-roi").style.color    = roiCol;
 
   const byDay = {};
   history.forEach(t => {
