@@ -238,7 +238,7 @@ function renderTips() {
 
   aEl.innerHTML = sa.length
     ? sa.map(t => aiTipHTML(t, false)).join("")
-    : `<div class="no-value">🤖 AI elemzés folyamatban vagy nincs mai meccs.</div>`;
+    : `<div class="no-value">🤖 AI elemzés folyamatban vagy nincs mai befejezetlen meccs.</div>`;
 }
 
 function renderHistory() {
