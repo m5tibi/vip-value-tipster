@@ -285,7 +285,11 @@ function renderHistory() {
   if (!history.length) { el.innerHTML = '<div class="empty">Még nincsenek rögzített tippek.</div>'; return; }
 
   el.innerHTML = Object.keys(byDay).sort((a,b) => b.localeCompare(a)).map(day => {
-    const sorted = [...byDay[day]].sort((a,b) => parseCommence(a.commence) - parseCommence(b.commence));
+    const pending = byDay[day].filter(t => !t.result || t.result === "pending")
+      .sort((a,b) => parseCommence(a.commence) - parseCommence(b.commence));
+    const closed  = byDay[day].filter(t => t.result && t.result !== "pending")
+      .sort((a,b) => parseCommence(a.commence) - parseCommence(b.commence));
+    const sorted  = [...pending, ...closed];
     return `<div class="day-header">${day}</div>${sorted.map(t => t.type === "ai" ? aiTipHTML(t,true) : valueTipHTML(t,true)).join("")}`;
   }).join("");
 }
