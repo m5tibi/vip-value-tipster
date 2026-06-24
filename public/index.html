@@ -60,7 +60,14 @@
   .stat-card { background: #0d1b2a; border: 1px solid #1e3a2f; border-radius: 10px; padding: 10px 8px; text-align: center; }
   .stat-label { font-size: 11px; color: #546e7a; }
   .stat-value { font-size: 20px; font-weight: 700; color: #00e676; }
-  .day-header { color: #546e7a; font-size: 12px; margin-bottom: 6px; border-bottom: 1px solid #1e3a2f; padding-bottom: 4px; margin-top: 12px; }
+  .day-section { margin-bottom: 8px; border: 1px solid #1e3a2f; border-radius: 10px; overflow: hidden; }
+  .day-toggle { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #0d1b2a; cursor: pointer; user-select: none; }
+  .day-toggle:hover { background: #112233; }
+  .day-toggle-title { font-size: 13px; font-weight: 700; color: #80cbc4; }
+  .day-toggle-meta { font-size: 11px; color: #546e7a; }
+  .day-toggle-arrow { color: #546e7a; font-size: 12px; transition: transform 0.2s; }
+  .day-toggle-arrow.open { transform: rotate(180deg); }
+  .day-content { padding: 10px 10px 4px; }
   .stats-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
   .empty { text-align: center; color: #37474f; padding: 30px; font-size: 14px; }
 </style>
@@ -274,6 +281,8 @@ function renderHistory() {
   document.getElementById("h-roi").textContent    = roi !== "–" ? (profit >= 0 ? "+" : "") + roi + "%" : "–";
   document.getElementById("h-roi").style.color    = roiCol;
 
+  if (!history.length) { el.innerHTML = '<div class="empty">Még nincsenek rögzített tippek.</div>'; return; }
+
   const byDay = {};
   history.forEach(t => {
     const d = t.addedAt?.split(" ")[0] || "–";
@@ -281,16 +290,42 @@ function renderHistory() {
     byDay[d].push(t);
   });
 
-  const el = document.getElementById("history-list");
-  if (!history.length) { el.innerHTML = '<div class="empty">Még nincsenek rögzített tippek.</div>'; return; }
+  const todayStr = new Date().toLocaleDateString("hu-HU").replace(/\s/g, "");
+  const yesterdayStr = new Date(Date.now() - 86400000).toLocaleDateString("hu-HU").replace(/\s/g, "");
 
-  el.innerHTML = Object.keys(byDay).sort((a,b) => b.localeCompare(a)).map(day => {
+  function dayLabel(d) {
+    const clean = d.replace(/\s/g, "");
+    if (clean === todayStr) return `📅 ${d} <span style="color:#00e676;font-size:11px">(ma)</span>`;
+    if (clean === yesterdayStr) return `📅 ${d} <span style="color:#ffe082;font-size:11px">(tegnap)</span>`;
+    return `📅 ${d} <span style="color:#546e7a;font-size:11px">(archív)</span>`;
+  }
+
+  function isToday(d) { return d.replace(/\s/g, "") === todayStr; }
+
+  el.innerHTML = Object.keys(byDay).sort((a,b) => b.localeCompare(a)).map((day, idx) => {
     const pending = byDay[day].filter(t => !t.result || t.result === "pending")
       .sort((a,b) => parseCommence(a.commence) - parseCommence(b.commence));
     const closed  = byDay[day].filter(t => t.result && t.result !== "pending")
       .sort((a,b) => parseCommence(a.commence) - parseCommence(b.commence));
     const sorted  = [...pending, ...closed];
-    return `<div class="day-header">${day}</div>${sorted.map(t => t.type === "ai" ? aiTipHTML(t,true) : valueTipHTML(t,true)).join("")}`;
+    const won     = closed.filter(t => t.result === "won").length;
+    const lost    = closed.filter(t => t.result === "lost").length;
+    const isOpen  = isToday(day) || idx === 0;
+    const id      = `day-${idx}`;
+    const meta    = `${sorted.length} tipp${closed.length ? ` · ✅${won} ❌${lost}` : ""}`;
+    return `
+    <div class="day-section">
+      <div class="day-toggle" onclick="toggleDay('${id}')">
+        <span class="day-toggle-title">${dayLabel(day)}</span>
+        <span style="display:flex;align-items:center;gap:8px">
+          <span class="day-toggle-meta">${meta}</span>
+          <span class="day-toggle-arrow ${isOpen ? "open" : ""}" id="arrow-${id}">▼</span>
+        </span>
+      </div>
+      <div class="day-content" id="${id}" style="display:${isOpen ? "" : "none"}">
+        ${sorted.map(t => t.type === "ai" ? aiTipHTML(t,true) : valueTipHTML(t,true)).join("")}
+      </div>
+    </div>`;
   }).join("");
 }
 
@@ -325,6 +360,14 @@ async function loadHistory() {
     history = await r.json();
     renderHistory();
   } catch(e) { console.error("loadHistory hiba:", e); }
+}
+
+function toggleDay(id) {
+  const content = document.getElementById(id);
+  const arrow   = document.getElementById("arrow-" + id);
+  const isOpen  = content.style.display !== "none";
+  content.style.display = isOpen ? "none" : "";
+  arrow.classList.toggle("open", !isOpen);
 }
 
 async function setResult(id, result) {
