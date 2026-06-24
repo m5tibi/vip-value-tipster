@@ -13,7 +13,7 @@
   .sub { font-size: 11px; color: #546e7a; }
   .cd { font-size: 12px; color: #546e7a; background: #0d1b2a; border: 1px solid #1e3a2f; border-radius: 8px; padding: 4px 10px; }
   .cd b { color: #ffe082; }
-  .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
   .tab { background: #0d1b2a; color: #80cbc4; border: 1px solid #1e3a2f; border-radius: 8px; padding: 7px 18px; font-weight: 700; font-size: 14px; cursor: pointer; }
   .tab.active { background: #00e676; color: #07111d; border-color: #00e676; }
   .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
@@ -35,19 +35,13 @@
   .tip-kelly { font-size: 12px; color: #ffe082; margin-top: 2px; }
   .tip-note { color: #78909c; font-size: 12px; margin-top: 6px; line-height: 1.5; }
   .tip-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
-  /* Badges */
   .bdg { border-radius: 6px; font-weight: 700; font-size: 12px; padding: 2px 9px; display: inline-block; }
   .bdg-value { background: #1b3a2a; color: #00e676; }
   .bdg-ai    { background: #2a1e3f; color: #b39ddb; }
-  .bdg-v     { color: #0a2a1a; }
-  .bdg-c0    { background: #37474f; color: #b0bec5; }
-  .bdg-c1    { background: #e65100; color: #ffe082; }
-  .bdg-c2    { background: #1b5e20; color: #69f0ae; }
   .bdg-won   { background: #1b5e20; color: #69f0ae; }
   .bdg-lost  { background: #7f0000; color: #ef9a9a; }
   .bdg-push  { background: #1a237e; color: #90caf9; }
   .bdg-pend  { background: #263238; color: #78909c; }
-  /* Buttons */
   button { cursor: pointer; font-family: sans-serif; }
   .btn-won  { background: #1b5e20; color: #69f0ae; border: none; border-radius: 6px; padding: 3px 12px; font-size: 12px; font-weight: 600; }
   .btn-lost { background: #7f0000; color: #ef9a9a; border: none; border-radius: 6px; padding: 3px 12px; font-size: 12px; font-weight: 600; }
@@ -60,21 +54,21 @@
   .stat-card { background: #0d1b2a; border: 1px solid #1e3a2f; border-radius: 10px; padding: 10px 8px; text-align: center; }
   .stat-label { font-size: 11px; color: #546e7a; }
   .stat-value { font-size: 20px; font-weight: 700; color: #00e676; }
-  .day-section { margin-bottom: 8px; border: 1px solid #1e3a2f; border-radius: 10px; overflow: hidden; }
+  .empty { text-align: center; color: #37474f; padding: 30px; font-size: 14px; }
+  .section-header { font-weight: 700; font-size: 14px; margin: 16px 0 8px; padding: 8px 12px; border-radius: 8px; }
+  .day-section { margin-bottom: 6px; border: 1px solid #1e3a2f; border-radius: 10px; overflow: hidden; }
   .day-toggle { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #0d1b2a; cursor: pointer; user-select: none; }
   .day-toggle:hover { background: #112233; }
-  .day-toggle-title { font-size: 13px; font-weight: 700; color: #80cbc4; }
-  .day-toggle-meta { font-size: 11px; color: #546e7a; }
-  .day-toggle-arrow { color: #546e7a; font-size: 12px; transition: transform 0.2s; }
-  .day-toggle-arrow.open { transform: rotate(180deg); }
+  .day-label { font-size: 13px; font-weight: 700; color: #80cbc4; }
+  .day-meta { font-size: 11px; color: #546e7a; margin-right: 8px; }
+  .day-arrow { color: #546e7a; font-size: 11px; transition: transform 0.2s; }
+  .day-arrow.open { transform: rotate(180deg); }
   .day-content { padding: 10px 10px 4px; }
   .stats-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
-  .empty { text-align: center; color: #37474f; padding: 30px; font-size: 14px; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <!-- Header -->
   <div class="header">
     <div>
       <div class="title">VIP Value Tipster</div>
@@ -88,7 +82,6 @@
 
   <div id="tg-status" class="tg-status" style="display:none"></div>
 
-  <!-- Tabs -->
   <div class="tabs">
     <button class="tab active" onclick="switchTab('tips')">📊 Mai tippek</button>
     <button class="tab" onclick="switchTab('history')">📁 Előzmények</button>
@@ -100,13 +93,10 @@
       <div class="last-update" id="last-update">Még nem futott elemzés</div>
       <button class="btn-refresh" id="btn-refresh" onclick="refresh()">🔄 Frissítés most</button>
     </div>
-
     <div class="section-title" style="color:#00e676">📊 Value tippek</div>
     <div class="section-sub">Pinnacle-alapú matematikai piaci előny (+6% felett)</div>
     <div id="value-list"><div class="no-value">Kattints a frissítésre...</div></div>
-
     <hr class="divider">
-
     <div class="section-title" style="color:#b39ddb">🤖 AI elemzett tippek</div>
     <div class="section-sub">Valós web keresés alapján, forma és statisztika elemzéssel</div>
     <div id="ai-list"><div class="no-value">Kattints a frissítésre...</div></div>
@@ -116,7 +106,7 @@
   <div id="tab-history-panel" style="display:none">
     <div class="stats-header">
       <div style="font-weight:700;color:#00e676;font-size:16px">📊 Előzmény & statisztika</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px">
         <button class="btn-send" onclick="sendStats()">📲 Küldés</button>
         <button class="btn-del"  onclick="clearHistory()">🗑️ Törlés</button>
       </div>
@@ -138,71 +128,93 @@
 <script>
 let valueTips = [], aiTips = [], history = [];
 let msRemaining = 0;
+let dayCounter = 0;
 
-document.getElementById("today").textContent = new Date().toLocaleDateString("hu-HU", { year:"numeric", month:"long", day:"numeric" });
+document.getElementById("today").textContent = new Date().toLocaleDateString("hu-HU", {year:"numeric",month:"long",day:"numeric"});
 
 function showStatus(msg, color) {
   const el = document.getElementById("tg-status");
-  el.textContent = msg;
-  el.style.color = color || "#00e676";
-  el.style.display = "block";
+  el.textContent = msg; el.style.color = color||"#00e676"; el.style.display = "block";
   setTimeout(() => el.style.display = "none", 4000);
 }
 
 function switchTab(t) {
-  document.getElementById("tab-tips").style.display          = t === "tips" ? "" : "none";
-  document.getElementById("tab-history-panel").style.display = t === "history" ? "" : "none";
-  document.querySelectorAll(".tab").forEach((b,i) => b.classList.toggle("active", (i===0)===(t==="tips")));
-  if (t === "history") loadHistory();
+  document.getElementById("tab-tips").style.display          = t==="tips" ? "" : "none";
+  document.getElementById("tab-history-panel").style.display = t==="history" ? "" : "none";
+  document.querySelectorAll(".tab").forEach((b,i) => b.classList.toggle("active",(i===0)===(t==="tips")));
+  if (t==="history") loadHistory();
 }
 
-// ── Badges & Buttons ──────────────────────────────────────
-function valueBg(v) { return v >= 15 ? "#00e676" : v >= 8 ? "#69f0ae" : "#b9f6ca"; }
+// ── Helpers ───────────────────────────────────────────────
+function valueBg(v) { return v>=15?"#00e676":v>=8?"#69f0ae":"#b9f6ca"; }
 
 function resBadge(r) {
-  if (!r || r === "pending") return `<span class="bdg bdg-pend">⏳ Folyamatban</span>`;
-  if (r === "won")  return `<span class="bdg bdg-won">✅ Nyert</span>`;
-  if (r === "push") return `<span class="bdg bdg-push">↩️ Visszajár</span>`;
+  if (!r||r==="pending") return `<span class="bdg bdg-pend">⏳ Folyamatban</span>`;
+  if (r==="won")  return `<span class="bdg bdg-won">✅ Nyert</span>`;
+  if (r==="push") return `<span class="bdg bdg-push">↩️ Visszajár</span>`;
   return `<span class="bdg bdg-lost">❌ Vesztett</span>`;
 }
 
 function needsPush(market) {
-  const m = (market || "").toLowerCase();
-  return m.includes("hendikep") || m.includes("over");
+  const m = (market||"").toLowerCase();
+  return m.includes("hendikep")||m.includes("over");
 }
 
 function actionBtns(t) {
-  if (t.result && t.result !== "pending") return "";
-  const pushBtn = needsPush(t.market)
-    ? `<button class="btn-push" onclick="setResult('${t.id}','push')">↩️ Visszajár</button>` : "";
+  if (t.result && t.result!=="pending") return "";
+  const pb = needsPush(t.market) ? `<button class="btn-push" onclick="setResult('${t.id}','push')">↩️ Visszajár</button>` : "";
   return `<button class="btn-won" onclick="setResult('${t.id}','won')">✅ Nyert</button>
-          <button class="btn-lost" onclick="setResult('${t.id}','lost')">❌ Vesztett</button>
-          ${pushBtn}`;
+          <button class="btn-lost" onclick="setResult('${t.id}','lost')">❌ Vesztett</button>${pb}`;
+}
+
+function parseCommence(c) {
+  if (!c) return 999999999;
+  const m = c.match(/(\d+)[.\-]?\s*(\d+)[.\-]?\s*(\d+):(\d+)/);
+  if (!m) return 999999999;
+  return parseInt(m[1])*1000000+parseInt(m[2])*10000+parseInt(m[3])*100+parseInt(m[4]);
+}
+
+// addedAt: "2026. 06. 24. 15:00:41" → "2026. 06. 24."
+function getDay(addedAt) {
+  if (!addedAt) return "–";
+  const p = addedAt.split(" ");
+  // p = ["2026.", "06.", "24.", "15:00:41"]
+  if (p.length >= 3) return p[0]+" "+p[1]+" "+p[2];
+  return "–";
+}
+
+// Ma/tegnap nap stringje ugyanolyan formátumban
+function todayKey() {
+  const s = new Date().toLocaleString("hu-HU",{timeZone:"Europe/Budapest"});
+  const p = s.split(" ");
+  return p.length>=3 ? p[0]+" "+p[1]+" "+p[2] : s;
+}
+function yesterdayKey() {
+  const s = new Date(Date.now()-86400000).toLocaleString("hu-HU",{timeZone:"Europe/Budapest"});
+  const p = s.split(" ");
+  return p.length>=3 ? p[0]+" "+p[1]+" "+p[2] : s;
 }
 
 // ── Tip card HTML ─────────────────────────────────────────
 function valueTipHTML(t, showResult) {
-  const conf = ["Alacsony","Közepes","Magas"][t.confidence] || "";
-  const confCls = ["bdg-c0","bdg-c1","bdg-c2"][t.confidence] || "bdg-c0";
   return `
   <div class="tip-card value">
     <div class="tip-top">
       <span class="bdg bdg-value">📊 VALUE</span>
-      <span style="font-size:13px;color:#80cbc4">${t.sportLabel || ""}</span>
-      ${conf ? `<span class="bdg ${confCls}">${conf}</span>` : ""}
-      <span class="bdg bdg-v" style="background:${valueBg(t.value)};margin-left:auto">+${t.value.toFixed(1)}%</span>
+      <span style="font-size:13px;color:#80cbc4">${t.sportLabel||""}</span>
+      <span class="bdg bdg-v" style="background:${valueBg(t.value)};color:#0a2a1a;margin-left:auto">+${t.value.toFixed(1)}%</span>
     </div>
     <div class="tip-match">${t.match}</div>
-    ${t.commence ? `<div class="tip-time">🕐 ${t.commence}</div>` : ""}
+    ${t.commence?`<div class="tip-time">🕐 ${t.commence}</div>`:""}
     <div style="margin-bottom:6px"><span class="tip-market">${t.market}</span><span class="tip-pick">${t.pick}</span></div>
     <div class="tip-odds-row">
       <span>Odds: <b style="color:#00e676">${t.odds}</b></span>
       <span>Fair: <b style="color:#fff">${t.fairOdds}</b></span>
       <span>Valószínűség: <b style="color:#fff">${t.prob}%</b></span>
     </div>
-    ${t.kelly ? `<div class="tip-kelly">📐 Kelly tét: <b>${t.kelly}%</b> a bankrollból</div>` : ""}
-    <div class="tip-note">${t.note || ""}</div>
-    ${showResult ? `<div class="tip-actions">${resBadge(t.result)}${actionBtns(t)}</div>` : ""}
+    ${t.kelly?`<div class="tip-kelly">📐 Kelly tét: <b>${t.kelly}%</b> a bankrollból</div>`:""}
+    <div class="tip-note">${t.note||""}</div>
+    ${showResult?`<div class="tip-actions">${resBadge(t.result)}${actionBtns(t)}</div>`:""}
   </div>`;
 }
 
@@ -211,148 +223,165 @@ function aiTipHTML(t, showResult) {
   <div class="tip-card ai">
     <div class="tip-top">
       <span class="bdg bdg-ai">🤖 AI</span>
-      <span style="font-size:13px;color:#b39ddb">${t.sportLabel || ""}</span>
+      <span style="font-size:13px;color:#b39ddb">${t.sportLabel||""}</span>
       <span class="bdg" style="background:#1565c0;color:#90caf9;margin-left:auto">PRE-MATCH</span>
     </div>
     <div class="tip-match">${t.match}</div>
-    ${t.commence ? `<div class="tip-time">🕐 ${t.commence}</div>` : ""}
+    ${t.commence?`<div class="tip-time">🕐 ${t.commence}</div>`:""}
     <div style="margin-bottom:6px"><span class="tip-market">${t.market}</span><span class="tip-pick">${t.pick}</span></div>
-    <div class="tip-odds-row">
-      <span>Odds: <b style="color:#b39ddb">${t.odds}</b></span>
-    </div>
-    <div class="tip-note">💡 ${t.note || ""}</div>
-    ${showResult ? `<div class="tip-actions">${resBadge(t.result)}${actionBtns(t)}</div>` : ""}
+    <div class="tip-odds-row"><span>Odds: <b style="color:#b39ddb">${t.odds}</b></span></div>
+    <div class="tip-note">💡 ${t.note||""}</div>
+    ${showResult?`<div class="tip-actions">${resBadge(t.result)}${actionBtns(t)}</div>`:""}
   </div>`;
 }
 
-// ── Rendezés commence szerint ─────────────────────────────
-function parseCommence(c) {
-  if (!c) return 999999999;
-  const m = c.match(/(\d+)\.\s*(\d+)\.\s*(\d+):(\d+)/);
-  if (!m) return 999999999;
-  return parseInt(m[1])*1000000 + parseInt(m[2])*10000 + parseInt(m[3])*100 + parseInt(m[4]);
+function tipHTML(t, showResult) {
+  return t.type==="ai" ? aiTipHTML(t,showResult) : valueTipHTML(t,showResult);
 }
 
-// ── Render ────────────────────────────────────────────────
+// ── Render tips ───────────────────────────────────────────
 function renderTips() {
-  const vEl = document.getElementById("value-list");
-  const aEl = document.getElementById("ai-list");
-
-  const sv = [...valueTips].filter(t => !t.result || t.result === "pending").sort((a,b) => parseCommence(a.commence) - parseCommence(b.commence));
-  const sa = [...aiTips].filter(t => !t.result || t.result === "pending").sort((a,b) => parseCommence(a.commence) - parseCommence(b.commence));
-
-  vEl.innerHTML = sv.length
-    ? sv.map(t => valueTipHTML(t, false)).join("")
+  const sv = [...valueTips].filter(t=>!t.result||t.result==="pending").sort((a,b)=>parseCommence(a.commence)-parseCommence(b.commence));
+  const sa = [...aiTips].filter(t=>!t.result||t.result==="pending").sort((a,b)=>parseCommence(a.commence)-parseCommence(b.commence));
+  document.getElementById("value-list").innerHTML = sv.length
+    ? sv.map(t=>valueTipHTML(t,false)).join("")
     : `<div class="no-value">📭 Ma nincs +6% feletti value lehetőség.</div>`;
-
-  aEl.innerHTML = sa.length
-    ? sa.map(t => aiTipHTML(t, false)).join("")
+  document.getElementById("ai-list").innerHTML = sa.length
+    ? sa.map(t=>aiTipHTML(t,false)).join("")
     : `<div class="no-value">🤖 AI elemzés folyamatban vagy nincs mai befejezetlen meccs.</div>`;
 }
 
+// ── Render history ────────────────────────────────────────
 function renderHistory() {
-  const won  = history.filter(t => t.result === "won").length;
-  const lost = history.filter(t => t.result === "lost").length;
-  const push = history.filter(t => t.result === "push").length;
-  const pend = history.filter(t => !t.result || t.result === "pending").length;
-  const vT   = history.filter(t => t.value);
-  const avg  = vT.length ? (vT.reduce((s,t) => s+t.value,0)/vT.length).toFixed(1) : "–";
-  const wr   = (won+lost) ? ((won/(won+lost))*100).toFixed(0)+"%" : "–";
-
-  // ROI számítás: 1 egység/tipp, lezárt meccsek alapján
-  const closed = history.filter(t => t.result === "won" || t.result === "lost" || t.result === "push");
-  let profit = 0;
-  closed.forEach(t => {
-    if (t.result === "won")  profit += (parseFloat(t.odds) - 1);
-    if (t.result === "lost") profit -= 1;
-    if (t.result === "push") profit += 0;
+  const won    = history.filter(t=>t.result==="won").length;
+  const lost   = history.filter(t=>t.result==="lost").length;
+  const push   = history.filter(t=>t.result==="push").length;
+  const vT     = history.filter(t=>t.value);
+  const avg    = vT.length?(vT.reduce((s,t)=>s+t.value,0)/vT.length).toFixed(1):"–";
+  const wr     = (won+lost)?((won/(won+lost))*100).toFixed(0)+"%":"–";
+  const closed = history.filter(t=>t.result==="won"||t.result==="lost"||t.result==="push");
+  let profit   = 0;
+  closed.forEach(t=>{
+    if (t.result==="won")  profit += parseFloat(t.odds)-1;
+    if (t.result==="lost") profit -= 1;
   });
-  const roi    = closed.length ? ((profit / closed.length) * 100).toFixed(1) : "–";
-  const roiCol = profit > 0 ? "#69f0ae" : profit < 0 ? "#ef9a9a" : "#90a4ae";
+  const roi    = closed.length?((profit/closed.length)*100).toFixed(1):"–";
+  const roiCol = profit>0?"#69f0ae":profit<0?"#ef9a9a":"#90a4ae";
 
   document.getElementById("h-total").textContent  = history.length;
   document.getElementById("h-won").textContent    = won;
   document.getElementById("h-lost").textContent   = lost;
   document.getElementById("h-push").textContent   = push;
-  document.getElementById("h-avg").textContent    = avg !== "–" ? avg+"%" : "–";
+  document.getElementById("h-avg").textContent    = avg!=="–"?avg+"%":"–";
   document.getElementById("h-wr").textContent     = wr;
-  document.getElementById("h-profit").textContent = closed.length ? (profit >= 0 ? "+" : "") + profit.toFixed(2) : "–";
+  document.getElementById("h-profit").textContent = closed.length?(profit>=0?"+":"")+profit.toFixed(2):"–";
   document.getElementById("h-profit").style.color = roiCol;
-  document.getElementById("h-roi").textContent    = roi !== "–" ? (profit >= 0 ? "+" : "") + roi + "%" : "–";
+  document.getElementById("h-roi").textContent    = roi!=="–"?(profit>=0?"+":"")+roi+"%":"–";
   document.getElementById("h-roi").style.color    = roiCol;
 
   const el = document.getElementById("history-list");
-  if (!history.length) { el.innerHTML = '<div class="empty">Még nincsenek rögzített tippek.</div>'; return; }
+  if (!history.length) { el.innerHTML='<div class="empty">Még nincsenek rögzített tippek.</div>'; return; }
 
+  const TODAY     = todayKey();
+  const YESTERDAY = yesterdayKey();
+
+  // Csoportosítás nap szerint
   const byDay = {};
   history.forEach(t => {
-    const d = t.addedAt?.split(" ")[0] || "–";
+    const d = getDay(t.addedAt);
     if (!byDay[d]) byDay[d] = [];
     byDay[d].push(t);
   });
 
-  const todayStr = new Date().toLocaleDateString("hu-HU").replace(/\s/g, "");
-  const yesterdayStr = new Date(Date.now() - 86400000).toLocaleDateString("hu-HU").replace(/\s/g, "");
-
-  function dayLabel(d) {
-    const clean = d.replace(/\s/g, "");
-    if (clean === todayStr) return `📅 ${d} <span style="color:#00e676;font-size:11px">(ma)</span>`;
-    if (clean === yesterdayStr) return `📅 ${d} <span style="color:#ffe082;font-size:11px">(tegnap)</span>`;
-    return `📅 ${d} <span style="color:#546e7a;font-size:11px">(archív)</span>`;
-  }
-
-  function isToday(d) { return d.replace(/\s/g, "") === todayStr; }
-
-  el.innerHTML = Object.keys(byDay).sort((a,b) => b.localeCompare(a)).map((day, idx) => {
-    const pending = byDay[day].filter(t => !t.result || t.result === "pending")
-      .sort((a,b) => parseCommence(a.commence) - parseCommence(b.commence));
-    const closed  = byDay[day].filter(t => t.result && t.result !== "pending")
-      .sort((a,b) => parseCommence(a.commence) - parseCommence(b.commence));
-    const sorted  = [...pending, ...closed];
-    const won     = closed.filter(t => t.result === "won").length;
-    const lost    = closed.filter(t => t.result === "lost").length;
-    const isOpen  = isToday(day) || idx === 0;
-    const id      = `day-${idx}`;
-    const meta    = `${sorted.length} tipp${closed.length ? ` · ✅${won} ❌${lost}` : ""}`;
+  // Nap szekció HTML generálás
+  function makeDaySection(day, tips, defaultOpen) {
+    const id      = "ds-"+(dayCounter++);
+    const pending = tips.filter(t=>!t.result||t.result==="pending").sort((a,b)=>parseCommence(a.commence)-parseCommence(b.commence));
+    const done    = tips.filter(t=>t.result&&t.result!=="pending").sort((a,b)=>parseCommence(a.commence)-parseCommence(b.commence));
+    const sorted  = [...pending,...done];
+    const dWon    = done.filter(t=>t.result==="won").length;
+    const dLost   = done.filter(t=>t.result==="lost").length;
+    const meta    = sorted.length+" tipp"+(done.length?" · ✅"+dWon+" ❌"+dLost:"");
+    let label     = "📅 "+day;
+    if (day===TODAY)     label += ' <span style="color:#00e676;font-size:11px">(ma)</span>';
+    else if (day===YESTERDAY) label += ' <span style="color:#ffe082;font-size:11px">(tegnap)</span>';
+    else                 label += ' <span style="color:#546e7a;font-size:11px">(archív)</span>';
     return `
     <div class="day-section">
       <div class="day-toggle" onclick="toggleDay('${id}')">
-        <span class="day-toggle-title">${dayLabel(day)}</span>
-        <span style="display:flex;align-items:center;gap:8px">
-          <span class="day-toggle-meta">${meta}</span>
-          <span class="day-toggle-arrow ${isOpen ? "open" : ""}" id="arrow-${id}">▼</span>
+        <span class="day-label">${label}</span>
+        <span style="display:flex;align-items:center;gap:6px">
+          <span class="day-meta">${meta}</span>
+          <span class="day-arrow ${defaultOpen?"open":""}" id="arr-${id}">▼</span>
         </span>
       </div>
-      <div class="day-content" id="${id}" style="display:${isOpen ? "" : "none"}">
-        ${sorted.map(t => t.type === "ai" ? aiTipHTML(t,true) : valueTipHTML(t,true)).join("")}
+      <div class="day-content" id="${id}" style="display:${defaultOpen?"":"none"}">
+        ${sorted.map(t=>tipHTML(t,true)).join("")}
       </div>
     </div>`;
-  }).join("");
+  }
+
+  dayCounter = 0;
+  const pending = history.filter(t=>!t.result||t.result==="pending");
+  const done    = history.filter(t=>t.result&&t.result!=="pending");
+
+  const pendingByDay = {};
+  pending.forEach(t=>{ const d=getDay(t.addedAt); if(!pendingByDay[d]) pendingByDay[d]=[]; pendingByDay[d].push(t); });
+
+  const doneByDay = {};
+  done.forEach(t=>{ const d=getDay(t.addedAt); if(!doneByDay[d]) doneByDay[d]=[]; doneByDay[d].push(t); });
+
+  let html = "";
+
+  if (pending.length) {
+    html += `<div class="section-header" style="background:#0d2a3a;color:#90caf9">⏳ Folyamatban lévő tippek</div>`;
+    Object.keys(pendingByDay).sort((a,b)=>b.localeCompare(a)).forEach(day => {
+      html += makeDaySection(day, pendingByDay[day], true);
+    });
+  }
+
+  if (done.length) {
+    html += `<div class="section-header" style="background:#0d1b2a;color:#80cbc4;margin-top:8px">📋 Lezárt tippek</div>`;
+    Object.keys(doneByDay).sort((a,b)=>b.localeCompare(a)).forEach((day,i) => {
+      const isRecent = day===TODAY||day===YESTERDAY;
+      html += makeDaySection(day, doneByDay[day], isRecent);
+    });
+  }
+
+  el.innerHTML = html;
 }
 
-// ── API hívások ───────────────────────────────────────────
+function toggleDay(id) {
+  const c = document.getElementById(id);
+  const a = document.getElementById("arr-"+id);
+  const open = c.style.display!=="none";
+  c.style.display = open?"none":"";
+  a.classList.toggle("open",!open);
+}
+
+// ── API ───────────────────────────────────────────────────
 async function refresh() {
   const btn = document.getElementById("btn-refresh");
-  btn.disabled = true; btn.textContent = "Elemzés folyamatban...";
+  btn.disabled=true; btn.textContent="Elemzés folyamatban...";
   try {
-    const r = await fetch("/api/refresh", { method: "POST" });
+    const r = await fetch("/api/refresh",{method:"POST"});
     const d = await r.json();
     showStatus(`✅ ${d.valueTips} value + ${d.aiTips} AI tipp`);
     await loadTips();
-  } catch(e) { showStatus("⚠️ Hiba: " + e.message, "#ef9a9a"); }
-  btn.disabled = false; btn.textContent = "🔄 Frissítés most";
-  msRemaining = 0;
+  } catch(e) { showStatus("⚠️ Hiba: "+e.message,"#ef9a9a"); }
+  btn.disabled=false; btn.textContent="🔄 Frissítés most";
+  msRemaining=0;
 }
 
 async function loadTips() {
   try {
     const r = await fetch("/api/tips");
     const d = await r.json();
-    valueTips = Array.isArray(d.valueTips) ? d.valueTips : [];
-    aiTips    = Array.isArray(d.aiTips)    ? d.aiTips    : [];
-    document.getElementById("last-update").textContent = "Frissítve: " + new Date().toLocaleTimeString("hu-HU");
+    valueTips = Array.isArray(d.valueTips)?d.valueTips:[];
+    aiTips    = Array.isArray(d.aiTips)?d.aiTips:[];
+    document.getElementById("last-update").textContent="Frissítve: "+new Date().toLocaleTimeString("hu-HU");
     renderTips();
-  } catch(e) { console.error("loadTips hiba:", e); }
+  } catch(e) { console.error("loadTips hiba:",e); }
 }
 
 async function loadHistory() {
@@ -360,31 +389,23 @@ async function loadHistory() {
     const r = await fetch("/api/history");
     history = await r.json();
     renderHistory();
-  } catch(e) { console.error("loadHistory hiba:", e); }
-}
-
-function toggleDay(id) {
-  const content = document.getElementById(id);
-  const arrow   = document.getElementById("arrow-" + id);
-  const isOpen  = content.style.display !== "none";
-  content.style.display = isOpen ? "none" : "";
-  arrow.classList.toggle("open", !isOpen);
+  } catch(e) { console.error("loadHistory hiba:",e); }
 }
 
 async function setResult(id, result) {
-  await fetch(`/api/history/${id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify({result}) });
+  await fetch(`/api/history/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({result})});
   await loadHistory();
 }
 
 async function sendStats() {
-  await fetch("/api/stats/send", { method:"POST" });
+  await fetch("/api/stats/send",{method:"POST"});
   showStatus("✅ Statisztika elküldve Telegramon");
 }
 
 async function clearHistory() {
   if (!confirm("Biztosan törlöd az összes előzményt? Ez nem visszavonható!")) return;
-  await fetch("/api/history", { method:"DELETE" });
-  history = [];
+  await fetch("/api/history",{method:"DELETE"});
+  history=[];
   renderHistory();
   showStatus("🗑️ Előzmények törölve");
 }
@@ -394,21 +415,17 @@ async function loadStatus() {
     const r = await fetch("/api/status");
     const d = await r.json();
     msRemaining = d.nextFetchMs;
-    const hours = d.fetchHours.join(":00, ") + ":00";
-    document.getElementById("fetch-schedule").textContent = `Mai lekérések: ${hours}`;
+    document.getElementById("fetch-schedule").textContent="Mai lekérések: "+d.fetchHours.join(":00, ")+":00";
   } catch(e) {}
 }
 
-// ── Visszaszámláló ────────────────────────────────────────
-setInterval(() => {
-  msRemaining = Math.max(0, msRemaining - 1000);
-  const s = Math.floor(msRemaining / 1000);
-  const h = Math.floor(s / 3600), m = Math.floor((s%3600)/60), sec = s%60;
-  document.getElementById("countdown").textContent =
-    h > 0 ? `${h}ó ${m}p` : `${m}:${String(sec).padStart(2,"0")}`;
-}, 1000);
+setInterval(()=>{
+  msRemaining=Math.max(0,msRemaining-1000);
+  const s=Math.floor(msRemaining/1000);
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
+  document.getElementById("countdown").textContent=h>0?`${h}ó ${m}p`:`${m}:${String(sec).padStart(2,"0")}`;
+},1000);
 
-// ── Init ──────────────────────────────────────────────────
 loadStatus();
 loadTips();
 </script>
