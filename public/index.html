@@ -342,9 +342,8 @@ function renderHistory() {
 
   if (done.length) {
     html += `<div class="section-header" style="background:#0d1b2a;color:#80cbc4;margin-top:8px">📋 Lezárt tippek</div>`;
-    Object.keys(doneByDay).sort((a,b)=>b.localeCompare(a)).forEach((day,i) => {
-      const isRecent = day===TODAY||day===YESTERDAY;
-      html += makeDaySection(day, doneByDay[day], isRecent);
+    Object.keys(doneByDay).sort((a,b)=>b.localeCompare(a)).forEach((day) => {
+      html += makeDaySection(day, doneByDay[day], false);
     });
   }
 
