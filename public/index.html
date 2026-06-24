@@ -359,16 +359,6 @@ async function loadHistory() {
   try {
     const r = await fetch("/api/history");
     history = await r.json();
-    console.log("History count:", history.length);
-    if (history.length) {
-      console.log("Első addedAt:", history[0].addedAt);
-      const parts = (history[0].addedAt || "").split(" ");
-      console.log("Parts:", parts);
-      const d = parts.length >= 3 ? `${parts[0]} ${parts[1]} ${parts[2]}` : "–";
-      console.log("Nap kulcs:", d);
-      const todayStr = new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" }).split(" ").slice(0,3).join(" ");
-      console.log("Today string:", todayStr);
-    }
     renderHistory();
   } catch(e) { console.error("loadHistory hiba:", e); }
 }
