@@ -53,7 +53,7 @@ const SPORT_MAP = {
   "soccer_conmebol_copa_libertadores": { sport: "soccer",     label: "⚽ Copa Libertadores",   minValue: 7 },
   "soccer_conmebol_copa_sudamericana": { sport: "soccer",     label: "⚽ Copa Sudamericana",   minValue: 7 },
   "basketball_nba":                    { sport: "basketball", label: "🏀 NBA",                 minValue: 6 },
-  "basketball_wnba":                   { sport: "basketball", label: "🏀 WNBA",                minValue: 9 },
+  "basketball_wnba":                   { sport: "basketball", label: "🏀 WNBA",                minValue: 12  },
   "basketball_euroleague":             { sport: "basketball", label: "🏀 Euroleague",           minValue: 8 },
   "icehockey_nhl":                     { sport: "hockey",     label: "🏒 NHL",                 minValue: 6 },
   "icehockey_ahl":                     { sport: "hockey",     label: "🏒 AHL",                 minValue: 9 },
@@ -515,6 +515,5 @@ app.listen(PORT, () => console.log(`VIP Tipster fut: http://localhost:${PORT}`))
 const lastRun = loadLastRun();
 if (lastRun) console.log(`Utolsó futás: ${Math.round((Date.now() - new Date(lastRun).getTime()) / 60000)} perce`);
 
-scheduleNextFetch();
 setInterval(checkResults, 60 * 60 * 1000);
 setTimeout(checkResults, 30000);
