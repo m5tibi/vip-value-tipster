@@ -503,6 +503,11 @@ app.delete("/api/history", (req, res) => {
   res.json({ ok: true });
 });
 
+app.post("/api/check-results", async (req, res) => {
+  await checkResults();
+  res.json({ ok: true });
+});
+
 app.post("/api/stats/send", async (req, res) => {
   await sendTelegram(buildStatsMsg("VIP Value Tipster – Statisztika"));
   res.json({ ok: true });
@@ -514,6 +519,3 @@ app.listen(PORT, () => console.log(`VIP Tipster fut: http://localhost:${PORT}`))
 
 const lastRun = loadLastRun();
 if (lastRun) console.log(`Utolsó futás: ${Math.round((Date.now() - new Date(lastRun).getTime()) / 60000)} perce`);
-
-setInterval(checkResults, 60 * 60 * 1000);
-setTimeout(checkResults, 30000);
