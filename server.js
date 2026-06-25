@@ -417,12 +417,28 @@ function scheduleNextFetch() {
 setInterval(() => {
   const { hour, minute } = getHungarianTime();
   if (hour === EOD_HOUR && minute === 0) {
-    const won   = history.filter(t => t.result === "won").length;
-    const lost  = history.filter(t => t.result === "lost").length;
-    const push  = history.filter(t => t.result === "push").length;
-    const vTips = history.filter(t => t.value);
-    const avg   = vTips.length ? (vTips.reduce((s, t) => s + t.value, 0) / vTips.length).toFixed(1) : "–";
-    sendTelegram(`📈 <b>Napi stat – ${new Date().toLocaleDateString("hu-HU")}</b>\n\nÖsszes: ${history.length}\n✅ Nyert: ${won}\n❌ Vesztett: ${lost}\n↩️ Visszajár: ${push}\n📊 Átl. value: +${avg}%`);
+    const won    = history.filter(t => t.result === "won").length;
+    const lost   = history.filter(t => t.result === "lost").length;
+    const push   = history.filter(t => t.result === "push").length;
+    const pend   = history.filter(t => !t.result || t.result === "pending").length;
+    const vTips  = history.filter(t => t.value);
+    const avg    = vTips.length ? (vTips.reduce((s,t) => s+t.value,0)/vTips.length).toFixed(1) : "–";
+    const wr     = (won+lost) ? ((won/(won+lost))*100).toFixed(0)+"%" : "–";
+    const closed = history.filter(t => t.result==="won"||t.result==="lost"||t.result==="push");
+    let profit   = 0;
+    closed.forEach(t => {
+      if (t.result==="won")  profit += parseFloat(t.odds)-1;
+      if (t.result==="lost") profit -= 1;
+    });
+    const roi       = closed.length ? ((profit/closed.length)*100).toFixed(1) : "–";
+    const profitStr = closed.length ? (profit>=0?"+":"")+profit.toFixed(2) : "–";
+    const roiStr    = roi!=="–" ? (profit>=0?"+":"")+roi+"%" : "–";
+    sendTelegram(
+      `📈 <b>Napi statisztika – ${new Date().toLocaleDateString("hu-HU")}</b>\n\n`+
+      `Összes: <b>${history.length}</b> | ⏳ ${pend} | ✅ ${won} | ❌ ${lost} | ↩️ ${push}\n`+
+      `Win %: <b>${wr}</b> | Profit: <b>${profitStr} e.</b> | ROI: <b>${roiStr}</b>\n`+
+      `Átl. value: <b>+${avg}%</b>`
+    );
   }
 }, 60000);
 
