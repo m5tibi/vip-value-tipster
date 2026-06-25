@@ -487,13 +487,38 @@ app.delete("/api/history", (req, res) => {
 });
 
 app.post("/api/stats/send", async (req, res) => {
-  const won   = history.filter(t => t.result === "won").length;
-  const lost  = history.filter(t => t.result === "lost").length;
-  const push  = history.filter(t => t.result === "push").length;
-  const vTips = history.filter(t => t.value);
-  const avg   = vTips.length ? (vTips.reduce((s, t) => s + t.value, 0) / vTips.length).toFixed(1) : "–";
-  await sendTelegram(`📈 <b>Napi stat – ${new Date().toLocaleDateString("hu-HU")}</b>\n\nÖsszes: ${history.length}\n✅ Nyert: ${won}\n❌ Vesztett: ${lost}\n↩️ Visszajár: ${push}\n📊 Átl. value: +${avg}%`);
+  const won    = history.filter(t => t.result === "won").length;
+  const lost   = history.filter(t => t.result === "lost").length;
+  const push   = history.filter(t => t.result === "push").length;
+  const pend   = history.filter(t => !t.result || t.result === "pending").length;
+  const vTips  = history.filter(t => t.value);
+  const avg    = vTips.length ? (vTips.reduce((s,t) => s+t.value,0)/vTips.length).toFixed(1) : "–";
+  const wr     = (won+lost) ? ((won/(won+lost))*100).toFixed(0)+"%" : "–";
+  const closed = history.filter(t => t.result==="won"||t.result==="lost"||t.result==="push");
+  let profit   = 0;
+  closed.forEach(t => {
+    if (t.result==="won")  profit += parseFloat(t.odds)-1;
+    if (t.result==="lost") profit -= 1;
+  });
+  const roi       = closed.length ? ((profit/closed.length)*100).toFixed(1) : "–";
+  const profitStr = closed.length ? (profit>=0?"+":"")+profit.toFixed(2) : "–";
+  const roiStr    = roi!=="–" ? (profit>=0?"+":"")+roi+"%" : "–";
+  const msg = `📈 <b>VIP Value Tipster – Statisztika</b>\n`+
+    `📅 ${new Date().toLocaleDateString("hu-HU")}\n\n`+
+    `📊 <b>Összesítés</b>\n`+
+    `Összes tipp: <b>${history.length}</b>\n`+
+    `⏳ Folyamatban: <b>${pend}</b>\n`+
+    `✅ Nyert: <b>${won}</b>\n`+
+    `❌ Vesztett: <b>${lost}</b>\n`+
+    `↩️ Visszajár: <b>${push}</b>\n\n`+
+    `📉 <b>Teljesítmény</b>\n`+
+    `Win %: <b>${wr}</b>\n`+
+    `Profit: <b>${profitStr} egység</b>\n`+
+    `ROI: <b>${roiStr}</b>\n`+
+    `Átl. value: <b>+${avg}%</b>`;
+  await sendTelegram(msg);
   res.json({ ok: true });
+});
 });
 
 // ── Indítás ───────────────────────────────────────────────
