@@ -75,8 +75,6 @@
       <div class="sub" id="today"></div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <div class="cd">⏱ <b id="countdown">–</b></div>
-      <div class="cd" id="fetch-schedule" style="font-size:10px"></div>
     </div>
   </div>
 
@@ -106,7 +104,8 @@
   <div id="tab-history-panel" style="display:none">
     <div class="stats-header">
       <div style="font-weight:700;color:#00e676;font-size:16px">📊 Előzmény & statisztika</div>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-send" onclick="checkResults()">🔍 Eredmények</button>
         <button class="btn-send" onclick="sendStats()">📲 Küldés</button>
         <button class="btn-del"  onclick="clearHistory()">🗑️ Törlés</button>
       </div>
@@ -399,6 +398,13 @@ async function setResult(id, result) {
   await loadHistory();
 }
 
+async function checkResults() {
+  showStatus("🔍 Eredmények ellenőrzése...");
+  await fetch("/api/check-results", { method: "POST" });
+  await loadHistory();
+  showStatus("✅ Eredmények frissítve");
+}
+
 async function sendStats() {
   await fetch("/api/stats/send",{method:"POST"});
   showStatus("✅ Statisztika elküldve Telegramon");
@@ -412,21 +418,9 @@ async function clearHistory() {
   showStatus("🗑️ Előzmények törölve");
 }
 
-async function loadStatus() {
-  try {
-    const r = await fetch("/api/status");
-    const d = await r.json();
-    msRemaining = d.nextFetchMs;
-    document.getElementById("fetch-schedule").textContent="Mai lekérések: "+d.fetchHours.join(":00, ")+":00";
-  } catch(e) {}
-}
+async function loadStatus() {}
 
-setInterval(()=>{
-  msRemaining=Math.max(0,msRemaining-1000);
-  const s=Math.floor(msRemaining/1000);
-  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
-  document.getElementById("countdown").textContent=h>0?`${h}ó ${m}p`:`${m}:${String(sec).padStart(2,"0")}`;
-},1000);
+
 
 loadStatus();
 loadTips();
