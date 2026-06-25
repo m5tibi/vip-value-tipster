@@ -99,6 +99,44 @@ async function sendTelegram(text) {
   } catch (e) { console.error("Telegram hiba:", e.message); }
 }
 
+// ── Statisztika számítás ──────────────────────────────────
+function calcStats() {
+  const won    = history.filter(t => t.result === "won").length;
+  const lost   = history.filter(t => t.result === "lost").length;
+  const push   = history.filter(t => t.result === "push").length;
+  const pend   = history.filter(t => !t.result || t.result === "pending").length;
+  const vTips  = history.filter(t => t.value);
+  const avg    = vTips.length ? (vTips.reduce((s,t) => s+t.value,0)/vTips.length).toFixed(1) : "–";
+  const wr     = (won+lost) ? ((won/(won+lost))*100).toFixed(0)+"%" : "–";
+  const closed = history.filter(t => t.result==="won"||t.result==="lost"||t.result==="push");
+  let profit   = 0;
+  closed.forEach(t => {
+    if (t.result==="won")  profit += parseFloat(t.odds)-1;
+    if (t.result==="lost") profit -= 1;
+  });
+  const roi       = closed.length ? ((profit/closed.length)*100).toFixed(1) : "–";
+  const profitStr = closed.length ? (profit>=0?"+":"")+profit.toFixed(2) : "–";
+  const roiStr    = roi!=="–" ? (profit>=0?"+":"")+roi+"%" : "–";
+  return { won, lost, push, pend, avg, wr, profitStr, roiStr };
+}
+
+function buildStatsMsg(title) {
+  const { won, lost, push, pend, avg, wr, profitStr, roiStr } = calcStats();
+  return `📈 <b>${title}</b>\n`+
+    `📅 ${new Date().toLocaleDateString("hu-HU")}\n\n`+
+    `📊 <b>Összesítés</b>\n`+
+    `Összes tipp: <b>${history.length}</b>\n`+
+    `⏳ Folyamatban: <b>${pend}</b>\n`+
+    `✅ Nyert: <b>${won}</b>\n`+
+    `❌ Vesztett: <b>${lost}</b>\n`+
+    `↩️ Visszajár: <b>${push}</b>\n\n`+
+    `📉 <b>Teljesítmény</b>\n`+
+    `Win %: <b>${wr}</b>\n`+
+    `Profit: <b>${profitStr} egység</b>\n`+
+    `ROI: <b>${roiStr}</b>\n`+
+    `Átl. value: <b>+${avg}%</b>`;
+}
+
 // ── Value tippek ──────────────────────────────────────────
 async function fetchValueTips() {
   const allTips = [];
@@ -178,7 +216,7 @@ async function fetchValueTips() {
       }
     } catch (e) { console.error(`Hiba (${sportKey}):`, e.message); }
   }
-  return allTips.sort((a, b) => b.value - a.value).slice(0, 5);
+  return allTips.sort((a, b) => b.value - a.value).slice(0, 3);
 }
 
 // ── AI tippek ─────────────────────────────────────────────
@@ -417,28 +455,7 @@ function scheduleNextFetch() {
 setInterval(() => {
   const { hour, minute } = getHungarianTime();
   if (hour === EOD_HOUR && minute === 0) {
-    const won    = history.filter(t => t.result === "won").length;
-    const lost   = history.filter(t => t.result === "lost").length;
-    const push   = history.filter(t => t.result === "push").length;
-    const pend   = history.filter(t => !t.result || t.result === "pending").length;
-    const vTips  = history.filter(t => t.value);
-    const avg    = vTips.length ? (vTips.reduce((s,t) => s+t.value,0)/vTips.length).toFixed(1) : "–";
-    const wr     = (won+lost) ? ((won/(won+lost))*100).toFixed(0)+"%" : "–";
-    const closed = history.filter(t => t.result==="won"||t.result==="lost"||t.result==="push");
-    let profit   = 0;
-    closed.forEach(t => {
-      if (t.result==="won")  profit += parseFloat(t.odds)-1;
-      if (t.result==="lost") profit -= 1;
-    });
-    const roi       = closed.length ? ((profit/closed.length)*100).toFixed(1) : "–";
-    const profitStr = closed.length ? (profit>=0?"+":"")+profit.toFixed(2) : "–";
-    const roiStr    = roi!=="–" ? (profit>=0?"+":"")+roi+"%" : "–";
-    sendTelegram(
-      `📈 <b>Napi statisztika – ${new Date().toLocaleDateString("hu-HU")}</b>\n\n`+
-      `Összes: <b>${history.length}</b> | ⏳ ${pend} | ✅ ${won} | ❌ ${lost} | ↩️ ${push}\n`+
-      `Win %: <b>${wr}</b> | Profit: <b>${profitStr} e.</b> | ROI: <b>${roiStr}</b>\n`+
-      `Átl. value: <b>+${avg}%</b>`
-    );
+    sendTelegram(buildStatsMsg("Napi statisztika"));
   }
 }, 60000);
 
@@ -487,38 +504,8 @@ app.delete("/api/history", (req, res) => {
 });
 
 app.post("/api/stats/send", async (req, res) => {
-  const won    = history.filter(t => t.result === "won").length;
-  const lost   = history.filter(t => t.result === "lost").length;
-  const push   = history.filter(t => t.result === "push").length;
-  const pend   = history.filter(t => !t.result || t.result === "pending").length;
-  const vTips  = history.filter(t => t.value);
-  const avg    = vTips.length ? (vTips.reduce((s,t) => s+t.value,0)/vTips.length).toFixed(1) : "–";
-  const wr     = (won+lost) ? ((won/(won+lost))*100).toFixed(0)+"%" : "–";
-  const closed = history.filter(t => t.result==="won"||t.result==="lost"||t.result==="push");
-  let profit   = 0;
-  closed.forEach(t => {
-    if (t.result==="won")  profit += parseFloat(t.odds)-1;
-    if (t.result==="lost") profit -= 1;
-  });
-  const roi       = closed.length ? ((profit/closed.length)*100).toFixed(1) : "–";
-  const profitStr = closed.length ? (profit>=0?"+":"")+profit.toFixed(2) : "–";
-  const roiStr    = roi!=="–" ? (profit>=0?"+":"")+roi+"%" : "–";
-  const msg = `📈 <b>VIP Value Tipster – Statisztika</b>\n`+
-    `📅 ${new Date().toLocaleDateString("hu-HU")}\n\n`+
-    `📊 <b>Összesítés</b>\n`+
-    `Összes tipp: <b>${history.length}</b>\n`+
-    `⏳ Folyamatban: <b>${pend}</b>\n`+
-    `✅ Nyert: <b>${won}</b>\n`+
-    `❌ Vesztett: <b>${lost}</b>\n`+
-    `↩️ Visszajár: <b>${push}</b>\n\n`+
-    `📉 <b>Teljesítmény</b>\n`+
-    `Win %: <b>${wr}</b>\n`+
-    `Profit: <b>${profitStr} egység</b>\n`+
-    `ROI: <b>${roiStr}</b>\n`+
-    `Átl. value: <b>+${avg}%</b>`;
-  await sendTelegram(msg);
+  await sendTelegram(buildStatsMsg("VIP Value Tipster – Statisztika"));
   res.json({ ok: true });
-});
 });
 
 // ── Indítás ───────────────────────────────────────────────
