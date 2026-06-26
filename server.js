@@ -388,15 +388,24 @@ async function checkResults() {
 
   for (const sportKey of Object.keys(SPORT_MAP)) {
     try {
-      const r = await fetch(`https://api.the-odds-api.com/v4/sports/${sportKey}/scores/?apiKey=${ODDS_API_KEY}&daysFrom=2`);
+      const r = await fetch(`https://api.the-odds-api.com/v4/sports/${sportKey}/scores/?apiKey=${ODDS_API_KEY}&daysFrom=3`);
       if (!r.ok) continue;
       const games = await r.json();
       for (const game of games) {
         if (!game.completed || !game.scores) continue;
-        const tips = pending.filter(t => t.matchId === game.id);
+
+        // Pending tippek keresése matchId VAGY meccs név alapján
+        const matchName = `${game.home_team} vs ${game.away_team}`;
+        const tips = pending.filter(t =>
+          t.matchId === game.id ||
+          t.match === matchName
+        );
         if (!tips.length) continue;
+
         const homeScore = parseInt(game.scores.find(s => s.name === game.home_team)?.score || 0);
         const awayScore = parseInt(game.scores.find(s => s.name === game.away_team)?.score || 0);
+        console.log(`  ${matchName}: ${homeScore}-${awayScore}`);
+
         for (const tip of tips) {
           let result = null;
           if (tip.market === "1X2") {
@@ -418,8 +427,11 @@ async function checkResults() {
           } else if (tip.market.toLowerCase().includes("btts") || tip.market.toLowerCase().includes("mindkét")) {
             result = homeScore > 0 && awayScore > 0 ? "won" : "lost";
           }
-          if (!result) continue;
-          console.log(`  ${game.home_team} vs ${game.away_team}: ${tip.pick} → ${result} (${homeScore}-${awayScore})`);
+          if (!result) {
+            console.log(`    ✗ ${tip.market} / ${tip.pick} – nem sikerült kiértékelni`);
+            continue;
+          }
+          console.log(`    ${tip.pick} → ${result}`);
           history    = history.map(t => t.id === tip.id ? { ...t, result } : t);
           latestTips = latestTips.map(t => t.id === tip.id ? { ...t, result } : t);
           aiTips     = aiTips.map(t => t.id === tip.id ? { ...t, result } : t);
@@ -429,6 +441,7 @@ async function checkResults() {
     } catch (e) { console.error(`Scores hiba (${sportKey}):`, e.message); }
   }
   if (changed) { saveHistory(); console.log("Eredmények mentve ✓"); }
+  else console.log("Nincs új lezárt meccs.");
 }
 
 // ── Ütemező ───────────────────────────────────────────────
