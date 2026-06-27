@@ -8,7 +8,8 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 app.use('/api/odds', require('./routes/odds'));
 
-const ODDS_API_KEY  = process.env.ODDS_API_KEY;
+const ADMIN_PWD = process.env.ADMIN_PASSWORD;
+
 const TG_BOT_TOKEN  = process.env.TG_BOT_TOKEN;
 const TG_CHAT_ID    = process.env.TG_CHAT_ID;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
@@ -498,6 +499,9 @@ app.get("/api/status", (req, res) => {
 });
 
 app.post("/api/refresh", async (req, res) => {
+  if (ADMIN_PWD && req.body.password !== ADMIN_PWD) {
+    return res.status(403).json({ error: 'Hozzáférés megtagadva — hibás jelszó.' });
+  }
   await fetchAndProcess();
   res.json({ ok: true, valueTips: latestTips.length, aiTips: aiTips.length });
 });
