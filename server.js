@@ -8,7 +8,8 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 app.use('/api/odds', require('./routes/odds'));
 
-const ADMIN_PWD = process.env.ADMIN_PASSWORD;
+const ADMIN_PWD     = process.env.ADMIN_PASSWORD;
+const ODDS_API_KEY  = process.env.ODDS_API_KEY;
 
 const TG_BOT_TOKEN  = process.env.TG_BOT_TOKEN;
 const TG_CHAT_ID    = process.env.TG_CHAT_ID;
