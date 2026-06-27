@@ -235,7 +235,7 @@ function rGuide(){
 }
 
 function rApp(){
-  var c=calc(), canGo=S.form.home&&S.form.away&&S.form.tip&&S.form.bookOdds&&S.form.fairOdds&&S.claudeKey;
+  var c=calc(), canGo=S.form.home&&S.form.away&&S.form.tip&&S.claudeKey;
   var tabs='<div class="tabs">'+[['analyzer','🔍 Elemzés'],['history','📋 Előzmények ('+S.history.length+')'],['settings','⚙️ Beállítások']].map(function(x){return '<button class="tab-btn '+(S.tab===x[0]?'active':'')+'" onclick="S.tab=\''+x[0]+'\';R()">'+x[1]+'</button>';}).join('')+'</div>';
   return rHeader()+tabs+'<div class="body">'+(S.tab==='analyzer'?rAnalyzer(c,canGo):S.tab==='history'?rHistory():rSettings())+'</div>';
 }
@@ -293,9 +293,9 @@ function rAnalyzer(c,canGo){
   '<label class="lbl">Tipp leírása</label><input id="f-tip" class="inp" placeholder="pl. Hazai győzelem | Over 2.5 | BTTS" value="'+esc(S.form.tip)+'" oninput="S.form.tip=this.value"></div>';
 
   html+='<div class="card"><div class="grid2" style="margin-bottom:12px">'+
-  '<div><label class="lbl">Bookmaker oddsz</label><input id="f-book" class="inp" type="number" step="0.01" placeholder="pl. 2.10" value="'+S.form.bookOdds+'" oninput="S.form.bookOdds=this.value;R()"></div>'+
-  '<div><label class="lbl">Fair / Pinnacle oddsz</label><input id="f-fair" class="inp" type="number" step="0.01" placeholder="pl. 1.90" value="'+S.form.fairOdds+'" oninput="S.form.fairOdds=this.value;R()"></div></div>'+
-  '<label class="lbl">Bankroll (egység)</label><input id="f-bank" class="inp" type="number" placeholder="100" value="'+S.form.bankroll+'" oninput="S.form.bankroll=this.value;R()"></div>';
+  '<div><label class="lbl">Bookmaker oddsz</label><input id="f-book" class="inp" type="text" inputmode="decimal" placeholder="pl. 2.10" value="'+S.form.bookOdds+'" oninput="S.form.bookOdds=this.value;R()"></div>'+
+  '<div><label class="lbl">Fair / Pinnacle oddsz</label><input id="f-fair" class="inp" type="text" inputmode="decimal" placeholder="pl. 1.90" value="'+S.form.fairOdds+'" oninput="S.form.fairOdds=this.value;R()"></div></div>'+
+  '<label class="lbl">Bankroll (egység)</label><input id="f-bank" class="inp" type="text" inputmode="decimal" placeholder="100" value="'+S.form.bankroll+'" oninput="S.form.bankroll=this.value;R()"></div>';
 
   // Kalkuláció
   if(c.edge!==null){
@@ -307,15 +307,20 @@ function rAnalyzer(c,canGo){
     '</div>';
   }
   if(!S.claudeKey) html+='<div class="card" style="border-color:#fbbf2433;font-size:13px;text-align:center;color:#fbbf24;margin-bottom:14px">⚠️ Claude API kulcs hiányzik — add meg a <strong>Beállítások</strong> fülön</div>';
-  html+='<button class="btn btn-full '+(canGo&&!S.loading?'btn-primary':'btn-off')+'" onclick="analyze()">'+(S.loading?'⏳ AI elemzés folyamatban...':'⚡ AI Elemzés indítása')+'</button>';
+  html+='<button class="btn btn-full '+(canGo&&!S.loading?'btn-primary':'btn-off')+'" onclick="analyze()">'+(S.loading?'⏳ Elemzés folyamatban...':'⚡ Elemzés indítása')+'</button>';
 
   if(S.result&&!S.result.error){
+    var vd=VERDICTS[S.result.verdict],borderCol=vd?vd.color+'33':'#a78bfa33';
     var ec2=S.result.edge>=8?'#4ade80':S.result.edge>=4?'#fbbf24':'#f87171';
-    html+='<div class="card" style="margin-top:16px;border-color:'+VERDICTS[S.result.verdict]?.color+'33">'+
+    var chips=ch('📌 '+S.result.tip);
+    if(S.result.hasOdds&&S.result.bk) chips+=ch('📊 '+S.result.bk);
+    if(S.result.hasOdds&&S.result.edge) chips+=ch('⚡ '+(S.result.edge>=0?'+':'')+S.result.edge+'%',ec2);
+    if(S.result.hasOdds&&S.result.stake&&S.result.bk) chips+=ch('🎯 '+S.result.stake+' e.','#60a5fa');
+    html+='<div class="card" style="margin-top:16px;border-color:'+borderCol+'">'+
     '<div class="flex-bw" style="margin-bottom:12px"><div><div style="font-size:15px;font-weight:700">'+esc(S.result.match)+'</div>'+
     '<div style="font-size:12px;color:#6b7280;margin-top:2px">'+esc(S.result.sport)+(S.result.league?' · '+esc(S.result.league):'')+' · '+S.result.ts+'</div></div>'+
-    vb(S.result.verdict)+'</div>'+
-    '<div class="chips" style="margin-bottom:14px">'+ch('📌 '+S.result.tip)+ch('📊 '+S.result.bk)+ch('⚡ +'+S.result.edge+'%',ec2)+ch('🎯 '+S.result.stake+' e.','#60a5fa')+'</div>'+
+    (vd?vb(S.result.verdict):'')+
+    '</div><div class="chips" style="margin-bottom:14px">'+chips+'</div>'+
     '<div class="divider"><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;margin-bottom:8px">AI Elemzés</div>'+
     '<div class="ai-text">'+esc(S.result.ai)+'</div></div></div>';
   }
