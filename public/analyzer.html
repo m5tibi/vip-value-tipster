@@ -135,6 +135,7 @@ window.addEventListener('DOMContentLoaded',function(){
   S.screen=k?'app':'onboarding';
   R();
   if(k) loadSports();
+  if(k) loadHistory();
 });
 
 function loadSports(){
@@ -272,7 +273,45 @@ function saveKey(){
   }).catch(function(){S.keyMsg='error';S.savingKey=false;R();});
 }
 
-function delKey(){localStorage.removeItem(KS);S.claudeKey='';S.keyIn='';S.keyMsg=null;R();}
+// Egyszerű hash az API kulcsból (felhasználóazonosítóhoz)
+function simpleHash(str){
+  var h=0;
+  for(var i=0;i<str.length;i++){h=Math.imul(31,h)+str.charCodeAt(i)|0;}
+  return Math.abs(h).toString(36);
+}
+
+function getUid(){ return S.claudeKey?simpleHash(S.claudeKey):''; }
+
+// History betöltése backendről
+function loadHistory(){
+  var uid=getUid();
+  if(!uid) return;
+  fetch('/api/analyzer-history?uid='+uid).then(function(r){return r.json();}).then(function(d){
+    if(Array.isArray(d)&&d.length){
+      S.history=d;
+      localStorage.setItem(HS,JSON.stringify(d));
+      R();
+    }
+  }).catch(function(){});
+}
+
+// Egy elemzés mentése backendre
+function saveEntry(entry){
+  var uid=getUid();
+  if(!uid) return;
+  fetch('/api/analyzer-history',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({uid:uid,entry:entry})
+  }).catch(function(){});
+}
+
+// History törlése backendről
+function clearHistory(){
+  var uid=getUid();
+  if(!uid) return;
+  fetch('/api/analyzer-history?uid='+uid,{method:'DELETE'}).catch(function(){});
+}
 
 function analyze(){
   if(!S.claudeKey){alert('Kérlek add meg a Claude API kulcsodat a Beállítások fülön!');return;}
@@ -334,6 +373,7 @@ function analyze(){
     S.result=entry;
     S.history=[entry].concat(S.history).slice(0,50);
     localStorage.setItem(HS,JSON.stringify(S.history));
+    saveEntry(entry);
     S.loading=false; R();
   }).catch(function(e){
     console.error(e);
@@ -517,7 +557,7 @@ function rAnalyzer(){
 
 function rHistory(){
   if(!S.history.length) return '<div style="text-align:center;color:#6b7280;padding:50px 20px;font-size:14px">Még nincs mentett elemzés.</div>';
-  var html='<button class="btn btn-del bsm" style="margin-bottom:14px" onclick="if(confirm(\'Törölni az összes előzményt?\')){S.history=[];localStorage.removeItem(\''+HS+'\');R()}">🗑️ Előzmények törlése</button>';
+  var html=  '<button class="btn btn-del bsm" style="margin-bottom:14px" onclick="if(confirm(\'Törölni az összes előzményt?\')){S.history=[];localStorage.removeItem(\''+HS+'\');clearHistory();R()}">🗑️ Előzmények törlése</button>';
   for(var i=0;i<S.history.length;i++){
     var h=S.history[i];
     var isExp=S.expanded===i;
