@@ -13,7 +13,7 @@
   .sub { font-size: 11px; color: #546e7a; }
   .cd { font-size: 12px; color: #546e7a; background: #0d1b2a; border: 1px solid #1e3a2f; border-radius: 8px; padding: 4px 10px; }
   .cd b { color: #ffe082; }
-  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
   .tab { background: #0d1b2a; color: #80cbc4; border: 1px solid #1e3a2f; border-radius: 8px; padding: 7px 18px; font-weight: 700; font-size: 14px; cursor: pointer; }
   .tab.active { background: #00e676; color: #07111d; border-color: #00e676; }
   .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
@@ -86,6 +86,47 @@
     <a href="/analyzer.html" style="text-decoration:none;padding:7px 18px;background:#0d1b2a;color:#80cbc4;border:1px solid #1e3a2f;border-radius:8px;font-weight:700;font-size:14px">⚡ Elemző</a>
   </div>
 
+  <!-- Kinyitható leírás -->
+  <div style="margin-bottom:14px;background:#0d1b2a;border:1px solid #1e3a2f;border-radius:10px;overflow:hidden">
+    <div onclick="var b=document.getElementById('guide-body');var a=document.getElementById('guide-arr');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▼':'▲'"
+         style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer">
+      <div style="font-size:14px;font-weight:700;color:#00e676">📖 Hogyan működik a VIP Value Tipster?</div>
+      <span id="guide-arr" style="color:#546e7a;font-size:12px">▼</span>
+    </div>
+    <div id="guide-body" style="display:none;padding:0 16px 16px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px">
+        <div style="background:#07111d;border:1px solid #1e3a2f;border-radius:8px;padding:12px">
+          <div style="font-size:13px;font-weight:700;color:#00e676;margin-bottom:6px">📊 Value tippek</div>
+          <div style="font-size:12px;color:#78909c;line-height:1.6">A rendszer a <strong style="color:#b2dfdb">Pinnacle</strong> (éles könyvelő) oddszait hasonlítja össze a puha könyvelőkkel. Ha a különbség meghaladja a <strong style="color:#b2dfdb">+6%-ot</strong>, matematikailag igazolt értékfogadásnak minősül.</div>
+        </div>
+        <div style="background:#07111d;border:1px solid #1e3a2f;border-radius:8px;padding:12px">
+          <div style="font-size:13px;font-weight:700;color:#b39ddb;margin-bottom:6px">🤖 AI tippek</div>
+          <div style="font-size:12px;color:#78909c;line-height:1.6">A Claude AI valós web keresést végez: <strong style="color:#b2dfdb">csapat forma, sérülések, motiváció, H2H előzmények</strong> alapján elemzi a napi meccseket és ad 2–3 konkrét tippet.</div>
+        </div>
+        <div style="background:#07111d;border:1px solid #1e3a2f;border-radius:8px;padding:12px">
+          <div style="font-size:13px;font-weight:700;color:#ffe082;margin-bottom:6px">📐 Kelly Kritérium</div>
+          <div style="font-size:12px;color:#78909c;line-height:1.6">Minden value tipphez <strong style="color:#b2dfdb">negyed-Kelly</strong> tét ajánlást kapsz — ez a bankroll optimális, konzervatív elosztása a hosszú távú profithoz.</div>
+        </div>
+      </div>
+      <div style="border-top:1px solid #1e3a2f;padding-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">
+        <div style="font-size:12px;color:#546e7a;line-height:1.7">
+          🕐 <strong style="color:#80cbc4">Mikor frissül?</strong><br>
+          Hétköznap: <strong style="color:#e0f7fa">15:00</strong><br>
+          Hétvégén: <strong style="color:#e0f7fa">10:00, 15:00, 19:00</strong><br>
+          (Csak a következő 24 óra meccseit elemzi)
+        </div>
+        <div style="font-size:12px;color:#546e7a;line-height:1.7">
+          🔄 <strong style="color:#80cbc4">Manuális frissítés</strong><br>
+          A <strong style="color:#e0f7fa">🔄 Frissítés most</strong> gombbal bármikor indíthatsz új elemzést — érdemes mérkőzések előtt 1–2 órával ellenőrizni.
+        </div>
+        <div style="font-size:12px;color:#546e7a;line-height:1.7">
+          💰 <strong style="color:#80cbc4">Mennyibe kerül?</strong><br>
+          Az előfizetők számára <strong style="color:#00e676">ingyenes</strong> — a rendszer fenntartási költségét a havi előfizetési díj fedezi.
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- TIPS TAB -->
   <div id="tab-tips">
     <div class="toolbar">
@@ -146,7 +187,6 @@ function switchTab(t) {
   if (t==="history") loadHistory();
 }
 
-// ── Helpers ───────────────────────────────────────────────
 function valueBg(v) { return v>=15?"#00e676":v>=8?"#69f0ae":"#b9f6ca"; }
 
 function resBadge(r) {
@@ -175,16 +215,13 @@ function parseCommence(c) {
   return parseInt(m[1])*1000000+parseInt(m[2])*10000+parseInt(m[3])*100+parseInt(m[4]);
 }
 
-// addedAt: "2026. 06. 24. 15:00:41" → "2026. 06. 24."
 function getDay(addedAt) {
   if (!addedAt) return "–";
   const p = addedAt.split(" ");
-  // p = ["2026.", "06.", "24.", "15:00:41"]
   if (p.length >= 3) return p[0]+" "+p[1]+" "+p[2];
   return "–";
 }
 
-// Ma/tegnap nap stringje ugyanolyan formátumban
 function todayKey() {
   const s = new Date().toLocaleString("hu-HU",{timeZone:"Europe/Budapest"});
   const p = s.split(" ");
@@ -196,7 +233,6 @@ function yesterdayKey() {
   return p.length>=3 ? p[0]+" "+p[1]+" "+p[2] : s;
 }
 
-// ── Tip card HTML ─────────────────────────────────────────
 function valueTipHTML(t, showResult) {
   return `
   <div class="tip-card value">
@@ -240,7 +276,6 @@ function tipHTML(t, showResult) {
   return t.type==="ai" ? aiTipHTML(t,showResult) : valueTipHTML(t,showResult);
 }
 
-// ── Render tips ───────────────────────────────────────────
 function renderTips() {
   const sv = [...valueTips].filter(t=>!t.result||t.result==="pending").sort((a,b)=>parseCommence(a.commence)-parseCommence(b.commence));
   const sa = [...aiTips].filter(t=>!t.result||t.result==="pending").sort((a,b)=>parseCommence(a.commence)-parseCommence(b.commence));
@@ -252,7 +287,6 @@ function renderTips() {
     : `<div class="no-value">🤖 AI elemzés folyamatban vagy nincs mai befejezetlen meccs.</div>`;
 }
 
-// ── Render history ────────────────────────────────────────
 function renderHistory() {
   const won    = history.filter(t=>t.result==="won").length;
   const lost   = history.filter(t=>t.result==="lost").length;
@@ -288,7 +322,6 @@ function renderHistory() {
   const TODAY     = todayKey();
   const YESTERDAY = yesterdayKey();
 
-  // Csoportosítás nap szerint
   const byDay = {};
   history.forEach(t => {
     const d = getDay(t.addedAt);
@@ -296,7 +329,6 @@ function renderHistory() {
     byDay[d].push(t);
   });
 
-  // Nap szekció HTML generálás
   function makeDaySection(day, tips, defaultOpen) {
     const id      = "ds-"+(dayCounter++);
     const pending = tips.filter(t=>!t.result||t.result==="pending").sort((a,b)=>parseCommence(a.commence)-parseCommence(b.commence));
@@ -335,21 +367,18 @@ function renderHistory() {
   done.forEach(t=>{ const d=getDay(t.addedAt); if(!doneByDay[d]) doneByDay[d]=[]; doneByDay[d].push(t); });
 
   let html = "";
-
   if (pending.length) {
     html += `<div class="section-header" style="background:#0d2a3a;color:#90caf9">⏳ Folyamatban lévő tippek</div>`;
     Object.keys(pendingByDay).sort((a,b)=>b.localeCompare(a)).forEach(day => {
       html += makeDaySection(day, pendingByDay[day], true);
     });
   }
-
   if (done.length) {
     html += `<div class="section-header" style="background:#0d1b2a;color:#80cbc4;margin-top:8px">📋 Lezárt tippek</div>`;
     Object.keys(doneByDay).sort((a,b)=>b.localeCompare(a)).forEach((day) => {
       html += makeDaySection(day, doneByDay[day], false);
     });
   }
-
   el.innerHTML = html;
 }
 
@@ -361,7 +390,6 @@ function toggleDay(id) {
   a.classList.toggle("open",!open);
 }
 
-// ── API ───────────────────────────────────────────────────
 async function refresh() {
   const btn = document.getElementById("btn-refresh");
   btn.disabled=true; btn.textContent="Elemzés folyamatban...";
@@ -420,8 +448,6 @@ async function clearHistory() {
 }
 
 async function loadStatus() {}
-
-
 
 loadStatus();
 loadTips();
