@@ -2,11 +2,9 @@ const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
 const path    = require("path");
-const cors = require("cors");
 
 const app = express();
 app.use(express.json());
-pp.use(cors());
 app.use(express.static(path.join(__dirname, "public")));
 app.use('/api/odds', require('./routes/odds'));
 
