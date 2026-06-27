@@ -16,7 +16,6 @@ const EOD_HOUR      = 23;
 const DATA_FILE     = "/data/history.json";
 const SCHEDULE_FILE = "/data/lastRun.json";
 
-
 // ── Perzisztens tárolás ───────────────────────────────────
 function loadHistory() {
   try {
@@ -396,7 +395,6 @@ async function checkResults() {
       for (const game of games) {
         if (!game.completed || !game.scores) continue;
 
-        // Pending tippek keresése matchId VAGY meccs név alapján
         const matchName = `${game.home_team} vs ${game.away_team}`;
         const tips = pending.filter(t =>
           t.matchId === game.id ||
@@ -526,6 +524,44 @@ app.post("/api/check-results", async (req, res) => {
 app.post("/api/stats/send", async (req, res) => {
   await sendTelegram(buildStatsMsg("VIP Value Tipster – Statisztika"));
   res.json({ ok: true });
+});
+
+// ── Analyzer history szinkronizáció ──────────────────────
+function aPath(uid) {
+  const safe = String(uid).replace(/[^a-z0-9]/g, '').slice(0, 32);
+  return '/data/ah_' + safe + '.json';
+}
+
+app.get("/api/analyzer-history", (req, res) => {
+  const uid = req.query.uid;
+  if (!uid) return res.json([]);
+  try {
+    const p = aPath(uid);
+    if (!fs.existsSync(p)) return res.json([]);
+    res.json(JSON.parse(fs.readFileSync(p, 'utf8')));
+  } catch (e) { res.json([]); }
+});
+
+app.post("/api/analyzer-history", (req, res) => {
+  const { uid, entry } = req.body;
+  if (!uid || !entry) return res.status(400).json({ error: 'Hiányzó adat' });
+  try {
+    const p = aPath(uid);
+    const hist = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : [];
+    const newHist = [entry, ...hist].slice(0, 50);
+    fs.writeFileSync(p, JSON.stringify(newHist), 'utf8');
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete("/api/analyzer-history", (req, res) => {
+  const uid = req.query.uid;
+  if (!uid) return res.status(400).json({ error: 'Hiányzó uid' });
+  try {
+    const p = aPath(uid);
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ── Indítás ───────────────────────────────────────────────
