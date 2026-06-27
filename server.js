@@ -2,6 +2,7 @@ const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
 const path    = require("path");
+const cors = require("cors");
 
 const app = express();
 app.use(express.json());
@@ -16,7 +17,7 @@ const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const EOD_HOUR      = 23;
 const DATA_FILE     = "/data/history.json";
 const SCHEDULE_FILE = "/data/lastRun.json";
-const cors = require("cors");
+
 
 // ── Perzisztens tárolás ───────────────────────────────────
 function loadHistory() {
