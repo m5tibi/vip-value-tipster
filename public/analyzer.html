@@ -127,26 +127,50 @@ async function loadMatches(){
 
 function getOuts(m){
   const pin=m.bookmakers?.find(b=>b.key==='pinnacle');
-  const oth=m.bookmakers?.find(b=>b.key==='bet365')||m.bookmakers?.find(b=>b.key==='unibet')||m.bookmakers?.[0];
-  const base=pin?.markets?.[0]?.outcomes||oth?.markets?.[0]?.outcomes||[];
-  return base.map(o=>({
-    name:o.name,
-    label:o.name===m.home_team?'🏠 Hazai':o.name===m.away_team?'✈️ Vendég':'🤝 Döntetlen',
-    pin:pin?.markets?.[0]?.outcomes?.find(x=>x.name===o.name)?.price,
-    oth:oth?.markets?.[0]?.outcomes?.find(x=>x.name===o.name)?.price,
-  }));
+  const oth=m.bookmakers?.find(b=>b.key==='bet365')||m.bookmakers?.find(b=>b.key==='unibet')||m.bookmakers?.find(b=>b.key!=='pinnacle');
+  const gp=(bm,mk,name,pt)=>{ const m2=bm?.markets?.find(x=>x.key===mk); return pt!==undefined?m2?.outcomes?.find(x=>x.name===name&&x.point==pt)?.price:m2?.outcomes?.find(x=>x.name===name)?.price; };
+  const groups=[];
+  // 1X2
+  const h2b=pin?.markets?.find(x=>x.key==='h2h')||oth?.markets?.find(x=>x.key==='h2h');
+  if(h2b){
+    const outs=h2b.outcomes.map(o=>({
+      name:o.name,label:o.name===m.home_team?'🏠 Hazai':o.name===m.away_team?'✈️ Vendég':'🤝 Döntetlen',
+      tip:o.name===m.home_team?'Hazai győzelem':o.name===m.away_team?'Vendég győzelem':'Döntetlen',
+      pin:gp(pin,'h2h',o.name),oth:gp(oth,'h2h',o.name),
+    }));
+    if(outs.length) groups.push({label:'1X2',outcomes:outs});
+  }
+  // Gólok (totals)
+  const tb=pin?.markets?.find(x=>x.key==='totals')||oth?.markets?.find(x=>x.key==='totals');
+  if(tb){
+    const lines=[...new Set(tb.outcomes.map(o=>o.point))].sort((a,b)=>a-b).slice(0,4);
+    const outs=[];
+    lines.forEach(pt=>['Over','Under'].forEach(name=>{
+      const p=gp(pin,'totals',name,pt),q=gp(oth,'totals',name,pt);
+      if(p||q) outs.push({name,point:pt,label:`${name==='Over'?'⬆️':'⬇️'} ${name} ${pt}`,tip:`${name} ${pt}`,pin:p,oth:q});
+    }));
+    if(outs.length) groups.push({label:'Gólok / Pontok',outcomes:outs});
+  }
+  // Hendikep (spreads)
+  const sb=pin?.markets?.find(x=>x.key==='spreads')||oth?.markets?.find(x=>x.key==='spreads');
+  if(sb){
+    const outs=sb.outcomes.map(o=>{
+      const pt=o.point>0?'+'+o.point:o.point;
+      return{name:o.name,point:o.point,label:`${o.point>=0?'⬆️':'⬇️'} ${o.name} ${pt}`,tip:`Hendikep: ${o.name} ${pt}`,
+        pin:gp(pin,'spreads',o.name,o.point),oth:gp(oth,'spreads',o.name,o.point)};
+    });
+    if(outs.length) groups.push({label:'Hendikep',outcomes:outs});
+  }
+  return groups;
 }
 
-function applyOut(mi,oi){
-  const m=S.matches[mi]; const o=getOuts(m)[oi];
+function applyOut(mi,gi,oi){
+  const m=S.matches[mi];const g=getOuts(m)[gi];const o=g.outcomes[oi];
   const sm={soccer:'⚽ Football',basketball:'🏀 Kosárlabda',icehockey:'🏒 Jégkorong',tennis:'🎾 Tenisz',baseball:'⚾ Baseball'};
   const sk=Object.keys(sm).find(k=>m.sport_key?.startsWith(k))||'';
-  S.form={...S.form,
-    home:m.home_team,away:m.away_team,league:m.sport_title,sport:sm[sk]||'🏆 Egyéb',
-    tip:o.name===m.home_team?'Hazai győzelem':o.name===m.away_team?'Vendég győzelem':'Döntetlen',
-    bookOdds:o.oth?o.oth.toFixed(2):'',fairOdds:o.pin?o.pin.toFixed(2):'',
-  };
-  S.selMatch=null;S.matches=[];S.result=null; R();
+  S.form={...S.form,home:m.home_team,away:m.away_team,league:m.sport_title,sport:sm[sk]||'🏆 Egyéb',
+    tip:o.tip,bookOdds:o.oth?o.oth.toFixed(2):'',fairOdds:o.pin?o.pin.toFixed(2):''};
+  S.selMatch=null;S.matches=[];S.result=null;R();
 }
 
 // ── Claude kulcs ─────────────────────────────────────────
