@@ -601,11 +601,16 @@ function rSettings(){
     '💡 <strong style="color:#6b7280">BYOK modell:</strong> Az AI elemzések a saját Anthropic számládat terhelik. Az odds adatok a VIP Tipster backendről jönnek. Te csak a platformért fizetsz nekünk.</div></div>';
 }
 
+function tabSt(name){
+  var a=S.tab===name;
+  return 'style="padding:8px 15px;font-size:13px;font-weight:600;border:none;border-radius:8px 8px 0 0;cursor:pointer;background:'+(a?'#1e2130':'transparent')+';color:'+(a?'#a78bfa':'#6b7280')+'"';
+}
+
 function rApp(){
   var tabs='<div class="tabs">'+
-    '<button class="tbtn'+(S.tab==='analyzer'?' on':'')+'" onclick="S.tab=\'analyzer\';R()">🔍 Elemzés</button>'+
-    '<button class="tbtn'+(S.tab==='history'?' on':'')+'" onclick="S.tab=\'history\';R()">📋 Előzmények ('+S.history.length+')</button>'+
-    '<button class="tbtn'+(S.tab==='settings'?' on':'')+'" onclick="S.tab=\'settings\';R()">⚙️ Beállítások</button>'+
+    '<button '+tabSt('analyzer')+' onclick="S.tab=\'analyzer\';R()">🔍 Elemzés</button>'+
+    '<button '+tabSt('history')+' onclick="S.tab=\'history\';R()">📋 Előzmények ('+S.history.length+')</button>'+
+    '<button '+tabSt('settings')+' onclick="S.tab=\'settings\';R()">⚙️ Beállítások</button>'+
     '</div>';
   var content=S.tab==='analyzer'?rAnalyzer():S.tab==='history'?rHistory():rSettings();
   return rHdr()+tabs+'<div class="body">'+content+'</div>';
