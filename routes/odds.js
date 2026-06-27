@@ -8,6 +8,15 @@ const router  = express.Router();
 const BASE = 'https://api.the-odds-api.com/v4';
 const KEY  = process.env.ODDS_API_KEY;
 
+// CORS – külső forrásból (pl. claude.ai) is elérhető legyen
+router.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
+
 // GET /api/odds/sports
 // Visszaadja az összes aktív, nem outrights sportot
 router.get('/sports', async (req, res) => {
