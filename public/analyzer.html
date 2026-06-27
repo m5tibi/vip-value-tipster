@@ -288,9 +288,9 @@ function rAnalyzer(c,canGo){
   '<label class="lbl">Bajnokság / Liga</label><input id="f-league" class="inp" placeholder="pl. Premier League, NBA..." value="'+esc(S.form.league)+'" oninput="S.form.league=this.value"></div>';
 
   html+='<div class="card"><div class="grid2" style="margin-bottom:12px">'+
-  '<div><label class="lbl">Hazai csapat</label><input id="f-home" class="inp" placeholder="pl. Arsenal" value="'+esc(S.form.home)+'" oninput="S.form.home=this.value"></div>'+
-  '<div><label class="lbl">Vendég csapat</label><input id="f-away" class="inp" placeholder="pl. Chelsea" value="'+esc(S.form.away)+'" oninput="S.form.away=this.value"></div></div>'+
-  '<label class="lbl">Tipp leírása</label><input id="f-tip" class="inp" placeholder="pl. Hazai győzelem | Over 2.5 | BTTS" value="'+esc(S.form.tip)+'" oninput="S.form.tip=this.value"></div>';
+  '<div><label class="lbl">Hazai csapat</label><input id="f-home" class="inp" placeholder="pl. Arsenal" value="'+esc(S.form.home)+'" oninput="S.form.home=this.value;R()"></div>'+
+  '<div><label class="lbl">Vendég csapat</label><input id="f-away" class="inp" placeholder="pl. Chelsea" value="'+esc(S.form.away)+'" oninput="S.form.away=this.value;R()"></div></div>'+
+  '<label class="lbl">Tipp leírása</label><input id="f-tip" class="inp" placeholder="pl. Hazai győzelem | Over 2.5 | BTTS" value="'+esc(S.form.tip)+'" oninput="S.form.tip=this.value;R()"></div>';
 
   html+='<div class="card"><div class="grid2" style="margin-bottom:12px">'+
   '<div><label class="lbl">Bookmaker oddsz</label><input id="f-book" class="inp" type="text" inputmode="decimal" placeholder="pl. 2.10" value="'+S.form.bookOdds+'" oninput="S.form.bookOdds=this.value;R()"></div>'+
