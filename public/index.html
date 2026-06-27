@@ -129,7 +129,7 @@
   <div id="tab-tips">
     <div class="toolbar">
       <div class="last-update" id="last-update">Még nem futott elemzés</div>
-      <button class="btn-refresh" id="btn-refresh" onclick="refresh()">🔄 Frissítés most</button>
+      <button class="btn-refresh" id="btn-refresh" onclick="refresh()" style="display:none">🔄 Frissítés most</button>
     </div>
     <div class="section-title" style="color:#00e676">📊 Value tippek</div>
     <div class="section-sub">Pinnacle-alapú matematikai piaci előny (+6% felett)</div>
@@ -169,6 +169,18 @@
 let valueTips = [], aiTips = [], history = [];
 let msRemaining = 0;
 let dayCounter = 0;
+
+// Admin mód beállítása URL param alapján
+(function(){
+  var p = new URLSearchParams(window.location.search).get('admin');
+  if (p) {
+    localStorage.setItem('vbt_admin', '1');
+    localStorage.setItem('vbt_admin_pwd', p);
+    window.history.replaceState({}, '', '/');
+  }
+})();
+function isAdmin() { return localStorage.getItem('vbt_admin') === '1'; }
+function getAdminPwd() { return localStorage.getItem('vbt_admin_pwd') || ''; }
 
 document.getElementById("today").textContent = new Date().toLocaleDateString("hu-HU", {year:"numeric",month:"long",day:"numeric"});
 
@@ -392,10 +404,14 @@ async function refresh() {
   const btn = document.getElementById("btn-refresh");
   btn.disabled=true; btn.textContent="Elemzés folyamatban...";
   try {
-    const r = await fetch("/api/refresh",{method:"POST"});
+    const r = await fetch("/api/refresh", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({password: getAdminPwd()})
+    });
     const d = await r.json();
-    showStatus(`✅ ${d.valueTips} value + ${d.aiTips} AI tipp`);
-    await loadTips();
+    if (d.error) { showStatus("⛔ " + d.error, "#ef9a9a"); }
+    else { showStatus(`✅ ${d.valueTips} value + ${d.aiTips} AI tipp`); await loadTips(); }
   } catch(e) { showStatus("⚠️ Hiba: "+e.message,"#ef9a9a"); }
   btn.disabled=false; btn.textContent="🔄 Frissítés most";
   msRemaining=0;
@@ -449,6 +465,7 @@ async function loadStatus() {}
 
 loadStatus();
 loadTips();
+if (isAdmin()) document.getElementById('btn-refresh').style.display = '';
 </script>
 </body>
 </html>
