@@ -235,7 +235,7 @@ function rGuide(){
 }
 
 function rApp(){
-  var c=calc(), canGo=S.form.home&&S.form.away&&S.form.tip&&S.claudeKey;
+  var c=calc(), canGo=!!S.claudeKey&&!S.loading;
   var tabs='<div class="tabs">'+[['analyzer','🔍 Elemzés'],['history','📋 Előzmények ('+S.history.length+')'],['settings','⚙️ Beállítások']].map(function(x){return '<button class="tab-btn '+(S.tab===x[0]?'active':'')+'" onclick="S.tab=\''+x[0]+'\';R()">'+x[1]+'</button>';}).join('')+'</div>';
   return rHeader()+tabs+'<div class="body">'+(S.tab==='analyzer'?rAnalyzer(c,canGo):S.tab==='history'?rHistory():rSettings())+'</div>';
 }
@@ -324,7 +324,10 @@ function rAnalyzer(c,canGo){
     '<div class="divider"><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;margin-bottom:8px">AI Elemzés</div>'+
     '<div class="ai-text">'+esc(S.result.ai)+'</div></div></div>';
   }
-  if(S.result?.error) html+='<div class="card" style="margin-top:14px;border-color:#f8717133;color:#f87171;font-size:14px">❌ Hiba az elemzés során. Ellenőrizd a Claude API kulcsodat.</div>';
+  if(S.result?.error){
+    var msg=S.result.msg||'Hiba az elemzés során. Ellenőrizd a Claude API kulcsodat.';
+    html+='<div class="card" style="margin-top:14px;border-color:#f8717133;color:#f87171;font-size:14px">❌ '+esc(msg)+'</div>';
+  }
   return html;
 }
 
