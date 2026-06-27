@@ -38,7 +38,7 @@ router.get('/matches', async (req, res) => {
   const { sport } = req.query;
   if (!sport) return res.status(400).json({ error: 'Hiányzó sport paraméter' });
   try {
-    const url = `${BASE}/sports/${sport}/odds/?apiKey=${KEY}&regions=eu&markets=h2h&bookmakers=pinnacle,bet365,unibet&dateFormat=iso`;
+    const url = `${BASE}/sports/${sport}/odds/?apiKey=${KEY}&regions=eu&markets=h2h&dateFormat=iso`;
     const r = await fetch(url);
     const d = await r.json();
     if (!r.ok) return res.status(r.status).json({ error: 'Odds API hiba', detail: d });
