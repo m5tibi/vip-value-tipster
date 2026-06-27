@@ -6,6 +6,7 @@ const path    = require("path");
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
+app.use('/api/odds', require('./routes/odds'));
 
 const ODDS_API_KEY  = process.env.ODDS_API_KEY;
 const TG_BOT_TOKEN  = process.env.TG_BOT_TOKEN;
