@@ -5,6 +5,7 @@ const path    = require("path");
 
 const app = express();
 app.use(express.json());
+pp.use(cors());
 app.use(express.static(path.join(__dirname, "public")));
 app.use('/api/odds', require('./routes/odds'));
 
@@ -15,6 +16,7 @@ const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const EOD_HOUR      = 23;
 const DATA_FILE     = "/data/history.json";
 const SCHEDULE_FILE = "/data/lastRun.json";
+const cors = require("cors");
 
 // ── Perzisztens tárolás ───────────────────────────────────
 function loadHistory() {
