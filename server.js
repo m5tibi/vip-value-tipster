@@ -63,10 +63,14 @@ const SPORT_MAP = {
 const EXCLUDED_BM = ["betfair_ex_eu", "betfair_ex_uk", "matchbook", "betfair_sb_uk", "smarkets"];
 const SHARP_BMS   = ["pinnacle", "pinnacle_au", "betsson", "nordicbet"];
 
-let latestTips = [];
-let aiTips     = [];
 let history    = loadHistory();
 console.log(`History betöltve: ${history.length} tipp`);
+
+// Mai pending tippek visszaállítása szerver-újraindítás után
+const _today = new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" }).split(" ")[0];
+let latestTips = history.filter(t => t.type === "value" && (!t.result || t.result === "pending") && (t.addedAt || "").startsWith(_today));
+let aiTips     = history.filter(t => t.type === "ai"    && (!t.result || t.result === "pending") && (t.addedAt || "").startsWith(_today));
+console.log(`Visszaállítva: ${latestTips.length} value + ${aiTips.length} AI tipp`);
 
 // ── Magyar idő ────────────────────────────────────────────
 function getHungarianTime() {
