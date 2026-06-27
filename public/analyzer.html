@@ -3,229 +3,397 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>⚡ VIP Value Bet Elemző</title>
+  <title>VIP Value Bet Elemző</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{background:#0c0e14;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;min-height:100vh}
-    .header{background:linear-gradient(135deg,#1a1d2e,#12141f);border-bottom:1px solid #2a2d3e;padding:16px 22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
-    .header-title{font-size:19px;font-weight:800;background:linear-gradient(90deg,#a78bfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-    .header-sub{font-size:11px;color:#6b7280;margin-top:2px}
-    .badges{display:flex;gap:6px;align-items:center}
-    .badge{display:flex;align-items:center;gap:5px;border-radius:20px;padding:5px 11px}
+    .hdr{background:linear-gradient(135deg,#1a1d2e,#12141f);border-bottom:1px solid #2a2d3e;padding:16px 22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+    .htitle{font-size:19px;font-weight:800;background:linear-gradient(90deg,#a78bfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .hsub{font-size:11px;color:#6b7280;margin-top:2px}
+    .hright{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .bdg{display:flex;align-items:center;gap:5px;border-radius:20px;padding:5px 11px}
     .dot{width:6px;height:6px;border-radius:50%}
-    .back-btn{background:#1a1d2e;border:1px solid #2a2d3e;border-radius:8px;padding:7px 13px;font-size:12px;font-weight:600;color:#94a3b8;text-decoration:none;white-space:nowrap}
-    .back-btn:hover{border-color:#a78bfa;color:#a78bfa}
+    .back{background:#1a1d2e;border:1px solid #2a2d3e;border-radius:8px;padding:7px 13px;font-size:12px;font-weight:600;color:#94a3b8;text-decoration:none}
     .tabs{display:flex;gap:4px;padding:12px 22px 0;border-bottom:1px solid #1e2130}
-    .tab-btn{padding:8px 15px;font-size:13px;font-weight:600;border:none;border-radius:8px 8px 0 0;cursor:pointer;background:transparent;color:#6b7280}
-    .tab-btn.active{background:#1e2130;color:#a78bfa}
+    .tbtn{padding:8px 15px;font-size:13px;font-weight:600;border:none;border-radius:8px 8px 0 0;cursor:pointer;background:transparent;color:#6b7280}
+    .tbtn.on{background:#1e2130;color:#a78bfa}
     .body{padding:18px 22px;max-width:700px;margin:0 auto}
     .card{background:#12141f;border:1px solid #1e2130;border-radius:12px;padding:18px;margin-bottom:14px}
     .lbl{font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:block}
     .inp{width:100%;background:#1a1d2e;border:1px solid #2a2d3e;border-radius:8px;padding:10px 14px;color:#e2e8f0;font-size:14px;outline:none}
     .inp::placeholder{color:#4b5563}
     select.inp{appearance:none;cursor:pointer}
-    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-    .btn{border:none;border-radius:9px;font-weight:700;cursor:pointer;transition:all .2s}
-    .btn-primary{background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff}
-    .btn-blue{background:#1d4ed8;color:#fff}
+    .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+    .btn{border:none;border-radius:9px;font-weight:700;cursor:pointer}
+    .btn-p{background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff}
+    .btn-b{background:#1d4ed8;color:#fff}
     .btn-off{background:#1e2130;color:#4b5563;cursor:not-allowed}
-    .btn-danger{background:#1f0707;border:1px solid #f8717133;color:#f87171}
-    .btn-full{width:100%;padding:13px;font-size:15px}
-    .btn-sm{padding:10px 14px;font-size:13px}
+    .btn-del{background:#1f0707;border:1px solid #f8717133;color:#f87171}
+    .bfull{width:100%;padding:13px;font-size:15px}
+    .bsm{padding:10px 14px;font-size:13px}
     .metric{background:#1a1d2e;border-radius:10px;padding:12px;text-align:center}
-    .metric-val{font-size:20px;font-weight:800;line-height:1}
-    .metric-lbl{font-size:10px;color:#6b7280;margin-top:5px;text-transform:uppercase;letter-spacing:.5px}
-    .vbadge{display:inline-flex;align-items:center;gap:5px;border-radius:20px;padding:4px 12px;font-size:13px;font-weight:700}
+    .mval{font-size:20px;font-weight:800;line-height:1}
+    .mlbl{font-size:10px;color:#6b7280;margin-top:5px;text-transform:uppercase;letter-spacing:.5px}
+    .vbdg{display:inline-flex;align-items:center;gap:5px;border-radius:20px;padding:4px 12px;font-size:13px;font-weight:700}
     .chip{background:#1a1d2e;border-radius:6px;padding:3px 9px;font-size:12px}
-    .match-item{background:#1a1d2e;border:1px solid #2a2d3e;border-radius:8px;overflow:hidden;margin-bottom:6px}
-    .match-hdr{padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
-    .match-outs{border-top:1px solid #2a2d3e;padding:12px;display:flex;flex-direction:column;gap:10px}
-    .out-btn{flex:1;min-width:80px;padding:9px 6px;background:#12141f;border:1px solid #2a2d3e;border-radius:8px;cursor:pointer;text-align:center}
-    .out-btn:hover{border-color:#60a5fa55}
-    .match-list{max-height:300px;overflow-y:auto}
-    .pw-wrap{position:relative}
-    .pw-btn{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#6b7280;cursor:pointer;font-size:16px}
-    .inp-mono{font-family:monospace;font-size:13px;padding-right:44px}
+    .mitem{background:#1a1d2e;border:1px solid #2a2d3e;border-radius:8px;overflow:hidden;margin-bottom:6px}
+    .mhdr{padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+    .mouts{border-top:1px solid #2a2d3e;padding:12px;display:flex;flex-direction:column;gap:10px}
+    .obtn{flex:1;min-width:80px;padding:9px 6px;background:#12141f;border:1px solid #2a2d3e;border-radius:8px;cursor:pointer;text-align:center}
+    .mlist{max-height:300px;overflow-y:auto}
+    .pwrap{position:relative}
+    .ptgl{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#6b7280;cursor:pointer;font-size:16px}
+    .imono{font-family:monospace;font-size:13px;padding-right:44px}
     .step{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px}
-    .step-num{width:24px;height:24px;border-radius:50%;background:#7c3aed22;border:1px solid #7c3aed55;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#a78bfa;flex-shrink:0}
-    .ai-text{font-size:14px;line-height:1.75;color:#cbd5e1;white-space:pre-wrap}
-    .divider{border-top:1px solid #1e2130;padding-top:12px;margin-top:4px}
-    .key-masked{background:#1a1d2e;border-radius:8px;padding:10px 14px;font-family:monospace;font-size:13px;color:#6b7280;letter-spacing:1px;margin-bottom:12px}
-    .flex-bw{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+    .snum{width:24px;height:24px;border-radius:50%;background:#7c3aed22;border:1px solid #7c3aed55;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#a78bfa;flex-shrink:0}
+    .aitext{font-size:14px;line-height:1.75;color:#cbd5e1;white-space:pre-wrap}
+    .div{border-top:1px solid #1e2130;padding-top:12px;margin-top:4px}
+    .kmask{background:#1a1d2e;border-radius:8px;padding:10px 14px;font-family:monospace;font-size:13px;color:#6b7280;letter-spacing:1px;margin-bottom:12px}
+    .fbw{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
     .chips{display:flex;flex-wrap:wrap;gap:6px}
-    .onboard{max-width:480px;margin:0 auto;padding:24px 22px}
-    .guide-step{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px}
-    .guide-icon{font-size:15px;flex-shrink:0;margin-top:1px}
-    .guide-text{font-size:13px;color:#94a3b8;line-height:1.6}
-    .guide-info{margin-top:8px;padding:10px 12px;background:#1a1d2e;border-radius:8px;font-size:12px;color:#6b7280;line-height:1.6}
-    @media(max-width:600px){.grid2{grid-template-columns:1fr};.body{padding:14px 16px}}
+    .ob{max-width:480px;margin:0 auto;padding:24px 22px}
+    .gstep{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px}
+    .gicon{font-size:15px;flex-shrink:0;margin-top:1px}
+    .gtxt{font-size:13px;color:#94a3b8;line-height:1.6}
+    .ginfo{margin-top:8px;padding:10px 12px;background:#1a1d2e;border-radius:8px;font-size:12px;color:#6b7280;line-height:1.6}
+    @media(max-width:600px){.g2{grid-template-columns:1fr}.body{padding:14px 16px}}
   </style>
 </head>
 <body>
 <div id="root"></div>
 <script>
-const KEY_STORE  = 'vbt_claude_key';
-const HIST_STORE = 'vbt_history';
-const VERDICTS   = {
-  'ÉRTÉK':     {color:'#4ade80',label:'✅ ÉRTÉK'},
-  'HATÁRESET': {color:'#fbbf24',label:'⚠️ HATÁRESET'},
-  'NEM ÉRTÉK': {color:'#f87171',label:'❌ NEM ÉRTÉK'},
+var KS='vbt_claude_key', HS='vbt_history';
+var VD={
+  'ERTEK':  {color:'#4ade80',label:'ERTEK'},
+  'HATAR':  {color:'#fbbf24',label:'HATAR'},
+  'NEM':    {color:'#f87171',label:'NEM ERTEK'}
+};
+var VERDICTS={
+  'ÉRTÉK':    {color:'#4ade80',label:'✅ ÉRTÉK'},
+  'HATÁRESET':{color:'#fbbf24',label:'⚠️ HATÁRESET'},
+  'NEM ÉRTÉK':{color:'#f87171',label:'❌ NEM ÉRTÉK'}
 };
 
-let S = {
-  screen:'loading', tab:'analyzer',
-  claudeKey:'', keyIn:'', savingKey:false, keyMsg:null,
+var S={
+  screen:'loading',tab:'analyzer',
+  claudeKey:'',keyIn:'',savingKey:false,keyMsg:null,
   form:{sport:'⚽ Football',league:'',home:'',away:'',tip:'',bookOdds:'',fairOdds:'',bankroll:'100'},
-  loading:false, result:null, history:[], expanded:null,
-  sports:[], selSport:'', matches:[], selMatch:null,
-  loadSports:false, loadMatches:false, oddsErr:'',
-  guideOpen:true,
+  loading:false,result:null,history:[],expanded:null,
+  sports:[],selSport:'',matches:[],selMatch:null,
+  loadSports:false,loadMatches:false,oddsErr:'',
+  guideOpen:false
 };
 
 function calc(){
-  const bk=parseFloat(S.form.bookOdds)||0, fk=parseFloat(S.form.fairOdds)||0, br=parseFloat(S.form.bankroll)||100;
-  const prob=fk>0?1/fk:0, edge=fk>0&&bk>0?(bk/fk-1)*100:null;
-  const qK=bk>1&&prob>0?Math.max(0,((bk-1)*prob-(1-prob))/(bk-1)*25):0;
-  const stake=(qK/100)*br;
-  const v=edge!==null?(edge>=8&&bk>=1.80?'ÉRTÉK':edge>=4?'HATÁRESET':'NEM ÉRTÉK'):null;
-  const ec=edge===null?'#6b7280':edge>=8?'#4ade80':edge>=4?'#fbbf24':'#f87171';
-  return {bk,fk,br,prob,edge,qK,stake,verdict:v,ec};
+  var bk=parseFloat(S.form.bookOdds)||0;
+  var fk=parseFloat(S.form.fairOdds)||0;
+  var br=parseFloat(S.form.bankroll)||100;
+  var prob=fk>0?1/fk:0;
+  var edge=fk>0&&bk>0?(bk/fk-1)*100:null;
+  var qK=bk>1&&prob>0?Math.max(0,((bk-1)*prob-(1-prob))/(bk-1)*25):0;
+  var stake=(qK/100)*br;
+  var verdict=edge!==null?(edge>=8&&bk>=1.80?'ÉRTÉK':edge>=4?'HATÁRESET':'NEM ÉRTÉK'):null;
+  var ec=edge===null?'#6b7280':edge>=8?'#4ade80':edge>=4?'#fbbf24':'#f87171';
+  return {bk:bk,fk:fk,br:br,prob:prob,edge:edge,qK:qK,stake:stake,verdict:verdict,ec:ec};
 }
 
-window.addEventListener('DOMContentLoaded',()=>{
-  const k=localStorage.getItem(KEY_STORE), h=localStorage.getItem(HIST_STORE);
+function esc(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function vb(v){
+  var d=VERDICTS[v];
+  return d?'<span class="vbdg" style="background:'+d.color+'1a;border:1px solid '+d.color+'44;color:'+d.color+'">'+d.label+'</span>':'';
+}
+function hv(v){
+  var d=VERDICTS[v];
+  return d?'<span style="font-size:11px;font-weight:700;background:'+d.color+'1a;color:'+d.color+';padding:2px 8px;border-radius:20px">'+d.label+'</span>':'';
+}
+function ch(t,c){return '<span class="chip" style="color:'+(c||'#94a3b8')+'">'+esc(t)+'</span>';}
+function mk(k){return k.slice(0,14)+'••••••••••••••••'+k.slice(-4);}
+
+function R(){
+  var ae=document.activeElement;
+  var fid=ae?ae.id:null;
+  var fss=(ae&&ae.selectionStart!=null)?ae.selectionStart:null;
+  var fse=(ae&&ae.selectionEnd!=null)?ae.selectionEnd:null;
+  document.getElementById('root').innerHTML=(S.screen==='onboarding')?rOnboard():rApp();
+  if(fid){
+    var el=document.getElementById(fid);
+    if(el){
+      el.focus();
+      if(fss!=null){try{el.setSelectionRange(fss,fse);}catch(e){}}
+    }
+  }
+}
+
+window.addEventListener('DOMContentLoaded',function(){
+  var k=localStorage.getItem(KS);
+  var h=localStorage.getItem(HS);
   if(k) S.claudeKey=k;
-  if(h) try{S.history=JSON.parse(h);}catch{}
+  if(h){try{S.history=JSON.parse(h);}catch(e){}}
   S.screen=k?'app':'onboarding';
-  R(); if(k) loadSports();
+  R();
+  if(k) loadSports();
 });
 
-async function loadSports(){
+function loadSports(){
   S.loadSports=true; R();
-  try{ const d=await(await fetch('/api/odds/sports')).json(); if(Array.isArray(d)&&d.length){S.sports=d;S.selSport=d[0].key;} }catch(e){console.error(e);}
-  S.loadSports=false; R();
+  fetch('/api/odds/sports').then(function(r){return r.json();}).then(function(d){
+    if(Array.isArray(d)&&d.length){S.sports=d;S.selSport=d[0].key;}
+    S.loadSports=false; R();
+  }).catch(function(){S.loadSports=false; R();});
 }
 
-async function loadMatches(){
+function loadMatches(){
   if(!S.selSport) return;
   S.loadMatches=true; S.matches=[]; S.selMatch=null; S.oddsErr=''; R();
-  try{
-    const d=await(await fetch('/api/odds/matches?sport='+S.selSport)).json();
-    if(Array.isArray(d)){S.matches=d; if(!d.length) S.oddsErr='Nincs elérhető meccs ehhez a sporthoz.';}
-    else S.oddsErr=d?.error||'Hiba a meccsek betöltésekor.';
-  }catch{S.oddsErr='Nem sikerült csatlakozni a backendhez.';}
-  S.loadMatches=false; R();
+  fetch('/api/odds/matches?sport='+S.selSport).then(function(r){return r.json();}).then(function(d){
+    if(Array.isArray(d)){
+      S.matches=d;
+      if(!d.length) S.oddsErr='Nincs elérhető meccs ehhez a sporthoz.';
+    } else {
+      S.oddsErr=(d&&d.error)?d.error:'Hiba a meccsek betöltésekor.';
+    }
+    S.loadMatches=false; R();
+  }).catch(function(){
+    S.oddsErr='Nem sikerült csatlakozni a backendhez.';
+    S.loadMatches=false; R();
+  });
 }
 
 function getOuts(m){
-  const pin=m.bookmakers?.find(b=>b.key==='pinnacle');
-  const oth=m.bookmakers?.find(b=>b.key==='bet365')||m.bookmakers?.find(b=>b.key==='unibet')||m.bookmakers?.find(b=>b.key!=='pinnacle');
-  const gp=(bm,mk,name,pt)=>{const m2=bm?.markets?.find(x=>x.key===mk);return pt!==undefined?m2?.outcomes?.find(x=>x.name===name&&x.point==pt)?.price:m2?.outcomes?.find(x=>x.name===name)?.price;};
-  const groups=[];
-  // 1X2
-  const h2b=pin?.markets?.find(x=>x.key==='h2h')||oth?.markets?.find(x=>x.key==='h2h');
+  var pin=null,oth=null;
+  if(m.bookmakers){
+    for(var i=0;i<m.bookmakers.length;i++){
+      if(m.bookmakers[i].key==='pinnacle') pin=m.bookmakers[i];
+    }
+    for(var i=0;i<m.bookmakers.length;i++){
+      if(m.bookmakers[i].key==='bet365'||m.bookmakers[i].key==='unibet'){oth=m.bookmakers[i];break;}
+    }
+    if(!oth){
+      for(var i=0;i<m.bookmakers.length;i++){
+        if(m.bookmakers[i].key!=='pinnacle'){oth=m.bookmakers[i];break;}
+      }
+    }
+  }
+  function gp(bm,mk,name,pt){
+    if(!bm||!bm.markets) return null;
+    for(var i=0;i<bm.markets.length;i++){
+      if(bm.markets[i].key===mk){
+        var outs=bm.markets[i].outcomes;
+        for(var j=0;j<outs.length;j++){
+          if(outs[j].name===name&&(pt===undefined||outs[j].point==pt)) return outs[j].price;
+        }
+      }
+    }
+    return null;
+  }
+  function getMarket(bm,mk){
+    if(!bm||!bm.markets) return null;
+    for(var i=0;i<bm.markets.length;i++){if(bm.markets[i].key===mk) return bm.markets[i];}
+    return null;
+  }
+  var groups=[];
+  var h2b=getMarket(pin,'h2h')||getMarket(oth,'h2h');
   if(h2b){
-    const outs=h2b.outcomes.map(o=>({name:o.name,label:o.name===m.home_team?'🏠 Hazai':o.name===m.away_team?'✈️ Vendég':'🤝 Döntetlen',tip:o.name===m.home_team?'Hazai győzelem':o.name===m.away_team?'Vendég győzelem':'Döntetlen',pin:gp(pin,'h2h',o.name),oth:gp(oth,'h2h',o.name)}));
+    var outs=[];
+    for(var i=0;i<h2b.outcomes.length;i++){
+      var o=h2b.outcomes[i];
+      var lbl=o.name===m.home_team?'🏠 Hazai':o.name===m.away_team?'✈️ Vendég':'🤝 Döntetlen';
+      var tip=o.name===m.home_team?'Hazai győzelem':o.name===m.away_team?'Vendég győzelem':'Döntetlen';
+      outs.push({name:o.name,label:lbl,tip:tip,pin:gp(pin,'h2h',o.name),oth:gp(oth,'h2h',o.name)});
+    }
     if(outs.length) groups.push({label:'1X2',outcomes:outs});
   }
-  // Gólok/Pontok
-  const tb=pin?.markets?.find(x=>x.key==='totals')||oth?.markets?.find(x=>x.key==='totals');
+  var tb=getMarket(pin,'totals')||getMarket(oth,'totals');
   if(tb){
-    const lines=[...new Set(tb.outcomes.map(o=>o.point))].sort((a,b)=>a-b).slice(0,4);
-    const outs=[];
-    lines.forEach(pt=>['Over','Under'].forEach(name=>{
-      const p=gp(pin,'totals',name,pt),q=gp(oth,'totals',name,pt);
-      if(p||q) outs.push({name,point:pt,label:(name==='Over'?'⬆️':'⬇️')+' '+name+' '+pt,tip:name+' '+pt,pin:p,oth:q});
-    }));
+    var lines={};
+    for(var i=0;i<tb.outcomes.length;i++){lines[tb.outcomes[i].point]=true;}
+    var pts=Object.keys(lines).map(parseFloat).sort(function(a,b){return a-b;}).slice(0,4);
+    var outs=[];
+    for(var i=0;i<pts.length;i++){
+      var pt=pts[i];
+      var names=['Over','Under'];
+      for(var j=0;j<names.length;j++){
+        var name=names[j];
+        var p=gp(pin,'totals',name,pt),q=gp(oth,'totals',name,pt);
+        if(p||q) outs.push({name:name,point:pt,label:(name==='Over'?'⬆️':'⬇️')+' '+name+' '+pt,tip:name+' '+pt,pin:p,oth:q});
+      }
+    }
     if(outs.length) groups.push({label:'Gólok / Pontok',outcomes:outs});
   }
-  // Hendikep
-  const sb=pin?.markets?.find(x=>x.key==='spreads')||oth?.markets?.find(x=>x.key==='spreads');
+  var sb=getMarket(pin,'spreads')||getMarket(oth,'spreads');
   if(sb){
-    const outs=sb.outcomes.map(o=>{const pt=o.point>0?'+'+o.point:o.point;return{name:o.name,point:o.point,label:(o.point>=0?'⬆️':'⬇️')+' '+o.name+' '+pt,tip:'Hendikep: '+o.name+' '+pt,pin:gp(pin,'spreads',o.name,o.point),oth:gp(oth,'spreads',o.name,o.point)};});
+    var outs=[];
+    for(var i=0;i<sb.outcomes.length;i++){
+      var o=sb.outcomes[i];
+      var pt=o.point>0?'+'+o.point:String(o.point);
+      outs.push({name:o.name,point:o.point,label:(o.point>=0?'⬆️':'⬇️')+' '+o.name+' '+pt,tip:'Hendikep: '+o.name+' '+pt,pin:gp(pin,'spreads',o.name,o.point),oth:gp(oth,'spreads',o.name,o.point)});
+    }
     if(outs.length) groups.push({label:'Hendikep',outcomes:outs});
   }
   return groups;
 }
 
 function applyOut(mi,gi,oi){
-  const m=S.matches[mi],g=getOuts(m)[gi],o=g.outcomes[oi];
-  const sm={soccer:'⚽ Football',basketball:'🏀 Kosárlabda',icehockey:'🏒 Jégkorong',tennis:'🎾 Tenisz',baseball:'⚾ Baseball'};
-  const sk=Object.keys(sm).find(k=>m.sport_key?.startsWith(k))||'';
-  S.form={...S.form,home:m.home_team,away:m.away_team,league:m.sport_title,sport:sm[sk]||'🏆 Egyéb',tip:o.tip,bookOdds:o.oth?o.oth.toFixed(2):'',fairOdds:o.pin?o.pin.toFixed(2):''};
-  S.selMatch=null; S.matches=[]; S.result=null; R();
+  var m=S.matches[mi];
+  var g=getOuts(m)[gi];
+  var o=g.outcomes[oi];
+  var sm={soccer:'⚽ Football',basketball:'🏀 Kosárlabda',icehockey:'🏒 Jégkorong',tennis:'🎾 Tenisz',baseball:'⚾ Baseball'};
+  var sk='';
+  var keys=Object.keys(sm);
+  for(var i=0;i<keys.length;i++){if(m.sport_key&&m.sport_key.indexOf(keys[i])===0){sk=keys[i];break;}}
+  S.form.home=m.home_team;
+  S.form.away=m.away_team;
+  S.form.league=m.sport_title;
+  S.form.sport=sm[sk]||'🏆 Egyéb';
+  S.form.tip=o.tip;
+  S.form.bookOdds=o.oth?o.oth.toFixed(2):'';
+  S.form.fairOdds=o.pin?o.pin.toFixed(2):'';
+  S.selMatch=null; S.matches=[]; S.result=null;
+  R();
 }
 
-async function saveKey(){
+function saveKey(){
   if(!S.keyIn.trim()){S.keyMsg='error';R();return;}
   S.savingKey=true; S.keyMsg=null; R();
-  try{
-    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':S.keyIn,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:10,messages:[{role:'user',content:'Hi'}]})});
-    if(r.ok){localStorage.setItem(KEY_STORE,S.keyIn);S.claudeKey=S.keyIn;S.keyIn='';S.keyMsg='ok';if(S.screen==='onboarding'){S.screen='app';loadSports();}}
-    else S.keyMsg='error';
-  }catch{S.keyMsg='error';}
-  S.savingKey=false; R();
+  fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':S.keyIn,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:10,messages:[{role:'user',content:'Hi'}]})
+  }).then(function(r){
+    if(r.ok){
+      localStorage.setItem(KS,S.keyIn);
+      S.claudeKey=S.keyIn; S.keyIn=''; S.keyMsg='ok';
+      if(S.screen==='onboarding'){S.screen='app';loadSports();}
+    } else {S.keyMsg='error';}
+    S.savingKey=false; R();
+  }).catch(function(){S.keyMsg='error';S.savingKey=false;R();});
 }
 
-function delKey(){localStorage.removeItem(KEY_STORE);S.claudeKey='';S.keyIn='';S.keyMsg=null;R();}
+function delKey(){localStorage.removeItem(KS);S.claudeKey='';S.keyIn='';S.keyMsg=null;R();}
 
-async function analyze(){
-  const {bk,fk,prob,edge,qK,stake,verdict}=calc();
-  if(!S.form.home||!S.form.away||!S.form.tip||!S.form.bookOdds||!S.form.fairOdds||!S.claudeKey||S.loading) return;
+function analyze(){
+  if(!S.claudeKey){alert('Kérlek add meg a Claude API kulcsodat a Beállítások fülön!');return;}
+  if(S.loading) return;
+  var home=S.form.home.trim(),away=S.form.away.trim(),tip=S.form.tip.trim();
+  if(!home||!away||!tip){
+    S.result={error:true,msg:'Kérlek add meg a hazai csapatot, a vendéget és a tipp leírását!'};
+    R(); return;
+  }
+  var c=calc();
   S.loading=true; S.result=null; R();
-  const prompt='Te egy profi sportfogadási elemző vagy (VIP Value Tipster keretrendszer).\nFOGADÁS: '+S.form.home+' vs '+S.form.away+' | '+S.form.sport+' | '+(S.form.league||'N/A')+'\nTIPP: '+S.form.tip+' | Bookmaker: '+bk+' | Fair/Pinnacle: '+fk+'\nImplied prob: '+(prob*100).toFixed(1)+'% | Edge: '+(edge!==null?edge.toFixed(2):'N/A')+'%\nNegyed-Kelly: '+qK.toFixed(2)+'% = '+stake.toFixed(1)+' egység (bankroll: '+S.form.bankroll+') | Verdikt: '+verdict+'\nKérlek: kontextuális értékelés, edge magyarázat, tét ajánlás, végső döntés (✅/⚠️/❌), összefoglaló. Magyar, max 180 szó.';
-  try{
-    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':S.claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
-    const d=await r.json(), ai=d.content?.find(c=>c.type==='text')?.text||'Elemzés sikertelen.';
-    const entry={id:Date.now(),ts:new Date().toLocaleString('hu-HU'),sport:S.form.sport,league:S.form.league,match:S.form.home+' vs '+S.form.away,tip:S.form.tip,bk,fk,edge:edge?.toFixed(2),verdict,kelly:qK.toFixed(2),stake:stake.toFixed(1),bankroll:S.form.bankroll,ai};
-    S.result=entry; S.history=[entry,...S.history].slice(0,50);
-    localStorage.setItem(HIST_STORE,JSON.stringify(S.history));
-  }catch{S.result={error:true};}
-  S.loading=false; R();
+  var hasOdds=!!(S.form.bookOdds&&S.form.fairOdds);
+  var oddsLine=hasOdds?
+    'ODDSZ: Bookmaker='+c.bk+' | Fair/Pinnacle='+c.fk+' | Edge='+(c.edge!==null?(c.edge>=0?'+':'')+c.edge.toFixed(2):'N/A')+'% | '+c.verdict:
+    'ODDSZ: Nincs megadva.';
+  var prompt='Te egy profi sportfogadási elemző vagy. Kérlek keress rá a mérkőzésre és elemezd ki!\n\n'+
+    'MÉRKŐZÉS: '+home+' vs '+away+'\n'+
+    'SPORT/LIGA: '+S.form.sport+(S.form.league?' / '+S.form.league:'')+'\n'+
+    'VIZSGÁLT OPCIÓ: '+tip+'\n'+
+    oddsLine+'\n\n'+
+    'Keress rá:\n'+
+    '1. Mindkét csapat jelenlegi formájára (utolsó 3-5 meccs)\n'+
+    '2. Egymás elleni előzmények (H2H)\n'+
+    '3. Sérülések, eltiltások, hiányzók\n'+
+    '4. Motiváció és torna-kontextus\n\n'+
+    'Adj:\n'+
+    '- Kontextuális összefoglalót (3-4 mondat)\n'+
+    (hasOdds?'- Edge és value elemzést\n':'')+
+    '- Javaslatot: AJÁNLOTT / BIZONYTALAN / NEM AJÁNLOTT\n'+
+    '- 1-2 mondatos indoklást\n\n'+
+    'Magyar nyelven, tömören, max 250 szó.';
+
+  fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key':S.claudeKey,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body:JSON.stringify({
+      model:'claude-sonnet-4-6',
+      max_tokens:2000,
+      tools:[{type:'web_search_20250305',name:'web_search'}],
+      messages:[{role:'user',content:prompt}]
+    })
+  }).then(function(r){return r.json();}).then(function(d){
+    var texts=[];
+    if(d.content){for(var i=0;i<d.content.length;i++){if(d.content[i].type==='text') texts.push(d.content[i].text);}}
+    var ai=texts.length?texts[texts.length-1]:'Elemzés sikertelen — ellenőrizd a Claude API kulcsodat.';
+    var entry={
+      id:Date.now(),ts:new Date().toLocaleString('hu-HU'),
+      sport:S.form.sport,league:S.form.league,
+      match:home+' vs '+away,tip:tip,
+      bk:c.bk,fk:c.fk,edge:c.edge?c.edge.toFixed(2):null,verdict:c.verdict,
+      kelly:c.qK.toFixed(2),stake:c.stake.toFixed(1),bankroll:S.form.bankroll,
+      hasOdds:hasOdds,ai:ai
+    };
+    S.result=entry;
+    S.history=[entry].concat(S.history).slice(0,50);
+    localStorage.setItem(HS,JSON.stringify(S.history));
+    S.loading=false; R();
+  }).catch(function(e){
+    console.error(e);
+    S.result={error:true,msg:'Hálózati hiba. Ellenőrizd a Claude API kulcsodat és az internetkapcsolatot.'};
+    S.loading=false; R();
+  });
 }
 
-// ── Render segédek ────────────────────────────────────────
-const vb=v=>{const d=VERDICTS[v];return d?'<span class="vbadge" style="background:'+d.color+'1a;border:1px solid '+d.color+'44;color:'+d.color+'">'+d.label+'</span>':'';}
-const hv=v=>{const d=VERDICTS[v];return d?'<span style="font-size:11px;font-weight:700;background:'+d.color+'1a;color:'+d.color+';padding:2px 8px;border-radius:20px">'+d.label+'</span>':'';}
-const ch=(t,c)=>'<span class="chip" style="color:'+(c||'#94a3b8')+'">'+t+'</span>';
-const mk=k=>k.slice(0,14)+'•'.repeat(16)+k.slice(-4);
-const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-
-// ── Render ────────────────────────────────────────────────
-function R(){
-  var ae=document.activeElement,fid=ae?ae.id:null,fss=ae&&ae.selectionStart!=null?ae.selectionStart:null,fse=ae&&ae.selectionEnd!=null?ae.selectionEnd:null;
-  document.getElementById('root').innerHTML=S.screen==='onboarding'?rOnboard():rApp();
-  if(fid){var el=document.getElementById(fid);if(el){el.focus();if(fss!=null)try{el.setSelectionRange(fss,fse);}catch(e){}}}
-}
-
-function rHeader(){
-  const back='<a class="back-btn" href="/">← Főoldal</a>';
-  const bdgs=(S.claudeKey?'<div class="badge" style="background:#0a3b1a;border:1px solid #4ade8033"><div class="dot" style="background:#4ade80"></div><span style="font-size:11px;color:#4ade80;font-weight:600">Claude ✓</span></div>':'')+(S.sports.length?'<div class="badge" style="background:#0a2b3b;border:1px solid #60a5fa33"><div class="dot" style="background:#60a5fa"></div><span style="font-size:11px;color:#60a5fa;font-weight:600">Odds API ✓</span></div>':'');
-  return '<div class="header"><div><div class="header-title">⚡ VIP Value Bet Elemző</div><div class="header-sub">AI-alapú értékfogadás · BYOK</div></div><div class="badges">'+bdgs+back+'</div></div>';
+function rHdr(){
+  var bdgs='';
+  if(S.claudeKey) bdgs+='<div class="bdg" style="background:#0a3b1a;border:1px solid #4ade8033"><div class="dot" style="background:#4ade80"></div><span style="font-size:11px;color:#4ade80;font-weight:600">Claude ✓</span></div>';
+  if(S.sports.length) bdgs+='<div class="bdg" style="background:#0a2b3b;border:1px solid #60a5fa33"><div class="dot" style="background:#60a5fa"></div><span style="font-size:11px;color:#60a5fa;font-weight:600">Odds ✓</span></div>';
+  return '<div class="hdr"><div><div class="htitle">⚡ VIP Value Bet Elemző</div><div class="hsub">AI-alapú értékfogadás · BYOK</div></div>'+
+    '<div class="hright">'+bdgs+'<a class="back" href="/">← Főoldal</a></div></div>';
 }
 
 function rOnboard(){
-  return rHeader()+'<div class="onboard">'+
-  '<div class="card" style="border-color:#7c3aed44;margin-bottom:18px"><div style="font-size:16px;font-weight:700;margin-bottom:8px">👋 Üdvözöllek!</div><div style="font-size:14px;color:#94a3b8;line-height:1.65">Ez az eszköz a <strong style="color:#e2e8f0">saját Claude API kulcsoddal</strong> működik. Az AI elemzések a te Anthropic számládat terhelik — csak a platformért fizetsz nekünk havi előfizetéssel.</div></div>'+
-  '<div class="card" style="margin-bottom:18px"><div style="font-size:12px;font-weight:700;color:#a78bfa;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px">Hogyan szerezz API kulcsot?</div>'+
-  [['1','Menj a console.anthropic.com oldalra'],['2','Regisztrálj ingyenesen (ha még nincs fiókod)'],['3','API Keys → Create Key gomb'],['4','Másold ki a kulcsot — ⚠️ csak egyszer látható!'],['5','Mentsd el azonnal egy biztonságos helyre (pl. jelszókezelő)'],['6','Illeszd be az alábbi mezőbe']].map(function(x){return '<div class="step"><div class="step-num">'+x[0]+'</div><div style="font-size:13px;color:#cbd5e1;padding-top:4px">'+x[1]+'</div></div>';}).join('')+'</div>'+
-  '<div class="card"><label class="lbl">Claude API Kulcs</label><div class="pw-wrap"><input class="inp inp-mono" id="ob-key" type="password" placeholder="sk-ant-api03-..." oninput="S.keyIn=this.value;S.keyMsg=null"><button class="pw-btn" onclick="pwToggle(\'ob-key\',this)">👁️</button></div>'+
-  (S.keyMsg==='ok'?'<div style="margin-top:8px;font-size:12px;color:#4ade80">✅ Kulcs érvényes! Belépés...</div>':'')+(S.keyMsg==='error'?'<div style="margin-top:8px;font-size:12px;color:#f87171">❌ Érvénytelen kulcs.</div>':'')+
-  '<button class="btn btn-full '+(S.savingKey||!S.keyIn?'btn-off':'btn-primary')+'" style="margin-top:14px" onclick="saveKey()">'+(S.savingKey?'⏳ Ellenőrzés...':'🔑 Kulcs tesztelése és mentése')+'</button>'+
-  '<div style="margin-top:12px;font-size:11px;color:#4b5563;text-align:center;line-height:1.5">🔒 A kulcsod csak a böngésződben tárolódik. Soha nem kerül a szerverre.</div></div></div>';
+  var steps=[
+    ['1','Menj a console.anthropic.com oldalra'],
+    ['2','Regisztrálj ingyenesen (ha még nincs fiókod)'],
+    ['3','API Keys → Create Key gomb'],
+    ['4','Másold ki a kulcsot — ⚠️ csak egyszer látható!'],
+    ['5','Mentsd el azonnal egy biztonságos helyre (pl. jelszókezelő)'],
+    ['6','Illeszd be az alábbi mezőbe']
+  ];
+  var stepsHtml='';
+  for(var i=0;i<steps.length;i++){
+    stepsHtml+='<div class="step"><div class="snum">'+steps[i][0]+'</div><div style="font-size:13px;color:#cbd5e1;padding-top:4px">'+steps[i][1]+'</div></div>';
+  }
+  return rHdr()+'<div class="ob">'+
+    '<div class="card" style="border-color:#7c3aed44;margin-bottom:18px">'+
+    '<div style="font-size:16px;font-weight:700;margin-bottom:8px">👋 Üdvözöllek!</div>'+
+    '<div style="font-size:14px;color:#94a3b8;line-height:1.65">Ez az eszköz a <strong style="color:#e2e8f0">saját Claude API kulcsoddal</strong> működik. Az AI elemzések a te Anthropic számládat terhelik — csak a platformért fizetsz nekünk.</div></div>'+
+    '<div class="card" style="margin-bottom:18px">'+
+    '<div style="font-size:12px;font-weight:700;color:#a78bfa;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px">Hogyan szerezz API kulcsot?</div>'+
+    stepsHtml+'</div>'+
+    '<div class="card">'+
+    '<label class="lbl">Claude API Kulcs</label>'+
+    '<div class="pwrap"><input id="ob-key" class="inp imono" type="password" placeholder="sk-ant-api03-..." oninput="S.keyIn=this.value;S.keyMsg=null"><button class="ptgl" onclick="pwt(\'ob-key\',this)">👁️</button></div>'+
+    (S.keyMsg==='ok'?'<div style="margin-top:8px;font-size:12px;color:#4ade80">✅ Kulcs érvényes!</div>':'')+
+    (S.keyMsg==='error'?'<div style="margin-top:8px;font-size:12px;color:#f87171">❌ Érvénytelen kulcs.</div>':'')+
+    '<button class="btn bfull '+(S.keyIn&&!S.savingKey?'btn-p':'btn-off')+'" style="margin-top:14px" onclick="saveKey()">'+
+    (S.savingKey?'⏳ Ellenőrzés...':'🔑 Kulcs tesztelése és mentése')+'</button>'+
+    '<div style="margin-top:12px;font-size:11px;color:#4b5563;text-align:center;line-height:1.5">🔒 Csak a böngésződben tárolódik. Soha nem kerül a szerverre.</div>'+
+    '</div></div>';
 }
 
 function rGuide(){
   var steps=[
-    ['1️⃣','Válassz sportot és ligát az <strong style="color:#e2e8f0">Automatikus odds betöltés</strong> panelben, majd kattints a <strong style="color:#e2e8f0">Meccsek</strong> gombra.'],
-    ['2️⃣','Kattints egy meccsre → megjelennek a piacok (<strong style="color:#e2e8f0">1X2 / Gólok / Hendikep</strong>). Mindegyiknél látod a Bet365 (📊) és Pinnacle (📌) oddszokat.'],
-    ['3️⃣','Kattints a kívánt kimenetelre → az összes mező <strong style="color:#e2e8f0">automatikusan kitöltődik</strong>: csapatok, tipp, bookmaker oddsz, fair oddsz.'],
-    ['4️⃣','Az <strong style="color:#e2e8f0">Élő kalkuláció</strong> azonnal mutatja az edge %-ot, a negyed-Kelly tétet és az előzetes verdiktet.'],
-    ['5️⃣','Nyomd meg az <strong style="color:#e2e8f0">⚡ AI Elemzés indítása</strong> gombot — a Claude részletes kontextuális elemzést ad és megerősíti vagy elveti a tippet.'],
+    ['1️⃣','Válassz sportot az <strong style="color:#e2e8f0">Automatikus odds betöltés</strong> panelben, majd kattints a <strong style="color:#e2e8f0">Meccsek</strong> gombra.'],
+    ['2️⃣','Kattints egy meccsre → megjelennek a piacok: <strong style="color:#e2e8f0">1X2 / Gólok / Hendikep</strong> Bet365 (📊) és Pinnacle (📌) oddszokkal.'],
+    ['3️⃣','Kattints a kívánt kimenetelre → az összes mező <strong style="color:#e2e8f0">automatikusan kitöltődik</strong>.'],
+    ['4️⃣','Vagy töltsd ki kézzel a mezőket — oddszok nélkül is elindul az elemzés.'],
+    ['5️⃣','Nyomd meg az <strong style="color:#e2e8f0">⚡ Elemzés indítása</strong> gombot — Claude webkereséssel elemez és javaslatot ad.']
   ];
-  var body=steps.map(function(x){return '<div class="guide-step"><span class="guide-icon">'+x[0]+'</span><span class="guide-text">'+x[1]+'</span></div>';}).join('');
-  body+='<div class="guide-info">💡 <strong style="color:#94a3b8">Értékfogadás logika:</strong> ✅ ÉRTÉK = edge ≥ +8% és oddsz ≥ 1.80 &nbsp;·&nbsp; ⚠️ HATÁRESET = edge +4–8% &nbsp;·&nbsp; ❌ NEM ÉRTÉK = edge &lt; +4%<br>A <strong style="color:#94a3b8">Pinnacle oddsz</strong> a fair (piaci) értéket jelzi — ez alapján számítjuk az edge-et és a Kelly tétet.</div>';
+  var body='';
+  for(var i=0;i<steps.length;i++){
+    body+='<div class="gstep"><span class="gicon">'+steps[i][0]+'</span><span class="gtxt">'+steps[i][1]+'</span></div>';
+  }
+  body+='<div class="ginfo">💡 <strong style="color:#94a3b8">Edge logika:</strong> ✅ ÉRTÉK = edge ≥ +8% és oddsz ≥ 1.80 · ⚠️ HATÁRESET = +4–8% · ❌ NEM ÉRTÉK &lt; +4%</div>';
   return '<div class="card" style="border-color:#a78bfa33">'+
     '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="S.guideOpen=!S.guideOpen;R()">'+
     '<div style="font-size:13px;font-weight:700;color:#a78bfa">📖 Hogyan használd az elemzőt?</div>'+
@@ -234,139 +402,180 @@ function rGuide(){
     '</div>';
 }
 
-function rApp(){
-  var c=calc(), canGo=!!S.claudeKey&&!S.loading;
-  var tabs='<div class="tabs">'+[['analyzer','🔍 Elemzés'],['history','📋 Előzmények ('+S.history.length+')'],['settings','⚙️ Beállítások']].map(function(x){return '<button class="tab-btn '+(S.tab===x[0]?'active':'')+'" onclick="S.tab=\''+x[0]+'\';R()">'+x[1]+'</button>';}).join('')+'</div>';
-  return rHeader()+tabs+'<div class="body">'+(S.tab==='analyzer'?rAnalyzer(c,canGo):S.tab==='history'?rHistory():rSettings())+'</div>';
-}
-
-function rAnalyzer(c,canGo){
+function rAnalyzer(){
+  var c=calc();
   var html=rGuide();
+
   // Odds panel
-  var oddsBody='';
-  if(S.sports.length===0){oddsBody='<div style="font-size:13px;color:#6b7280;text-align:center;padding:8px">'+(S.loadSports?'⏳ Sportok betöltése...':'❌ Backend nem elérhető.')+'</div>';}
-  else{
-    oddsBody='<div style="display:flex;gap:8px;margin-bottom:10px"><select class="inp" style="flex:1" onchange="S.selSport=this.value;S.matches=[];S.selMatch=null;R()">'+S.sports.map(function(s){return '<option value="'+esc(s.key)+'"'+(S.selSport===s.key?' selected':'')+'>'+esc(s.title)+'</option>';}).join('')+'</select>'+
-      '<button class="btn btn-sm '+(S.loadMatches?'btn-off':'btn-blue')+'" onclick="loadMatches()">'+(S.loadMatches?'⏳ Betöltés...':'🔄 Meccsek')+'</button></div>';
-    if(S.oddsErr) oddsBody+='<div style="font-size:12px;color:#f87171;margin-bottom:8px">❌ '+esc(S.oddsErr)+'</div>';
+  var ob='';
+  if(!S.sports.length){
+    ob='<div style="font-size:13px;color:#6b7280;text-align:center;padding:8px">'+(S.loadSports?'⏳ Sportok betöltése...':'❌ Backend nem elérhető.')+'</div>';
+  } else {
+    ob='<div style="display:flex;gap:8px;margin-bottom:10px"><select class="inp" style="flex:1" onchange="S.selSport=this.value;S.matches=[];S.selMatch=null;R()">';
+    for(var i=0;i<S.sports.length;i++){
+      ob+='<option value="'+esc(S.sports[i].key)+'"'+(S.selSport===S.sports[i].key?' selected':'')+'>'+esc(S.sports[i].title)+'</option>';
+    }
+    ob+='</select><button class="btn bsm '+(S.loadMatches?'btn-off':'btn-b')+'" onclick="loadMatches()">'+(S.loadMatches?'⏳ Betöltés...':'🔄 Meccsek')+'</button></div>';
+    if(S.oddsErr) ob+='<div style="font-size:12px;color:#f87171;margin-bottom:8px">❌ '+esc(S.oddsErr)+'</div>';
     if(S.matches.length){
-      oddsBody+='<div class="match-list">';
-      S.matches.forEach(function(m,mi){
+      ob+='<div class="mlist">';
+      for(var mi=0;mi<S.matches.length;mi++){
+        var m=S.matches[mi];
         var isSel=S.selMatch===mi;
         var time=new Date(m.commence_time).toLocaleString('hu-HU',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-        var matchHtml='<div class="match-item'+(isSel?' selected':'')+'">'+
-          '<div class="match-hdr" onclick="S.selMatch=S.selMatch==='+mi+'?null:'+mi+';R()">'+
+        ob+='<div class="mitem'+(isSel?' sel':'')+'">'+
+          '<div class="mhdr" onclick="S.selMatch=S.selMatch==='+mi+'?null:'+mi+';R()">'+
           '<div><div style="font-size:13px;font-weight:600">'+esc(m.home_team)+' <span style="color:#6b7280">vs</span> '+esc(m.away_team)+'</div>'+
           '<div style="font-size:11px;color:#6b7280;margin-top:2px">🕐 '+time+'</div></div>'+
           '<span style="color:#6b7280">'+(isSel?'▲':'▼')+'</span></div>';
         if(isSel){
           var groups=getOuts(m);
-          matchHtml+='<div class="match-outs">';
-          groups.forEach(function(g,gi){
-            matchHtml+='<div><div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">'+g.label+'</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
-            g.outcomes.forEach(function(o,oi){
-              matchHtml+='<button class="out-btn" onclick="applyOut('+mi+','+gi+','+oi+')">'+
-                '<div style="font-size:12px;font-weight:700;color:#e2e8f0">'+o.label+'</div>'+
+          ob+='<div class="mouts">';
+          for(var gi=0;gi<groups.length;gi++){
+            var g=groups[gi];
+            ob+='<div><div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">'+g.label+'</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
+            for(var oi=0;oi<g.outcomes.length;oi++){
+              var o=g.outcomes[oi];
+              ob+='<button class="obtn" onclick="applyOut('+mi+','+gi+','+oi+')">'+
+                '<div style="font-size:12px;font-weight:700;color:#e2e8f0">'+esc(o.label)+'</div>'+
                 (o.oth?'<div style="font-size:11px;color:#94a3b8;margin-top:2px">📊 '+o.oth+'</div>':'')+
                 (o.pin?'<div style="font-size:11px;color:#60a5fa;margin-top:1px">📌 '+o.pin+'</div>':'')+
                 '</button>';
-            });
-            matchHtml+='</div></div>';
-          });
-          matchHtml+='</div>';
+            }
+            ob+='</div></div>';
+          }
+          ob+='</div>';
         }
-        matchHtml+='</div>';
-        oddsBody+=matchHtml;
-      });
-      oddsBody+='</div>';
+        ob+='</div>';
+      }
+      ob+='</div>';
     }
   }
-  html+='<div class="card" style="border-color:#60a5fa33"><div style="font-size:13px;font-weight:700;color:#60a5fa;margin-bottom:12px">⚡ Automatikus odds betöltés</div>'+oddsBody+'</div>';
+  html+='<div class="card" style="border-color:#60a5fa33"><div style="font-size:13px;font-weight:700;color:#60a5fa;margin-bottom:12px">⚡ Automatikus odds betöltés</div>'+ob+'</div>';
 
   // Form
-  html+='<div class="card"><div style="margin-bottom:12px"><label class="lbl">Sport</label><select class="inp" onchange="S.form.sport=this.value">'+['⚽ Football','🏀 Kosárlabda','🏒 Jégkorong','🎾 Tenisz','⚾ Baseball','🏆 Egyéb'].map(function(s){return '<option'+(S.form.sport===s?' selected':'')+'>'+s+'</option>';}).join('')+'</select></div>'+
-  '<label class="lbl">Bajnokság / Liga</label><input id="f-league" class="inp" placeholder="pl. Premier League, NBA..." value="'+esc(S.form.league)+'" oninput="S.form.league=this.value"></div>';
+  var sportOpts='';
+  var sports=['⚽ Football','🏀 Kosárlabda','🏒 Jégkorong','🎾 Tenisz','⚾ Baseball','🏆 Egyéb'];
+  for(var i=0;i<sports.length;i++) sportOpts+='<option'+(S.form.sport===sports[i]?' selected':'')+'>'+sports[i]+'</option>';
+  html+='<div class="card"><div style="margin-bottom:12px"><label class="lbl">Sport</label><select class="inp" onchange="S.form.sport=this.value">'+sportOpts+'</select></div>'+
+    '<label class="lbl">Bajnokság / Liga</label>'+
+    '<input id="f-lg" class="inp" placeholder="pl. Premier League, NBA..." value="'+esc(S.form.league)+'" oninput="S.form.league=this.value"></div>';
 
-  html+='<div class="card"><div class="grid2" style="margin-bottom:12px">'+
-  '<div><label class="lbl">Hazai csapat</label><input id="f-home" class="inp" placeholder="pl. Arsenal" value="'+esc(S.form.home)+'" oninput="S.form.home=this.value;R()"></div>'+
-  '<div><label class="lbl">Vendég csapat</label><input id="f-away" class="inp" placeholder="pl. Chelsea" value="'+esc(S.form.away)+'" oninput="S.form.away=this.value;R()"></div></div>'+
-  '<label class="lbl">Tipp leírása</label><input id="f-tip" class="inp" placeholder="pl. Hazai győzelem | Over 2.5 | BTTS" value="'+esc(S.form.tip)+'" oninput="S.form.tip=this.value;R()"></div>';
+  html+='<div class="card"><div class="g2" style="margin-bottom:12px">'+
+    '<div><label class="lbl">Hazai csapat</label><input id="f-hm" class="inp" placeholder="pl. Arsenal" value="'+esc(S.form.home)+'" oninput="S.form.home=this.value;R()"></div>'+
+    '<div><label class="lbl">Vendég csapat</label><input id="f-aw" class="inp" placeholder="pl. Chelsea" value="'+esc(S.form.away)+'" oninput="S.form.away=this.value;R()"></div></div>'+
+    '<label class="lbl">Tipp leírása</label>'+
+    '<input id="f-tp" class="inp" placeholder="pl. Hazai győzelem | Over 2.5 | BTTS | Döntetlen" value="'+esc(S.form.tip)+'" oninput="S.form.tip=this.value;R()"></div>';
 
-  html+='<div class="card"><div class="grid2" style="margin-bottom:12px">'+
-  '<div><label class="lbl">Bookmaker oddsz</label><input id="f-book" class="inp" type="text" inputmode="decimal" placeholder="pl. 2.10" value="'+S.form.bookOdds+'" oninput="S.form.bookOdds=this.value;R()"></div>'+
-  '<div><label class="lbl">Fair / Pinnacle oddsz</label><input id="f-fair" class="inp" type="text" inputmode="decimal" placeholder="pl. 1.90" value="'+S.form.fairOdds+'" oninput="S.form.fairOdds=this.value;R()"></div></div>'+
-  '<label class="lbl">Bankroll (egység)</label><input id="f-bank" class="inp" type="text" inputmode="decimal" placeholder="100" value="'+S.form.bankroll+'" oninput="S.form.bankroll=this.value;R()"></div>';
+  html+='<div class="card"><div class="g2" style="margin-bottom:12px">'+
+    '<div><label class="lbl">Bookmaker oddsz <span style="font-weight:400;text-transform:none">(opcionális)</span></label>'+
+    '<input id="f-bk" class="inp" type="text" inputmode="decimal" placeholder="pl. 2.10" value="'+esc(S.form.bookOdds)+'" oninput="S.form.bookOdds=this.value;R()"></div>'+
+    '<div><label class="lbl">Fair / Pinnacle oddsz <span style="font-weight:400;text-transform:none">(opcionális)</span></label>'+
+    '<input id="f-fk" class="inp" type="text" inputmode="decimal" placeholder="pl. 1.90" value="'+esc(S.form.fairOdds)+'" oninput="S.form.fairOdds=this.value;R()"></div></div>'+
+    '<label class="lbl">Bankroll (egység)</label>'+
+    '<input id="f-br" class="inp" type="text" inputmode="decimal" placeholder="100" value="'+esc(S.form.bankroll)+'" oninput="S.form.bankroll=this.value;R()"></div>';
 
   // Kalkuláció
   if(c.edge!==null){
-    html+='<div class="card" style="border-color:'+c.ec+'33"><div class="lbl" style="margin-bottom:12px">Élő kalkuláció</div><div class="grid3">'+
-    '<div class="metric" style="border:1px solid '+c.ec+'33"><div class="metric-val" style="color:'+c.ec+'">'+(c.edge>=0?'+':'')+c.edge.toFixed(1)+'%</div><div class="metric-lbl">Edge</div></div>'+
-    '<div class="metric" style="border:1px solid #60a5fa33"><div class="metric-val" style="color:#60a5fa">'+c.qK.toFixed(1)+'%</div><div class="metric-lbl">¼ Kelly</div></div>'+
-    '<div class="metric" style="border:1px solid #a78bfa33"><div class="metric-val" style="color:#a78bfa">'+c.stake.toFixed(1)+'</div><div class="metric-lbl">Tét (e.)</div></div></div>'+
-    (c.verdict?'<div style="margin-top:12px;text-align:center">'+vb(c.verdict)+'</div>':'')+
-    '</div>';
+    html+='<div class="card" style="border-color:'+c.ec+'33">'+
+      '<div class="lbl" style="margin-bottom:12px">Élő kalkuláció</div><div class="g3">'+
+      '<div class="metric" style="border:1px solid '+c.ec+'33"><div class="mval" style="color:'+c.ec+'">'+(c.edge>=0?'+':'')+c.edge.toFixed(1)+'%</div><div class="mlbl">Edge</div></div>'+
+      '<div class="metric" style="border:1px solid #60a5fa33"><div class="mval" style="color:#60a5fa">'+c.qK.toFixed(1)+'%</div><div class="mlbl">¼ Kelly</div></div>'+
+      '<div class="metric" style="border:1px solid #a78bfa33"><div class="mval" style="color:#a78bfa">'+c.stake.toFixed(1)+'</div><div class="mlbl">Tét (e.)</div></div></div>'+
+      (c.verdict?'<div style="margin-top:12px;text-align:center">'+vb(c.verdict)+'</div>':'')+
+      '</div>';
   }
-  if(!S.claudeKey) html+='<div class="card" style="border-color:#fbbf2433;font-size:13px;text-align:center;color:#fbbf24;margin-bottom:14px">⚠️ Claude API kulcs hiányzik — add meg a <strong>Beállítások</strong> fülön</div>';
-  html+='<button class="btn btn-full '+(canGo&&!S.loading?'btn-primary':'btn-off')+'" onclick="analyze()">'+(S.loading?'⏳ Elemzés folyamatban...':'⚡ Elemzés indítása')+'</button>';
 
+  var canClick=!!S.claudeKey&&!S.loading;
+  html+='<button class="btn bfull '+(canClick?'btn-p':'btn-off')+'" onclick="analyze()">'+
+    (S.loading?'⏳ Elemzés folyamatban...':'⚡ Elemzés indítása')+'</button>';
+
+  // Eredmény
   if(S.result&&!S.result.error){
-    var vd=VERDICTS[S.result.verdict],borderCol=vd?vd.color+'33':'#a78bfa33';
-    var ec2=S.result.edge>=8?'#4ade80':S.result.edge>=4?'#fbbf24':'#f87171';
-    var chips=ch('📌 '+S.result.tip);
-    if(S.result.hasOdds&&S.result.bk) chips+=ch('📊 '+S.result.bk);
-    if(S.result.hasOdds&&S.result.edge) chips+=ch('⚡ '+(S.result.edge>=0?'+':'')+S.result.edge+'%',ec2);
-    if(S.result.hasOdds&&S.result.stake&&S.result.bk) chips+=ch('🎯 '+S.result.stake+' e.','#60a5fa');
-    html+='<div class="card" style="margin-top:16px;border-color:'+borderCol+'">'+
-    '<div class="flex-bw" style="margin-bottom:12px"><div><div style="font-size:15px;font-weight:700">'+esc(S.result.match)+'</div>'+
-    '<div style="font-size:12px;color:#6b7280;margin-top:2px">'+esc(S.result.sport)+(S.result.league?' · '+esc(S.result.league):'')+' · '+S.result.ts+'</div></div>'+
-    (vd?vb(S.result.verdict):'')+
-    '</div><div class="chips" style="margin-bottom:14px">'+chips+'</div>'+
-    '<div class="divider"><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;margin-bottom:8px">AI Elemzés</div>'+
-    '<div class="ai-text">'+esc(S.result.ai)+'</div></div></div>';
+    var r=S.result;
+    var vd=VERDICTS[r.verdict];
+    var bcolor=vd?vd.color+'33':'#a78bfa33';
+    var ec2=r.edge>=8?'#4ade80':r.edge>=4?'#fbbf24':'#f87171';
+    html+='<div class="card" style="margin-top:16px;border-color:'+bcolor+'">'+
+      '<div class="fbw" style="margin-bottom:12px">'+
+      '<div><div style="font-size:15px;font-weight:700">'+esc(r.match)+'</div>'+
+      '<div style="font-size:12px;color:#6b7280;margin-top:2px">'+esc(r.sport)+(r.league?' · '+esc(r.league):'')+' · '+r.ts+'</div></div>'+
+      (vd?vb(r.verdict):'')+'</div>'+
+      '<div class="chips" style="margin-bottom:14px">'+ch('📌 '+r.tip)+
+      (r.hasOdds&&r.bk?ch('📊 '+r.bk):'')+
+      (r.hasOdds&&r.edge?ch('⚡ '+(r.edge>=0?'+':'')+r.edge+'%',ec2):'')+
+      (r.hasOdds&&r.stake?ch('🎯 '+r.stake+' e.','#60a5fa'):'')+
+      '</div>'+
+      '<div class="div"><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;margin-bottom:8px">AI Elemzés</div>'+
+      '<div class="aitext">'+esc(r.ai)+'</div></div></div>';
   }
-  if(S.result?.error){
-    var msg=S.result.msg||'Hiba az elemzés során. Ellenőrizd a Claude API kulcsodat.';
-    html+='<div class="card" style="margin-top:14px;border-color:#f8717133;color:#f87171;font-size:14px">❌ '+esc(msg)+'</div>';
+  if(S.result&&S.result.error){
+    html+='<div class="card" style="margin-top:14px;border-color:#f8717133;color:#f87171;font-size:14px">❌ '+(S.result.msg||'Hiba az elemzés során.')+'</div>';
   }
   return html;
 }
 
 function rHistory(){
   if(!S.history.length) return '<div style="text-align:center;color:#6b7280;padding:50px 20px;font-size:14px">Még nincs mentett elemzés.</div>';
-  var html='<button class="btn btn-danger btn-sm" style="margin-bottom:14px" onclick="if(confirm(\'Törölni az összes előzményt?\')){S.history=[];localStorage.removeItem(\''+HIST_STORE+'\');R()}">🗑️ Előzmények törlése</button>';
-  S.history.forEach(function(h,hi){
-    var isExp=S.expanded===hi, vd=VERDICTS[h.verdict];
-    html+='<div class="card" style="cursor:pointer;border-color:'+(isExp?(vd?.color+'44'||'#1e2130'):'#1e2130')+'" onclick="S.expanded=S.expanded==='+hi+'?null:'+hi+';R()">'+
-    '<div class="flex-bw"><div><div style="font-size:14px;font-weight:600">'+esc(h.match)+'</div>'+
-    '<div style="font-size:12px;color:#6b7280;margin-top:2px">'+h.ts+' · '+esc(h.tip)+'</div></div>'+
-    '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">'+hv(h.verdict)+'<span style="font-size:11px;color:#6b7280">+'+h.edge+'% edge</span></div></div>'+
-    (isExp?'<div class="divider" style="margin-top:10px"><div class="chips" style="margin-bottom:10px">'+ch('📊 '+h.bk)+ch('Fair: '+h.fk)+ch('¼K: '+h.kelly+'%','#60a5fa')+ch('Tét: '+h.stake+' e.','#a78bfa')+'</div><div class="ai-text" style="font-size:13px">'+esc(h.ai)+'</div></div>':'')+
-    '</div>';
-  });
+  var html='<button class="btn btn-del bsm" style="margin-bottom:14px" onclick="if(confirm(\'Törölni az összes előzményt?\')){S.history=[];localStorage.removeItem(\''+HS+'\');R()}">🗑️ Előzmények törlése</button>';
+  for(var i=0;i<S.history.length;i++){
+    var h=S.history[i];
+    var isExp=S.expanded===i;
+    var vd=VERDICTS[h.verdict];
+    html+='<div class="card" style="cursor:pointer;border-color:'+(isExp?(vd?vd.color+'44':'#1e2130'):'#1e2130')+'" onclick="S.expanded=S.expanded==='+i+'?null:'+i+';R()">'+
+      '<div class="fbw"><div>'+
+      '<div style="font-size:14px;font-weight:600">'+esc(h.match)+'</div>'+
+      '<div style="font-size:12px;color:#6b7280;margin-top:2px">'+esc(h.ts)+' · '+esc(h.tip)+'</div></div>'+
+      '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">'+
+      hv(h.verdict)+'<span style="font-size:11px;color:#6b7280">'+(h.edge?'+'+h.edge+'% edge':'')+'</span></div></div>'+
+      (isExp?'<div class="div" style="margin-top:10px">'+
+      '<div class="chips" style="margin-bottom:10px">'+
+      (h.bk?ch('📊 '+h.bk):'')+
+      (h.fk?ch('Fair: '+h.fk):'')+
+      (h.kelly?ch('¼K: '+h.kelly+'%','#60a5fa'):'')+
+      (h.stake?ch('Tét: '+h.stake+' e.','#a78bfa'):'')+
+      '</div>'+
+      '<div class="aitext" style="font-size:13px">'+esc(h.ai)+'</div></div>':'')+
+      '</div>';
+  }
   return html;
 }
 
 function rSettings(){
   return '<div class="card" style="border-color:'+(S.claudeKey?'#4ade8033':'#2a2d3e')+'">'+
-  '<div class="flex-bw" style="margin-bottom:14px"><div style="font-size:15px;font-weight:700">🤖 Claude API kulcs</div>'+
-  '<div style="display:flex;align-items:center;gap:5px;background:'+(S.claudeKey?'#0a3b1a':'#1a1d2e')+';border:1px solid '+(S.claudeKey?'#4ade8033':'#2a2d3e')+';border-radius:20px;padding:4px 10px">'+
-  '<div class="dot" style="background:'+(S.claudeKey?'#4ade80':'#4b5563')+'"></div>'+
-  '<span style="font-size:11px;color:'+(S.claudeKey?'#4ade80':'#4b5563')+';font-weight:600">'+(S.claudeKey?'Aktív':'Nincs beállítva')+'</span></div></div>'+
-  (S.claudeKey?'<div class="key-masked">'+mk(S.claudeKey)+'</div>':'')+
-  '<label class="lbl">'+(S.claudeKey?'Kulcs frissítése':'API kulcs megadása')+'</label>'+
-  '<div class="pw-wrap"><input class="inp inp-mono" id="set-key" type="password" placeholder="sk-ant-api03-..." oninput="S.keyIn=this.value;S.keyMsg=null"><button class="pw-btn" onclick="pwToggle(\'set-key\',this)">👁️</button></div>'+
-  (S.keyMsg==='ok'?'<div style="margin-top:8px;font-size:12px;color:#4ade80">✅ Kulcs mentve!</div>':'')+
-  (S.keyMsg==='error'?'<div style="margin-top:8px;font-size:12px;color:#f87171">❌ Érvénytelen kulcs.</div>':'')+
-  '<button class="btn btn-full btn-sm '+(S.keyIn&&!S.savingKey?'btn-primary':'btn-off')+'" style="margin-top:12px" onclick="saveKey()">'+(S.savingKey?'⏳ Ellenőrzés...':'🔑 Kulcs mentése')+'</button>'+
-  (S.claudeKey?'<button class="btn btn-full btn-danger btn-sm" style="margin-top:8px" onclick="delKey()">🗑️ Kulcs törlése</button>':'')+
-  '<div style="margin-top:12px;font-size:11px;color:#4b5563;text-align:center;line-height:1.5">🔒 A kulcsod csak a böngésződben tárolódik (localStorage). Soha nem kerül a szerverre.</div></div>'+
-  '<div class="card" style="background:transparent;border-color:#1e2130"><div style="font-size:11px;color:#4b5563;line-height:1.65">💡 <strong style="color:#6b7280">BYOK modell:</strong> Az AI elemzések a saját Anthropic számládat terhelik. Az odds adatok a VIP Tipster backendről jönnek (ODDS_API_KEY a szerveren). Te csak a platformért fizetsz nekünk.</div></div>';
+    '<div class="fbw" style="margin-bottom:14px">'+
+    '<div style="font-size:15px;font-weight:700">🤖 Claude API kulcs</div>'+
+    '<div style="display:flex;align-items:center;gap:5px;background:'+(S.claudeKey?'#0a3b1a':'#1a1d2e')+';border:1px solid '+(S.claudeKey?'#4ade8033':'#2a2d3e')+';border-radius:20px;padding:4px 10px">'+
+    '<div class="dot" style="background:'+(S.claudeKey?'#4ade80':'#4b5563')+'"></div>'+
+    '<span style="font-size:11px;color:'+(S.claudeKey?'#4ade80':'#4b5563')+';font-weight:600">'+(S.claudeKey?'Aktív':'Nincs beállítva')+'</span></div></div>'+
+    (S.claudeKey?'<div class="kmask">'+mk(S.claudeKey)+'</div>':'')+
+    '<label class="lbl">'+(S.claudeKey?'Kulcs frissítése':'API kulcs megadása')+'</label>'+
+    '<div class="pwrap"><input id="st-key" class="inp imono" type="password" placeholder="sk-ant-api03-..." oninput="S.keyIn=this.value;S.keyMsg=null"><button class="ptgl" onclick="pwt(\'st-key\',this)">👁️</button></div>'+
+    (S.keyMsg==='ok'?'<div style="margin-top:8px;font-size:12px;color:#4ade80">✅ Kulcs mentve!</div>':'')+
+    (S.keyMsg==='error'?'<div style="margin-top:8px;font-size:12px;color:#f87171">❌ Érvénytelen kulcs.</div>':'')+
+    '<button class="btn bfull bsm '+(S.keyIn&&!S.savingKey?'btn-p':'btn-off')+'" style="margin-top:12px" onclick="saveKey()">'+
+    (S.savingKey?'⏳ Ellenőrzés...':'🔑 Kulcs mentése')+'</button>'+
+    (S.claudeKey?'<button class="btn bfull btn-del bsm" style="margin-top:8px" onclick="delKey()">🗑️ Kulcs törlése</button>':'')+
+    '<div style="margin-top:12px;font-size:11px;color:#4b5563;text-align:center;line-height:1.5">🔒 Csak a böngésződben tárolódik (localStorage). Soha nem kerül a szerverre.</div></div>'+
+    '<div class="card" style="background:transparent;border-color:#1e2130"><div style="font-size:11px;color:#4b5563;line-height:1.65">'+
+    '💡 <strong style="color:#6b7280">BYOK modell:</strong> Az AI elemzések a saját Anthropic számládat terhelik. Az odds adatok a VIP Tipster backendről jönnek. Te csak a platformért fizetsz nekünk.</div></div>';
 }
 
-function pwToggle(id,btn){
-  var el=document.getElementById(id); if(!el) return;
-  el.type=el.type==='password'?'text':'password';
-  btn.textContent=el.type==='password'?'👁️':'🙈';
+function rApp(){
+  var tabs='<div class="tabs">'+
+    '<button class="tbtn'+(S.tab==='analyzer'?' on':'')+'" onclick="S.tab=\'analyzer\';R()">🔍 Elemzés</button>'+
+    '<button class="tbtn'+(S.tab==='history'?' on':'')+'" onclick="S.tab=\'history\';R()">📋 Előzmények ('+S.history.length+')</button>'+
+    '<button class="tbtn'+(S.tab==='settings'?' on':'')+'" onclick="S.tab=\'settings\';R()">⚙️ Beállítások</button>'+
+    '</div>';
+  var content=S.tab==='analyzer'?rAnalyzer():S.tab==='history'?rHistory():rSettings();
+  return rHdr()+tabs+'<div class="body">'+content+'</div>';
+}
+
+function pwt(id,btn){
+  var el=document.getElementById(id);
+  if(!el) return;
+  el.type=(el.type==='password')?'text':'password';
+  btn.textContent=(el.type==='password')?'👁️':'🙈';
 }
 </script>
 </body>
