@@ -46,20 +46,15 @@ function saveLastRun() {
 
 // ── Sport térkép ──────────────────────────────────────────
 const SPORT_MAP = {
-  "soccer_fifa_world_cup":             { sport: "soccer",     label: "⚽ FIFA VB 2026",      minValue: 6 },
-  "soccer_uefa_champs_league":         { sport: "soccer",     label: "⚽ BL",                 minValue: 6 },
-  "soccer_epl":                        { sport: "soccer",     label: "⚽ Premier League",      minValue: 6 },
-  "soccer_germany_bundesliga":         { sport: "soccer",     label: "⚽ Bundesliga",          minValue: 6 },
-  "soccer_spain_la_liga":              { sport: "soccer",     label: "⚽ La Liga",             minValue: 6 },
-  "soccer_italy_serie_a":              { sport: "soccer",     label: "⚽ Serie A",             minValue: 6 },
-  "soccer_france_ligue_one":           { sport: "soccer",     label: "⚽ Ligue 1",             minValue: 6 },
-  "soccer_conmebol_copa_libertadores": { sport: "soccer",     label: "⚽ Copa Libertadores",   minValue: 7 },
-  "soccer_conmebol_copa_sudamericana": { sport: "soccer",     label: "⚽ Copa Sudamericana",   minValue: 7 },
-  "basketball_nba":                    { sport: "basketball", label: "🏀 NBA",                 minValue: 6 },
-  "basketball_wnba":                   { sport: "basketball", label: "🏀 WNBA",                minValue: 12  },
-  "basketball_euroleague":             { sport: "basketball", label: "🏀 Euroleague",           minValue: 8 },
-  "icehockey_nhl":                     { sport: "hockey",     label: "🏒 NHL",                 minValue: 6 },
-  "icehockey_ahl":                     { sport: "hockey",     label: "🏒 AHL",                 minValue: 9 },
+  "soccer_fifa_world_cup":             { sport: "soccer", label: "⚽ FIFA VB 2026",      minValue: 6 },
+  "soccer_uefa_champs_league":         { sport: "soccer", label: "⚽ BL",                 minValue: 6 },
+  "soccer_epl":                        { sport: "soccer", label: "⚽ Premier League",      minValue: 6 },
+  "soccer_germany_bundesliga":         { sport: "soccer", label: "⚽ Bundesliga",          minValue: 6 },
+  "soccer_spain_la_liga":              { sport: "soccer", label: "⚽ La Liga",             minValue: 6 },
+  "soccer_italy_serie_a":              { sport: "soccer", label: "⚽ Serie A",             minValue: 6 },
+  "soccer_france_ligue_one":           { sport: "soccer", label: "⚽ Ligue 1",             minValue: 6 },
+  "soccer_conmebol_copa_libertadores": { sport: "soccer", label: "⚽ Copa Libertadores",   minValue: 7 },
+  "soccer_conmebol_copa_sudamericana": { sport: "soccer", label: "⚽ Copa Sudamericana",   minValue: 7 },
 };
 
 const EXCLUDED_BM = ["betfair_ex_eu", "betfair_ex_uk", "matchbook", "betfair_sb_uk", "smarkets"];
@@ -235,7 +230,7 @@ async function fetchAiTips(matchList) {
     `- ${m.sport} | ${m.match} | Kezdés: ${m.commence}\n  Valós odds: ${m.odds.map(o => `${o.market} / ${o.name}: ${o.odds} (${o.bookmaker})`).join(", ")}`
   ).join("\n");
 
-  const prompt = `Te egy profi sportfogadási elemző vagy. Használj web keresést hogy megtudd az aktuális formát, sérüléseket, és keretinformációkat az alábbi mai meccsekre, majd adj 2-3 konkrét fogadási tippet.
+  const prompt = `Te egy profi labdarúgás-fogadási elemző vagy. Használj web keresést hogy megtudd az aktuális formát, sérüléseket, és keretinformációkat az alábbi mai foci meccsekre, majd adj 2-3 konkrét fogadási tippet — csak akkor többet, ha valóban több erős lehetőség van. Ne erőltesd a tippszámot.
 
 Mai meccsek (valós bookmaker oddsokkal):
 ${matchText}
