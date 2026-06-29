@@ -357,8 +357,7 @@ async function fetchAndProcess() {
   if (fresh.length) { history = [...fresh, ...history]; saveHistory(); }
   saveLastRun();
 
-  // latestTips = összes mai pending tipp (nem csak az aktuális futásé)
-  const today = todayHU();
+  // latestTips = összes mai pending tipp
   latestTips = history.filter(t => t.type === "value" && t.addedAt?.startsWith(today) && (!t.result || t.result === "pending"));
   aiTips     = history.filter(t => t.type === "ai"    && t.addedAt?.startsWith(today) && (!t.result || t.result === "pending"));
 
