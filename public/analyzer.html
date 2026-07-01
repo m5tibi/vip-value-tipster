@@ -135,13 +135,20 @@ function analyze(){
   var prompt=
     'Te egy profi labdarúgás-fogadási elemző vagy. A felhasználó az alábbi fogadási opciót szeretné elemeztetni:\n\n'+
     '"'+q+'"\n\n'+
-    'Feladatod:\n'+
-    '1. Azonosítsd be pontosan a meccset és a fogadási opció(ka)t\n'+
-    '2. Keress rá a legfrissebb információkra: jelenlegi forma, egymás elleni előzmények (H2H), sérülések, eltiltások, motiváció, torna-kontextus\n'+
-    '3. Elemezd ki részletesen, hogy a fogadási opció mennyire valószínű\n'+
-    '4. Adj egyértelmű javaslatot pontosan ebben a formában (a sor elején): ✅ AJÁNLOTT / ⚠️ BIZONYTALAN / ❌ NEM AJÁNLOTT\n'+
-    '5. Írj 3-5 mondatos tömör, tényszerű indoklást valós adatok alapján\n\n'+
-    'Fontos: csak labdarúgásra válaszolj. Magyar nyelven, szakszerűen és tömören.';
+    'Feladatod — keress rá a legfrissebb adatokra, majd adj részletes elemzést az alábbi struktúra szerint:\n\n'+
+    '1. **Meccs kontextus**: Torna, forduló, tét (kieséses? csoportmeccs?)\n'+
+    '2. **Hazai csapat formája**: Utolsó 3-5 meccs eredménye, gólstatisztika, kulcsjátékosok\n'+
+    '3. **Vendég csapat formája**: Utolsó 3-5 meccs eredménye, gólstatisztika, kulcsjátékosok\n'+
+    '4. **Egymás elleni előzmények (H2H)**: Utolsó 3-5 találkozó, gólátlag\n'+
+    '5. **Sérülések, eltiltások, hiányzók**: Mindkét csapatnál\n'+
+    '6. **A fogadási opció értékelése**: Mennyire valószínű, milyen tényezők támogatják vagy szólnak ellene\n\n'+
+    'A válasz végén — egy üres sor után — add meg a verdiktet PONTOSAN ebben a formában (csak ez a sor, semmi más utána):\n'+
+    'VERDIKT: ✅ AJÁNLOTT\n'+
+    'vagy\n'+
+    'VERDIKT: ⚠️ BIZONYTALAN\n'+
+    'vagy\n'+
+    'VERDIKT: ❌ NEM AJÁNLOTT\n\n'+
+    'Magyar nyelven válaszolj, szakszerűen. A teljes elemzés legyen részletes, de tömör — körülbelül 150-250 szó.';
 
   fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
@@ -217,17 +224,26 @@ function rAnalyzer(){
   // Eredmény
   if(S.result&&!S.result.error){
     var r=S.result;
-    var verdict='';
-    if(r.ai.includes('✅ AJÁNLOTT')) verdict='<span class="vbdg" style="background:#4ade801a;border:1px solid #4ade8044;color:#4ade80">✅ AJÁNLOTT</span>';
-    else if(r.ai.includes('⚠️ BIZONYTALAN')) verdict='<span class="vbdg" style="background:#fbbf241a;border:1px solid #fbbf2444;color:#fbbf24">⚠️ BIZONYTALAN</span>';
-    else if(r.ai.includes('❌ NEM AJÁNLOTT')) verdict='<span class="vbdg" style="background:#f871711a;border:1px solid #f8717144;color:#f87171">❌ NEM AJÁNLOTT</span>';
+    var ai=r.ai||'';
+    // Verdikt kiszedése a szöveg végéről
+    var verdiktLine='', aiBody=ai;
+    var vMatch=ai.match(/VERDIKT:\s*(✅ AJÁNLOTT|⚠️ BIZONYTALAN|❌ NEM AJÁNLOTT)/);
+    if(vMatch){
+      verdiktLine=vMatch[1];
+      aiBody=ai.replace(/\n*VERDIKT:.*$/,'').trim();
+    } else if(ai.includes('✅ AJÁNLOTT')) verdiktLine='✅ AJÁNLOTT';
+    else if(ai.includes('⚠️ BIZONYTALAN')) verdiktLine='⚠️ BIZONYTALAN';
+    else if(ai.includes('❌ NEM AJÁNLOTT')) verdiktLine='❌ NEM AJÁNLOTT';
+    var vColor=verdiktLine.includes('✅')?'#4ade80':verdiktLine.includes('⚠️')?'#fbbf24':'#f87171';
     html+='<div class="card" style="margin-top:16px;border-color:#a78bfa33">'+
       '<div class="fbw" style="margin-bottom:12px">'+
       '<div><div style="font-size:15px;font-weight:700;color:#e2e8f0">'+esc(r.query)+'</div>'+
-      '<div style="font-size:12px;color:#6b7280;margin-top:4px">'+r.ts+'</div></div>'+
-      verdict+'</div>'+
-      '<div class="div"><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">AI Elemzés</div>'+
-      '<div class="aitext">'+esc(r.ai)+'</div></div></div>';
+      '<div style="font-size:12px;color:#6b7280;margin-top:4px">'+r.ts+'</div></div></div>'+
+      '<div class="div">'+
+      '<div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">AI Elemzés</div>'+
+      '<div class="aitext">'+esc(aiBody)+'</div>'+
+      (verdiktLine?'<div style="margin-top:16px;padding:14px 18px;background:'+vColor+'18;border:2px solid '+vColor+'55;border-radius:10px;text-align:center;font-size:17px;font-weight:800;color:'+vColor+'">'+esc(verdiktLine)+'</div>':'')+
+      '</div></div>';
   }
   if(S.result&&S.result.error){
     html+='<div class="card" style="margin-top:14px;border-color:#f8717133;color:#f87171;font-size:14px">❌ '+(S.result.msg||'Hiba az elemzés során.')+'</div>';
