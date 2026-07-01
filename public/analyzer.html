@@ -163,7 +163,7 @@ function R(){
     '<span style="color:#4b5563">Pl.: Belgium - Szenegál; mindkét csapat szerez gólt + Over 2.5</span>'+
     '</div></div>';
 
-  var html=howItWorks+(S.screen==='onboarding')?rOnboard():rApp();
+    var html=howItWorks+(S.screen==='onboarding'?rOnboard():rApp());
     document.getElementById('root').innerHTML=html;
   }catch(e){
     document.getElementById('root').innerHTML='<div style="padding:20px;color:#f87171">Hiba: '+esc(String(e))+'</div>';
@@ -238,7 +238,7 @@ function saveKey(){
   }).catch(function(){ S.keyMsg='error'; S.savingKey=false; R(); });
 }
 
-function delKey(){lsRemove(KS);S.claudeKey='';S.keyIn='';S.keyMsg=null;R();}
+function delKey(){lsRemove(KS);S.claudeKey='';S.keyIn='';S.keyMsg=null;S.screen='onboarding';R();}
 
 // ── Példa betöltése ───────────────────────────────────────
 function setEx(idx){
