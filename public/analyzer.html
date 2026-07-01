@@ -224,11 +224,12 @@ function saveKey(){
   }).then(function(r){
     if(r.ok){
       lsSet(KS,S.keyIn);
-      S.claudeKey=S.keyIn;S.keyIn='';S.keyMsg='ok';
-      if(S.screen==='onboarding'){S.screen='app';syncHistory();}
-    } else {S.keyMsg='error';}
-    S.savingKey=false;R();
-  }).catch(function(){S.keyMsg='error';S.savingKey=false;R();});
+      S.claudeKey=S.keyIn; S.keyIn=''; S.keyMsg='ok'; S.savingKey=false; R();
+      setTimeout(function(){ S.screen='app'; S.keyMsg=null; R(); syncHistory(); }, 1000);
+    } else {
+      S.keyMsg='error'; S.savingKey=false; R();
+    }
+  }).catch(function(){ S.keyMsg='error'; S.savingKey=false; R(); });
 }
 
 function delKey(){lsRemove(KS);S.claudeKey='';S.keyIn='';S.keyMsg=null;R();}
@@ -359,7 +360,7 @@ function rOnboard(){
     '<button class="ptgl" onclick="pwt(\'ob-key\',this)">&#128065;</button></div>'+
     (S.keyMsg==='ok'?'<div style="margin-top:8px;font-size:12px;color:#4ade80">Kulcs érvényes!</div>':'')+
     (S.keyMsg==='error'?'<div style="margin-top:8px;font-size:12px;color:#f87171">Érvénytelen kulcs.</div>':'')+
-    '<button class="btn bfull '+(S.keyIn&&!S.savingKey?'btn-p':'btn-off')+'" style="margin-top:14px" onclick="saveKey()">'+
+    '<button class="btn bfull btn-p" style="margin-top:14px" onclick="saveKey()">'+
     (S.savingKey?'Ellenőrzés...':'Kulcs tesztelése és mentése')+'</button>'+
     '<div style="margin-top:12px;font-size:11px;color:#4b5563;text-align:center;line-height:1.5">'+
     'Csak a böngésződben tárolódik. Soha nem kerül a szerverre.</div>'+
@@ -452,7 +453,7 @@ function rSettings(){
     '<button class="ptgl" onclick="pwt(\'st-key\',this)">&#128065;</button></div>'+
     (S.keyMsg==='ok'?'<div style="margin-top:8px;font-size:12px;color:#4ade80">Kulcs mentve!</div>':'')+
     (S.keyMsg==='error'?'<div style="margin-top:8px;font-size:12px;color:#f87171">Érvénytelen kulcs.</div>':'')+
-    '<button class="btn bfull bsm '+(S.keyIn&&!S.savingKey?'btn-p':'btn-off')+'" style="margin-top:12px" onclick="saveKey()">'+
+    '<button class="btn bfull bsm btn-p" style="margin-top:12px" onclick="saveKey()">'+
     (S.savingKey?'Ellenőrzés...':'Kulcs mentése')+'</button>'+
     (S.claudeKey?'<button class="btn bfull btn-del bsm" style="margin-top:8px" onclick="delKey()">Kulcs törlése</button>':'')+
     '<div style="margin-top:12px;font-size:11px;color:#4b5563;text-align:center;line-height:1.5">'+
