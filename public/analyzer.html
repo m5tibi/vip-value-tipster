@@ -107,7 +107,18 @@ function clearServerHistory(){
   fetch('/api/analyzer-history?uid='+uid,{method:'DELETE'}).catch(function(){});
 }
 
-function saveKey(){
+function renderAI(text){
+  var h=text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.+?)\*\*/g,'<strong style="color:#e2e8f0">$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em style="color:#94a3b8">$1</em>')
+    .replace(/(^|\n)((🏆|⚽|⚔️|🏥|🎯|📊|📌|💡)[^\n]+)/g,function(m,p1,p2){
+      return p1+'<div style="font-weight:700;font-size:13px;color:#a78bfa;margin-top:16px;margin-bottom:5px;padding-bottom:6px;border-bottom:1px solid #1e2130">'+p2+'</div>';
+    })
+    .replace(/^---+$/gm,'')
+    .replace(/\n/g,'<br>');
+  return h;
+}
   if(!S.keyIn.trim()){S.keyMsg='error';R();return;}
   S.savingKey=true;S.keyMsg=null;R();
   fetch('https://api.anthropic.com/v1/messages',{
@@ -135,20 +146,27 @@ function analyze(){
   var prompt=
     'Te egy profi labdarúgás-fogadási elemző vagy. A felhasználó az alábbi fogadási opciót szeretné elemeztetni:\n\n'+
     '"'+q+'"\n\n'+
-    'Feladatod — keress rá a legfrissebb adatokra, majd adj részletes elemzést az alábbi struktúra szerint:\n\n'+
-    '1. **Meccs kontextus**: Torna, forduló, tét (kieséses? csoportmeccs?)\n'+
-    '2. **Hazai csapat formája**: Utolsó 3-5 meccs eredménye, gólstatisztika, kulcsjátékosok\n'+
-    '3. **Vendég csapat formája**: Utolsó 3-5 meccs eredménye, gólstatisztika, kulcsjátékosok\n'+
-    '4. **Egymás elleni előzmények (H2H)**: Utolsó 3-5 találkozó, gólátlag\n'+
-    '5. **Sérülések, eltiltások, hiányzók**: Mindkét csapatnál\n'+
-    '6. **A fogadási opció értékelése**: Mennyire valószínű, milyen tényezők támogatják vagy szólnak ellene\n\n'+
-    'A válasz végén — egy üres sor után — add meg a verdiktet PONTOSAN ebben a formában (csak ez a sor, semmi más utána):\n'+
+    'Keress rá a legfrissebb adatokra, majd add meg az elemzést PONTOSAN az alábbi struktúrában (a szekciófejléceket pontosan így írd):\n\n'+
+    '🏆 MECCS KONTEXTUS\n'+
+    'Torna neve, forduló, tét (csoportmeccs / kieséses / döntő stb.) — 1-2 tömör mondat.\n\n'+
+    '⚽ HAZAI CSAPAT FORMA\n'+
+    'Utolsó 5 meccs eredményei konkrét számokkal (pl. 3-1, 0-0), gólszerzési és kapott gól átlag, kulcsjátékosok állapota.\n\n'+
+    '⚽ VENDÉG CSAPAT FORMA\n'+
+    'Utolsó 5 meccs eredményei konkrét számokkal, gólszerzési és kapott gól átlag, kulcsjátékosok állapota.\n\n'+
+    '⚔️ EGYMÁS ELLENI ELŐZMÉNYEK\n'+
+    'Utolsó 3-5 találkozó eredménye konkrét számokkal, gólátlag, tendenciák.\n\n'+
+    '🏥 SÉRÜLÉSEK / HIÁNYZÓK\n'+
+    'Mindkét csapat fontos hiányzói, eltiltottak — ha nincs adat, jelezd.\n\n'+
+    '🎯 A FOGADÁSI OPCIÓ ÉRTÉKELÉSE\n'+
+    'A konkrét fogadási opció részletes elemzése: milyen tényezők szólnak mellette és ellene, milyen valószínűséggel következhet be — 3-5 mondat, tényszerűen.\n\n'+
+    'A válasz végén — egy üres sor után — add meg a verdiktet PONTOSAN ebben a formában (semmi más ezen a soron):\n'+
     'VERDIKT: ✅ AJÁNLOTT\n'+
-    'vagy\n'+
-    'VERDIKT: ⚠️ BIZONYTALAN\n'+
-    'vagy\n'+
-    'VERDIKT: ❌ NEM AJÁNLOTT\n\n'+
-    'Magyar nyelven válaszolj, szakszerűen. A teljes elemzés legyen részletes, de tömör — körülbelül 150-250 szó.';
+    'vagy: VERDIKT: ⚠️ BIZONYTALAN\n'+
+    'vagy: VERDIKT: ❌ NEM AJÁNLOTT\n\n'+
+    'Fontos szabályok:\n'+
+    '- Ne használj csillag (**) formázást a szövegben\n'+
+    '- Adj valódi, konkrét adatokat (eredmények, gólszámok, százalékok)\n'+
+    '- Magyar nyelven, szakszerűen és tömören';
 
   fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
@@ -270,7 +288,7 @@ function rHistory(){
       '<div style="font-size:14px;font-weight:600;color:#e2e8f0">'+esc(title)+'</div>'+
       '<div style="font-size:12px;color:#6b7280;margin-top:2px">'+esc(h.ts)+'</div></div>'+
       verdict+'</div>'+
-      (isExp&&h.ai?'<div class="div" style="margin-top:10px"><div class="aitext" style="font-size:13px">'+esc(h.ai)+'</div></div>':'')+
+      (isExp&&h.ai?'<div class="div" style="margin-top:10px"><div style="font-size:13px;line-height:1.75;color:#cbd5e1">'+renderAI(h.ai)+'</div></div>':'')+
       '</div>';
   }
   return html;
