@@ -6,7 +6,9 @@ const path    = require("path");
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
+app.use('/api/odds', require('./routes/odds'));
 
+const ADMIN_PWD     = process.env.ADMIN_PASSWORD;
 const ODDS_API_KEY  = process.env.ODDS_API_KEY;
 const TG_BOT_TOKEN  = process.env.TG_BOT_TOKEN;
 const TG_CHAT_ID    = process.env.TG_CHAT_ID;
@@ -41,31 +43,30 @@ function saveLastRun() {
   catch (e) { console.error("LastRun mentési hiba:", e.message); }
 }
 
-// ── Sport térkép ──────────────────────────────────────────
+// ── Sport térkép (csak foci) ──────────────────────────────
 const SPORT_MAP = {
-  "soccer_fifa_world_cup":             { sport: "soccer",     label: "⚽ FIFA VB 2026",      minValue: 6 },
-  "soccer_uefa_champs_league":         { sport: "soccer",     label: "⚽ BL",                 minValue: 6 },
-  "soccer_epl":                        { sport: "soccer",     label: "⚽ Premier League",      minValue: 6 },
-  "soccer_germany_bundesliga":         { sport: "soccer",     label: "⚽ Bundesliga",          minValue: 6 },
-  "soccer_spain_la_liga":              { sport: "soccer",     label: "⚽ La Liga",             minValue: 6 },
-  "soccer_italy_serie_a":              { sport: "soccer",     label: "⚽ Serie A",             minValue: 6 },
-  "soccer_france_ligue_one":           { sport: "soccer",     label: "⚽ Ligue 1",             minValue: 6 },
-  "soccer_conmebol_copa_libertadores": { sport: "soccer",     label: "⚽ Copa Libertadores",   minValue: 7 },
-  "soccer_conmebol_copa_sudamericana": { sport: "soccer",     label: "⚽ Copa Sudamericana",   minValue: 7 },
-  "basketball_nba":                    { sport: "basketball", label: "🏀 NBA",                 minValue: 6 },
-  "basketball_wnba":                   { sport: "basketball", label: "🏀 WNBA",                minValue: 12  },
-  "basketball_euroleague":             { sport: "basketball", label: "🏀 Euroleague",           minValue: 8 },
-  "icehockey_nhl":                     { sport: "hockey",     label: "🏒 NHL",                 minValue: 6 },
-  "icehockey_ahl":                     { sport: "hockey",     label: "🏒 AHL",                 minValue: 9 },
+  "soccer_fifa_world_cup":             { sport: "soccer", label: "⚽ FIFA VB 2026",    minValue: 6 },
+  "soccer_uefa_champs_league":         { sport: "soccer", label: "⚽ BL",               minValue: 6 },
+  "soccer_epl":                        { sport: "soccer", label: "⚽ Premier League",    minValue: 6 },
+  "soccer_germany_bundesliga":         { sport: "soccer", label: "⚽ Bundesliga",        minValue: 6 },
+  "soccer_spain_la_liga":              { sport: "soccer", label: "⚽ La Liga",           minValue: 6 },
+  "soccer_italy_serie_a":              { sport: "soccer", label: "⚽ Serie A",           minValue: 6 },
+  "soccer_france_ligue_one":           { sport: "soccer", label: "⚽ Ligue 1",           minValue: 6 },
+  "soccer_conmebol_copa_libertadores": { sport: "soccer", label: "⚽ Copa Libertadores", minValue: 7 },
+  "soccer_conmebol_copa_sudamericana": { sport: "soccer", label: "⚽ Copa Sudamericana", minValue: 7 },
 };
 
 const EXCLUDED_BM = ["betfair_ex_eu", "betfair_ex_uk", "matchbook", "betfair_sb_uk", "smarkets"];
 const SHARP_BMS   = ["pinnacle", "pinnacle_au", "betsson", "nordicbet"];
 
-let latestTips = [];
-let aiTips     = [];
 let history    = loadHistory();
 console.log(`History betöltve: ${history.length} tipp`);
+
+// Mai pending tippek visszaállítása szerver-újraindítás után
+const _today = new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" }).split(" ")[0];
+let latestTips = history.filter(t => t.type === "value" && (!t.result || t.result === "pending") && (t.addedAt || "").startsWith(_today));
+let aiTips     = history.filter(t => t.type === "ai"    && (!t.result || t.result === "pending") && (t.addedAt || "").startsWith(_today));
+console.log(`Visszaállítva: ${latestTips.length} value + ${aiTips.length} AI tipp`);
 
 // ── Magyar idő ────────────────────────────────────────────
 function getHungarianTime() {
@@ -187,7 +188,7 @@ async function fetchValueTips() {
           }
           if (!bestOdds) continue;
 
-          const odds     = parseFloat(bestOdds.toFixed(2));
+          const odds = parseFloat(bestOdds.toFixed(2));
           if (odds < 1.3 || odds > 6.0) continue;
 
           const trueProb = (1 / sharpO.price) / overround;
@@ -228,13 +229,12 @@ async function fetchAiTips(matchList) {
     `- ${m.sport} | ${m.match} | Kezdés: ${m.commence}\n  Valós odds: ${m.odds.map(o => `${o.market} / ${o.name}: ${o.odds} (${o.bookmaker})`).join(", ")}`
   ).join("\n");
 
-  const prompt = `Te egy profi sportfogadási elemző vagy. Használj web keresést hogy megtudd az aktuális formát, sérüléseket, és keretinformációkat az alábbi mai meccsekre, majd adj pontosan 1 tippet meccsenkén, maximum 3 tippet összesen.
+  const prompt = `Te egy profi labdarúgás-fogadási elemző vagy. Használj web keresést hogy megtudd az aktuális formát, sérüléseket, és keretinformációkat az alábbi mai foci meccsekre, majd adj 2-3 konkrét fogadási tippet — csak akkor többet, ha valóban több erős lehetőség van. Ne erőltesd a tippszámot.
 
 Mai meccsek (valós bookmaker oddsokkal):
 ${matchText}
 
 Szabályok:
-- Minden meccsre MAXIMUM 1 tipp
 - Csak OVER típusú vagy pozitív kimenetelű tippek (over gólok, hendikep győzelem, csapat győzelme)
 - NE adj under típusú tippet
 - KÖTELEZŐ: az odds mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd be
@@ -357,10 +357,6 @@ async function fetchAndProcess() {
   if (fresh.length) { history = [...fresh, ...history]; saveHistory(); }
   saveLastRun();
 
-  // latestTips = összes mai pending tipp
-  latestTips = history.filter(t => t.type === "value" && t.addedAt?.startsWith(today) && (!t.result || t.result === "pending"));
-  aiTips     = history.filter(t => t.type === "ai"    && t.addedAt?.startsWith(today) && (!t.result || t.result === "pending"));
-
   let msg = `🏆 <b>VIP Value Tipster – ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</b>\n\n`;
   if (valueTips.length) {
     msg += `📊 <b>VALUE TIPPEK</b>\n<i>Pinnacle-alapú, matematikailag igazolt</i>\n\n`;
@@ -373,16 +369,16 @@ async function fetchAndProcess() {
   } else {
     msg += `📊 <b>VALUE TIPPEK</b>\nMa nincs +6% feletti value.\n\n`;
   }
-  if (aiTips.length) {
+  if (newAiTips.length) {
     msg += `🤖 <b>AI ELEMZETT TIPPEK</b>\n<i>Web keresés, forma és statisztika alapján</i>\n\n`;
-    aiTips.forEach(t => {
+    newAiTips.forEach(t => {
       msg += `${t.sportLabel} <b>${t.match}</b>\n`;
       if (t.commence) msg += `🕐 ${t.commence}\n`;
       msg += `📌 ${t.market} → <b>${t.pick}</b>\n💰 Odds: ${t.odds}\n💡 ${t.note}\n\n`;
     });
   }
   await sendTelegram(msg);
-  console.log(`Frissítve – ${valueTips.length} value + ${aiTips.length} AI tipp`);
+  console.log(`Frissítve – ${valueTips.length} value + ${newAiTips.length} AI tipp`);
 }
 
 // ── Eredményjelölés ───────────────────────────────────────
@@ -399,13 +395,8 @@ async function checkResults() {
       const games = await r.json();
       for (const game of games) {
         if (!game.completed || !game.scores) continue;
-
-        // Pending tippek keresése matchId VAGY meccs név alapján
         const matchName = `${game.home_team} vs ${game.away_team}`;
-        const tips = pending.filter(t =>
-          t.matchId === game.id ||
-          t.match === matchName
-        );
+        const tips = pending.filter(t => t.matchId === game.id || t.match === matchName);
         if (!tips.length) continue;
 
         const homeScore = parseInt(game.scores.find(s => s.name === game.home_team)?.score || 0);
@@ -415,9 +406,9 @@ async function checkResults() {
         for (const tip of tips) {
           let result = null;
           if (tip.market === "1X2") {
-            if (tip.pick === game.home_team) result = homeScore > awayScore ? "won" : homeScore === awayScore ? "push" : "lost";
+            if (tip.pick === game.home_team)      result = homeScore > awayScore ? "won" : homeScore === awayScore ? "push" : "lost";
             else if (tip.pick === game.away_team) result = awayScore > homeScore ? "won" : homeScore === awayScore ? "push" : "lost";
-            else if (tip.pick === "Draw") result = homeScore === awayScore ? "won" : "lost";
+            else if (tip.pick === "Draw")         result = homeScore === awayScore ? "won" : "lost";
           } else if (tip.market.toLowerCase().includes("over")) {
             const line = parseFloat(tip.market.match(/[\d.]+/)?.[0] || 0);
             const total = homeScore + awayScore;
@@ -433,10 +424,7 @@ async function checkResults() {
           } else if (tip.market.toLowerCase().includes("btts") || tip.market.toLowerCase().includes("mindkét")) {
             result = homeScore > 0 && awayScore > 0 ? "won" : "lost";
           }
-          if (!result) {
-            console.log(`    ✗ ${tip.market} / ${tip.pick} – nem sikerült kiértékelni`);
-            continue;
-          }
+          if (!result) { console.log(`    ✗ ${tip.market} / ${tip.pick} – nem sikerült kiértékelni`); continue; }
           console.log(`    ${tip.pick} → ${result}`);
           history    = history.map(t => t.id === tip.id ? { ...t, result } : t);
           latestTips = latestTips.map(t => t.id === tip.id ? { ...t, result } : t);
@@ -500,6 +488,9 @@ app.get("/api/status", (req, res) => {
 });
 
 app.post("/api/refresh", async (req, res) => {
+  if (ADMIN_PWD && req.body.password !== ADMIN_PWD) {
+    return res.status(403).json({ error: 'Hozzáférés megtagadva — hibás jelszó.' });
+  }
   await fetchAndProcess();
   res.json({ ok: true, valueTips: latestTips.length, aiTips: aiTips.length });
 });
@@ -530,6 +521,44 @@ app.post("/api/check-results", async (req, res) => {
 app.post("/api/stats/send", async (req, res) => {
   await sendTelegram(buildStatsMsg("VIP Value Tipster – Statisztika"));
   res.json({ ok: true });
+});
+
+// ── Analyzer history szinkronizáció ──────────────────────
+function aPath(uid) {
+  const safe = String(uid).replace(/[^a-z0-9]/g, '').slice(0, 32);
+  return '/data/ah_' + safe + '.json';
+}
+
+app.get("/api/analyzer-history", (req, res) => {
+  const uid = req.query.uid;
+  if (!uid) return res.json([]);
+  try {
+    const p = aPath(uid);
+    if (!fs.existsSync(p)) return res.json([]);
+    res.json(JSON.parse(fs.readFileSync(p, 'utf8')));
+  } catch (e) { res.json([]); }
+});
+
+app.post("/api/analyzer-history", (req, res) => {
+  const { uid, entry } = req.body;
+  if (!uid || !entry) return res.status(400).json({ error: 'Hiányzó adat' });
+  try {
+    const p = aPath(uid);
+    const hist = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : [];
+    const newHist = [entry, ...hist].slice(0, 50);
+    fs.writeFileSync(p, JSON.stringify(newHist), 'utf8');
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete("/api/analyzer-history", (req, res) => {
+  const uid = req.query.uid;
+  if (!uid) return res.status(400).json({ error: 'Hiányzó uid' });
+  try {
+    const p = aPath(uid);
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ── Indítás ───────────────────────────────────────────────
