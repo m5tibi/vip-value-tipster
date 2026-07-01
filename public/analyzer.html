@@ -224,10 +224,16 @@ function saveKey(){
   }).then(function(r){
     if(r.ok){
       lsSet(KS,S.keyIn);
-      S.claudeKey=S.keyIn; S.keyIn=''; S.keyMsg='ok'; S.savingKey=false; R();
-      setTimeout(function(){ S.screen='app'; S.keyMsg=null; R(); syncHistory(); }, 1000);
+      S.claudeKey=S.keyIn;
+      S.keyIn='';
+      S.savingKey=false;
+      S.screen='app';
+      R();
+      syncHistory();
     } else {
-      S.keyMsg='error'; S.savingKey=false; R();
+      S.keyMsg='error';
+      S.savingKey=false;
+      R();
     }
   }).catch(function(){ S.keyMsg='error'; S.savingKey=false; R(); });
 }
