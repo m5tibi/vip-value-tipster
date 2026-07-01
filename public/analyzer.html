@@ -108,16 +108,24 @@ function clearServerHistory(){
 }
 
 function renderAI(text){
-  var h=text
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/\*\*(.+?)\*\*/g,'<strong style="color:#e2e8f0">$1</strong>')
-    .replace(/\*(.+?)\*/g,'<em style="color:#94a3b8">$1</em>')
-    .replace(/(^|\n)((🏆|⚽|⚔️|🏥|🎯|📊|📌|💡)[^\n]+)/g,function(m,p1,p2){
-      return p1+'<div style="font-weight:700;font-size:13px;color:#a78bfa;margin-top:16px;margin-bottom:5px;padding-bottom:6px;border-bottom:1px solid #1e2130">'+p2+'</div>';
-    })
-    .replace(/^---+$/gm,'')
-    .replace(/\n/g,'<br>');
-  return h;
+  if(!text) return '';
+  var HEADS=['🏆','⚽','⚔','🏥','🎯','📊','📌','💡'];
+  var lines=text.split('\n');
+  var out='';
+  for(var i=0;i<lines.length;i++){
+    var line=lines[i];
+    var safe=line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    if(/^-{3,}$/.test(line)) continue;
+    var isH=false;
+    for(var j=0;j<HEADS.length;j++){if(line.indexOf(HEADS[j])===0){isH=true;break;}}
+    if(isH){
+      out+='<div style="font-weight:700;font-size:13px;color:#a78bfa;margin-top:16px;margin-bottom:5px;padding-bottom:6px;border-bottom:1px solid #1e2130">'+safe+'</div>';
+    } else {
+      var fmt=safe.replace(/\*\*(.+?)\*\*/g,'<strong style="color:#e2e8f0">$1</strong>').replace(/\*([^*]+)\*/g,'<em style="color:#94a3b8">$1</em>');
+      out+=fmt+'<br>';
+    }
+  }
+  return out;
 }
   if(!S.keyIn.trim()){S.keyMsg='error';R();return;}
   S.savingKey=true;S.keyMsg=null;R();
