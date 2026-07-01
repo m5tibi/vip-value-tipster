@@ -154,7 +154,16 @@ function stripVerdict(ai){
 // ── Render ────────────────────────────────────────────────
 function R(){
   try{
-    var html=(S.screen==='onboarding')?rOnboard():rApp();
+    var howItWorks=
+    '<div class="card" style="border-color:#1e2130;margin-bottom:14px">'+
+    '<div style="font-size:13px;font-weight:700;color:#a78bfa;margin-bottom:10px">Hogyan használd?</div>'+
+    '<div style="font-size:13px;color:#6b7280;line-height:1.7">'+
+    'Írj be bármely foci meccset és fogadási opciót szabad szövegként. A Claude rákeresz az aktuális formára, H2H előzményekre, sérülésekre — és javaslatot ad.<br><br>'+
+    '<strong style="color:#94a3b8">Javasolt formátum:</strong> Csapat1 - Csapat2; fogadási opció<br>'+
+    '<span style="color:#4b5563">Pl.: Belgium - Szenegál; mindkét csapat szerez gólt + Over 2.5</span>'+
+    '</div></div>';
+
+  var html=howItWorks+(S.screen==='onboarding')?rOnboard():rApp();
     document.getElementById('root').innerHTML=html;
   }catch(e){
     document.getElementById('root').innerHTML='<div style="padding:20px;color:#f87171">Hiba: '+esc(String(e))+'</div>';
@@ -242,50 +251,69 @@ function analyze(){
   if(!q){alert('Kérlek írj be egy meccset és fogadási opciót!');return;}
   S.loading=true;S.result=null;R();
 
-  var prompt=
-    'Te egy profi labdarúgás-fogadási elemző vagy. A felhasználó az alábbi fogadási opciót szeretné elemeztetni:\n\n'+
-    '"'+q+'"\n\n'+
-    'Keress rá a legfrissebb adatokra, majd adj részletes elemzést PONTOSAN az alábbi struktúrában:\n\n'+
-    'MECCS KONTEXTUS:\nTorna neve, forduló, tét (kieséses / csoportmeccs / stb.) - 1-2 mondat.\n\n'+
-    'HAZAI CSAPAT FORMA:\nUtolsó 5 meccs eredménye konkrét számokkal, gólszerzési átlag, kulcsjátékosok állapota.\n\n'+
-    'VENDÉG CSAPAT FORMA:\nUtolsó 5 meccs eredménye konkrét számokkal, gólszerzési átlag, kulcsjátékosok állapota.\n\n'+
-    'H2H ELŐZMÉNYEK:\nUtolsó 3-5 találkozó konkrét eredményekkel, gólátlag.\n\n'+
-    'SÉRÜLÉSEK / HIÁNYZÓK:\nMindkét csapat fontos hiányzói.\n\n'+
-    'FOGADÁSI OPCIÓ ÉRTÉKELÉSE:\nA konkrét fogadási opció részletes elemzése - mik szólnak mellette és ellene - 4-5 mondat.\n\n'+
-    'A válasz végén, egy üres sor után, add meg pontosan így:\n'+
-    'VERDIKT: AJANLOTT\n'+
-    'vagy: VERDIKT: BIZONYTALAN\n'+
-    'vagy: VERDIKT: NEM AJANLOTT\n\n'+
-    'Fontos: ne használj csillag formázást (**), adj valódi statisztikai adatokat. Magyar nyelven, szakszerűen.';
+  // Főoldali tippek lekérése kontextushoz
+  fetch('/api/tips').then(function(r){return r.json();}).catch(function(){return {valueTips:[],aiTips:[]};})
+  .then(function(td){
+    var allTips=(td.valueTips||[]).concat(td.aiTips||[]);
+    var tipsCtx='';
+    if(allTips.length){
+      tipsCtx='\n\nA VIP Value Tipster főoldalán ma az alábbi tippek szerepelnek (NE mondj ezeknek ellent, hacsak nem egyértelmű hiba):\n';
+      for(var i=0;i<allTips.length;i++){
+        var t=allTips[i];
+        tipsCtx+='- '+t.match+': '+t.market+' → '+t.pick+' @ '+t.odds+'\n';
+      }
+    }
 
-  fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':S.claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({
-      model:'claude-sonnet-4-6',max_tokens:2000,
-      tools:[{type:'web_search_20250305',name:'web_search'}],
-      messages:[{role:'user',content:prompt}]
-    })
-  }).then(function(r){return r.json();})
-  .then(function(d){
-    var texts=[];
-    if(d.content){for(var i=0;i<d.content.length;i++){if(d.content[i].type==='text')texts.push(d.content[i].text);}}
-    var ai=texts.length?texts[texts.length-1]:'Elemzés sikertelen.';
-    // Verdikt formázása
-    ai=ai.replace(/VERDIKT\s*:\s*AJANLOTT/gi,'VERDIKT: \u2705 AJÁNLOTT')
-         .replace(/VERDIKT\s*:\s*NEM AJANLOTT/gi,'VERDIKT: \u274C NEM AJÁNLOTT')
-         .replace(/VERDIKT\s*:\s*BIZONYTALAN/gi,'VERDIKT: \u26A0\uFE0F BIZONYTALAN')
-         .replace(/VERDIKT\s*:\s*AJ\u00C1NLOTT/gi,'VERDIKT: \u2705 AJÁNLOTT')
-         .replace(/VERDIKT\s*:\s*NEM AJ\u00C1NLOTT/gi,'VERDIKT: \u274C NEM AJÁNLOTT');
-    var entry={id:Date.now(),ts:new Date().toLocaleString('hu-HU'),query:q,ai:ai};
-    S.result=entry;
-    S.history=[entry].concat(S.history).slice(0,50);
-    lsSet(HS,JSON.stringify(S.history));
-    saveEntry(entry);
-    S.loading=false;R();
-  }).catch(function(e){
-    S.result={error:true,msg:'Hiba: '+String(e)};
-    S.loading=false;R();
+    var prompt=
+      'Te egy profi labdarúgás-fogadási elemző vagy.\n\n'+
+      'FONTOS: Ha nem tudsz labdarúgó meccset és fogadási opciót azonosítani a kérésből, vagy ha a kérés nem focival kapcsolatos, NE kezdj elemzésbe! Helyette írd pontosan ezt:\n'+
+      'NEM ÉRTEM: [rövid magyarázat, és javaslat a helyes formátumra, pl.: "Csapat1 - Csapat2; fogadási opció"]\n\n'+
+      'A felhasználó kérése:\n"'+q+'"\n'+
+      tipsCtx+'\n\n'+
+      'Ha felismerted a meccset és az opciót, adj elemzést PONTOSAN ebben a struktúrában:\n\n'+
+      'MECCS KONTEXTUS:\n[Torna, forduló, tét — 1-2 mondat]\n\n'+
+      'HAZAI CSAPAT FORMA:\n[Utolsó 5 meccs konkrét eredményekkel, gólátlag]\n\n'+
+      'VENDÉG CSAPAT FORMA:\n[Utolsó 5 meccs konkrét eredményekkel, gólátlag]\n\n'+
+      'H2H ELŐZMÉNYEK:\n[Utolsó 3-5 találkozó eredménye, gólátlag]\n\n'+
+      'SÉRÜLÉSEK / HIÁNYZÓK:\n[Mindkét csapat fontos hiányzói]\n\n'+
+      'FOGADÁSI OPCIÓ ÉRTÉKELÉSE:\n[A konkrét opció részletes elemzése — 4-5 mondat]\n\n'+
+      'Egy üres sor után add meg a verdiktet pontosan így:\n'+
+      'VERDIKT: AJANLOTT\n'+
+      'vagy: VERDIKT: BIZONYTALAN\n'+
+      'vagy: VERDIKT: NEM AJANLOTT\n\n'+
+      'Szabályok: ne használj csillag formázást, adj valódi számokat. Magyar nyelven, szakszerűen.';
+
+    fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':S.claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-6',max_tokens:4000,
+        tools:[{type:'web_search_20250305',name:'web_search'}],
+        messages:[{role:'user',content:prompt}]
+      })
+    }).then(function(r){return r.json();})
+    .then(function(d){
+      var texts=[];
+      if(d.content){for(var i=0;i<d.content.length;i++){if(d.content[i].type==='text')texts.push(d.content[i].text);}}
+      var ai=texts.length?texts[texts.length-1]:'Elemzés sikertelen.';
+      ai=ai.replace(/VERDIKT\s*:\s*AJANLOTT/gi,'VERDIKT: \u2705 AJÁNLOTT')
+           .replace(/VERDIKT\s*:\s*NEM AJANLOTT/gi,'VERDIKT: \u274C NEM AJÁNLOTT')
+           .replace(/VERDIKT\s*:\s*BIZONYTALAN/gi,'VERDIKT: \u26A0\uFE0F BIZONYTALAN')
+           .replace(/VERDIKT\s*:\s*AJ\u00C1NLOTT/gi,'VERDIKT: \u2705 AJÁNLOTT')
+           .replace(/VERDIKT\s*:\s*NEM AJ\u00C1NLOTT/gi,'VERDIKT: \u274C NEM AJÁNLOTT');
+      var unclear=ai.indexOf('NEM ÉRTEM:')!==-1||ai.indexOf('NEM ERTEM:')!==-1;
+      var entry={id:Date.now(),ts:new Date().toLocaleString('hu-HU'),query:q,ai:ai,unclear:unclear};
+      S.result=entry;
+      if(!unclear){
+        S.history=[entry].concat(S.history).slice(0,50);
+        lsSet(HS,JSON.stringify(S.history));
+        saveEntry(entry);
+      }
+      S.loading=false;R();
+    }).catch(function(e){
+      S.result={error:true,msg:'Hiba: '+String(e)};
+      S.loading=false;R();
+    });
   });
 }
 
@@ -357,7 +385,13 @@ function rAnalyzer(){
     '<div style="margin-top:8px;font-size:11px;color:#374151;text-align:center">'+
     'Egy elemzés kb. 40-50 Ft (~$0.10-0.15) a saját Anthropic számládra</div>';
 
-  if(S.result&&!S.result.error){
+  if(S.result&&S.result.unclear){
+    html+='<div class="card" style="margin-top:14px;border-color:#fbbf2433">'+
+      '<div style="font-size:13px;font-weight:700;color:#fbbf24;margin-bottom:8px">Nem értem a kérést</div>'+
+      '<div style="font-size:13px;color:#94a3b8;line-height:1.7">'+esc(S.result.ai.replace(/NEM \u00C9RTEM:/gi,'').replace(/NEM ERTEM:/gi,'').trim())+'</div>'+
+      '</div>';
+  }
+  if(S.result&&!S.result.error&&!S.result.unclear){
     var r=S.result;
     var v=getVerdict(r.ai);
     var body=stripVerdict(r.ai);
@@ -422,13 +456,7 @@ function rSettings(){
     (S.savingKey?'Ellenőrzés...':'Kulcs mentése')+'</button>'+
     (S.claudeKey?'<button class="btn bfull btn-del bsm" style="margin-top:8px" onclick="delKey()">Kulcs törlése</button>':'')+
     '<div style="margin-top:12px;font-size:11px;color:#4b5563;text-align:center;line-height:1.5">'+
-    'Csak a böngésződben tárolódik. Soha nem kerül a szerverre.</div></div>'+
-    '<div class="card" style="background:transparent;border-color:#1e2130">'+
-    '<div style="font-size:12px;color:#4b5563;line-height:1.7">'+
-    'Hogyan működik: Írj be bármely foci meccset és fogadási opciót. '+
-    'A Claude webkereséssel rákeresz az aktuális formára, H2H előzményekre, sérülésekre és javaslatot ad.<br><br>'+
-    'Egy elemzés ára: kb. 40-50 Ft (~$0.10-0.15) a saját Anthropic számládra.'+
-    '</div></div>';
+    'Csak a böngésződben tárolódik. Soha nem kerül a szerverre.</div></div>';
 }
 
 function rApp(){
