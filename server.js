@@ -466,6 +466,21 @@ setInterval(() => {
   }
 }, 60000);
 
+// ── Admin hitelesítés ─────────────────────────────────────
+// Jelszó jöhet: x-admin-password header, body.password, vagy ?password= query.
+function requireAdmin(req, res) {
+  if (!ADMIN_PWD) {
+    // Ha nincs jelszó beállítva, nyitva marad – de erről induláskor figyelmeztetünk.
+    return true;
+  }
+  const pwd = req.get("x-admin-password") || req.body?.password || req.query?.password;
+  if (pwd !== ADMIN_PWD) {
+    res.status(403).json({ error: "Hozzáférés megtagadva — hibás vagy hiányzó admin jelszó." });
+    return false;
+  }
+  return true;
+}
+
 // ── API végpontok ─────────────────────────────────────────
 app.get("/api/tips",    (req, res) => res.json({ valueTips: latestTips, aiTips }));
 app.get("/api/history", (req, res) => res.json(history));
@@ -488,14 +503,13 @@ app.get("/api/status", (req, res) => {
 });
 
 app.post("/api/refresh", async (req, res) => {
-  if (ADMIN_PWD && req.body.password !== ADMIN_PWD) {
-    return res.status(403).json({ error: 'Hozzáférés megtagadva — hibás jelszó.' });
-  }
+  if (!requireAdmin(req, res)) return;
   await fetchAndProcess();
   res.json({ ok: true, valueTips: latestTips.length, aiTips: aiTips.length });
 });
 
 app.patch("/api/history/:id", (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const { result } = req.body;
   history    = history.map(t => t.id === req.params.id ? { ...t, result } : t);
   latestTips = latestTips.map(t => t.id === req.params.id ? { ...t, result } : t);
@@ -505,6 +519,7 @@ app.patch("/api/history/:id", (req, res) => {
 });
 
 app.delete("/api/history", (req, res) => {
+  if (!requireAdmin(req, res)) return;
   history    = [];
   latestTips = [];
   aiTips     = [];
@@ -514,11 +529,13 @@ app.delete("/api/history", (req, res) => {
 });
 
 app.post("/api/check-results", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   await checkResults();
   res.json({ ok: true });
 });
 
 app.post("/api/stats/send", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   await sendTelegram(buildStatsMsg("VIP Value Tipster – Statisztika"));
   res.json({ ok: true });
 });
@@ -564,6 +581,10 @@ app.delete("/api/analyzer-history", (req, res) => {
 // ── Indítás ───────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`VIP Tipster fut: http://localhost:${PORT}`));
+
+if (!ADMIN_PWD) {
+  console.warn("⚠️  FIGYELEM: ADMIN_PASSWORD nincs beállítva – az admin végpontok (törlés, eredményjelölés, stat-küldés, frissítés) VÉDTELENEK! Állítsd be a Render Environment Variables között.");
+}
 
 const lastRun = loadLastRun();
 if (lastRun) console.log(`Utolsó futás: ${Math.round((Date.now() - new Date(lastRun).getTime()) / 60000)} perce`);
