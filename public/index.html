@@ -64,6 +64,11 @@
   .day-arrow { color: #546e7a; font-size: 11px; transition: transform 0.2s; }
   .day-arrow.open { transform: rotate(180deg); }
   .day-content { padding: 10px 10px 4px; }
+  .month-section { margin: 8px 0 6px; border: 1px solid #2a3550; border-radius: 10px; overflow: hidden; }
+  .month-toggle { display: flex; justify-content: space-between; align-items: center; padding: 11px 14px; background: #101a30; cursor: pointer; user-select: none; }
+  .month-toggle:hover { background: #16223d; }
+  .month-label { font-size: 13px; font-weight: 700; color: #b39ddb; }
+  .month-content { padding: 6px 6px 2px; }
   .stats-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
 </style>
 </head>
@@ -144,7 +149,7 @@
   <div id="tab-history-panel" style="display:none">
     <div class="stats-header">
       <div style="font-weight:700;color:#00e676;font-size:16px">📊 Előzmény & statisztika</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div id="admin-tools" style="display:none;gap:8px;flex-wrap:wrap">
         <button class="btn-send" onclick="checkResults()">🔍 Eredmények</button>
         <button class="btn-send" onclick="sendStats()">📲 Küldés</button>
         <button class="btn-del"  onclick="clearHistory()">🗑️ Törlés</button>
@@ -181,6 +186,19 @@ let dayCounter = 0;
 })();
 function isAdmin() { return localStorage.getItem('vbt_admin') === '1'; }
 function getAdminPwd() { return localStorage.getItem('vbt_admin_pwd') || ''; }
+function adminHeaders(json) {
+  const h = { "x-admin-password": getAdminPwd() };
+  if (json) h["Content-Type"] = "application/json";
+  return h;
+}
+async function handleAdminResp(r, okMsg) {
+  if (r.status === 403) {
+    showStatus("⛔ Nincs admin jogosultság. Nyisd meg az oldalt így: ?admin=JELSZÓ", "#ef9a9a");
+    return false;
+  }
+  if (okMsg) showStatus(okMsg);
+  return true;
+}
 
 document.getElementById("today").textContent = new Date().toLocaleDateString("hu-HU", {year:"numeric",month:"long",day:"numeric"});
 
@@ -212,6 +230,7 @@ function needsPush(market) {
 }
 
 function actionBtns(t) {
+  if (!isAdmin()) return "";
   if (t.result && t.result!=="pending") return "";
   const pb = needsPush(t.market) ? `<button class="btn-push" onclick="setResult('${t.id}','push')">↩️ Visszajár</button>` : "";
   return `<button class="btn-won" onclick="setResult('${t.id}','won')">✅ Nyert</button>
@@ -230,6 +249,19 @@ function getDay(addedAt) {
   const p = addedAt.split(" ");
   if (p.length >= 3) return p[0]+" "+p[1]+" "+p[2];
   return "–";
+}
+
+const HU_MONTHS = ["január","február","március","április","május","június","július","augusztus","szeptember","október","november","december"];
+function monthKeyOf(dayKey) {
+  const p = dayKey.split(" ");                 // ["2026.","07.","02."]
+  return p.length>=2 ? p[0]+" "+p[1] : dayKey; // "2026. 07."
+}
+function monthLabel(monthKey) {
+  const p = monthKey.split(" ");
+  const y = (p[0]||"").replace(".","");
+  const mNum = parseInt((p[1]||"").replace(".",""),10);
+  const name = HU_MONTHS[mNum-1] || (p[1]||"");
+  return y+". "+name;                          // "2026. július"
 }
 
 function todayKey() {
@@ -366,6 +398,31 @@ function renderHistory() {
     </div>`;
   }
 
+  // Egy korábbi hónap: napokra bontva, összecsukva (alapból zárva).
+  function makeMonthSection(monthKey, tips) {
+    const id = "ms-"+(dayCounter++);
+    const byDay = {};
+    tips.forEach(t=>{ const d=getDay(t.addedAt); if(!byDay[d]) byDay[d]=[]; byDay[d].push(t); });
+    const mWon  = tips.filter(t=>t.result==="won").length;
+    const mLost = tips.filter(t=>t.result==="lost").length;
+    const meta  = tips.length+" tipp · ✅"+mWon+" ❌"+mLost;
+    const inner = Object.keys(byDay).sort((a,b)=>b.localeCompare(a))
+      .map(day=>makeDaySection(day, byDay[day], false)).join("");
+    return `
+    <div class="month-section">
+      <div class="month-toggle" onclick="toggleDay('${id}')">
+        <span class="month-label">🗓️ ${monthLabel(monthKey)}</span>
+        <span style="display:flex;align-items:center;gap:6px">
+          <span class="day-meta">${meta}</span>
+          <span class="day-arrow" id="arr-${id}">▼</span>
+        </span>
+      </div>
+      <div class="month-content" id="${id}" style="display:none">
+        ${inner}
+      </div>
+    </div>`;
+  }
+
   dayCounter = 0;
   const pending = history.filter(t=>!t.result||t.result==="pending");
   const done    = history.filter(t=>t.result&&t.result!=="pending");
@@ -385,9 +442,28 @@ function renderHistory() {
   }
   if (done.length) {
     html += `<div class="section-header" style="background:#0d1b2a;color:#80cbc4;margin-top:8px">📋 Lezárt tippek</div>`;
-    Object.keys(doneByDay).sort((a,b)=>b.localeCompare(a)).forEach((day) => {
+    const currentMonth = monthKeyOf(todayKey());
+
+    // Napokat hónapokba soroljuk
+    const monthsToDays = {};
+    Object.keys(doneByDay).forEach(day => {
+      const mk = monthKeyOf(day);
+      if (!monthsToDays[mk]) monthsToDays[mk] = [];
+      monthsToDays[mk].push(day);
+    });
+
+    // Aktuális hónap: napok közvetlenül (mint eddig)
+    (monthsToDays[currentMonth] || []).sort((a,b)=>b.localeCompare(a)).forEach(day => {
       html += makeDaySection(day, doneByDay[day], false);
     });
+
+    // Korábbi hónapok: hónaponként összecsukva, legfrissebb elöl
+    Object.keys(monthsToDays).filter(mk => mk !== currentMonth)
+      .sort((a,b)=>b.localeCompare(a)).forEach(mk => {
+        const monthTips = [];
+        monthsToDays[mk].forEach(day => monthTips.push(...doneByDay[day]));
+        html += makeMonthSection(mk, monthTips);
+      });
   }
   el.innerHTML = html;
 }
@@ -437,25 +513,28 @@ async function loadHistory() {
 }
 
 async function setResult(id, result) {
-  await fetch(`/api/history/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({result})});
+  const r = await fetch(`/api/history/${id}`,{method:"PATCH",headers:adminHeaders(true),body:JSON.stringify({result})});
+  if (!(await handleAdminResp(r))) return;
   await loadHistory();
 }
 
 async function checkResults() {
   showStatus("🔍 Eredmények ellenőrzése...");
-  await fetch("/api/check-results", { method: "POST" });
+  const r = await fetch("/api/check-results", { method: "POST", headers: adminHeaders() });
+  if (!(await handleAdminResp(r))) return;
   await loadHistory();
   showStatus("✅ Eredmények frissítve");
 }
 
 async function sendStats() {
-  await fetch("/api/stats/send",{method:"POST"});
-  showStatus("✅ Statisztika elküldve Telegramon");
+  const r = await fetch("/api/stats/send",{method:"POST", headers: adminHeaders()});
+  await handleAdminResp(r, "✅ Statisztika elküldve Telegramon");
 }
 
 async function clearHistory() {
   if (!confirm("Biztosan törlöd az összes előzményt? Ez nem visszavonható!")) return;
-  await fetch("/api/history",{method:"DELETE"});
+  const r = await fetch("/api/history",{method:"DELETE", headers: adminHeaders()});
+  if (!(await handleAdminResp(r))) return;
   history=[];
   renderHistory();
   showStatus("🗑️ Előzmények törölve");
@@ -465,7 +544,10 @@ async function loadStatus() {}
 
 loadStatus();
 loadTips();
-if (isAdmin()) document.getElementById('btn-refresh').style.display = '';
+if (isAdmin()) {
+  document.getElementById('btn-refresh').style.display = '';
+  document.getElementById('admin-tools').style.display = 'flex';
+}
 </script>
 </body>
 </html>
