@@ -520,15 +520,23 @@ async function refresh() {
   msRemaining=0;
 }
 
+let tipsEverLoaded = false;
 async function loadTips() {
   try {
-    const r = await fetch("/api/tips");
+    const r = await fetch("/api/tips", { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP "+r.status);
     const d = await r.json();
     valueTips = Array.isArray(d.valueTips)?d.valueTips:[];
     aiTips    = Array.isArray(d.aiTips)?d.aiTips:[];
+    tipsEverLoaded = true;
     document.getElementById("last-update").textContent="Frissítve: "+new Date().toLocaleTimeString("hu-HU");
     renderTips();
-  } catch(e) { console.error("loadTips hiba:",e); }
+  } catch(e) {
+    console.error("loadTips hiba:",e);
+    // Deploy/hálózati hiba esetén NE ürítsük ki a meglévő tippeket – megtartjuk a
+    // kijelzőt, és rövidesen újrapróbáljuk, így az oldal magától helyreáll.
+    if (!tipsEverLoaded) setTimeout(loadTips, 3000);   // első betöltés: gyors újrapróba, míg sikerül
+  }
 }
 
 async function loadHistory() {
@@ -571,6 +579,10 @@ async function loadStatus() {}
 
 loadStatus();
 loadTips();
+// Önjavító frissítés: percenként, és amikor a fül újra aktív lesz (pl. deploy után).
+// Így az esetleg elhalt betöltés magától helyreáll, nem kell kézi oldalfrissítés.
+setInterval(() => { if (document.visibilityState === "visible") loadTips(); }, 60000);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") loadTips(); });
 if (isAdmin()) {
   document.getElementById('btn-refresh').style.display = '';
   document.getElementById('admin-tools').style.display = 'flex';
