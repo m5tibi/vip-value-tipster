@@ -63,7 +63,7 @@ let history    = loadHistory();
 console.log(`History betöltve: ${history.length} tipp`);
 
 // Mai pending tippek visszaállítása szerver-újraindítás után
-const _today = new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" }).split(" ")[0];
+const _today = todayHU();   // nap-szintű, pl. "2026. 07. 02."
 let latestTips = history.filter(t => t.type === "value" && (!t.result || t.result === "pending") && (t.addedAt || "").startsWith(_today));
 let aiTips     = history.filter(t => t.type === "ai"    && (!t.result || t.result === "pending") && (t.addedAt || "").startsWith(_today));
 console.log(`Visszaállítva: ${latestTips.length} value + ${aiTips.length} AI tipp`);
@@ -82,7 +82,9 @@ function huTime(isoDate) {
 }
 
 function todayHU() {
-  return new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" }).split(" ")[0];
+  // "2026. 07. 02. 23:31:14" → "2026. 07. 02." (nap, nem csak év)
+  const p = new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" }).split(" ");
+  return p.slice(0, 3).join(" ");
 }
 
 // ── Telegram ──────────────────────────────────────────────
