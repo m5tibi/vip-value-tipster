@@ -102,7 +102,7 @@
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px">
         <div style="background:#07111d;border:1px solid #1e3a2f;border-radius:8px;padding:12px">
           <div style="font-size:13px;font-weight:700;color:#00e676;margin-bottom:6px">📊 Value tippek</div>
-          <div style="font-size:12px;color:#78909c;line-height:1.6">A rendszer a <strong style="color:#b2dfdb">Pinnacle</strong> (éles könyvelő) oddszait hasonlítja össze a puha könyvelőkkel. Ha a különbség meghaladja a <strong style="color:#b2dfdb">+6%-ot</strong>, matematikailag igazolt értékfogadásnak minősül.</div>
+          <div style="font-size:12px;color:#78909c;line-height:1.6">A rendszer több <strong style="color:#b2dfdb">éles fogadóiroda</strong> (elsősorban a <strong style="color:#b2dfdb">Pinnacle</strong>) árait vonja össze valós piaci eséllyé, és ehhez méri a legjobb elérhető oddsot. Ha a különbség meghaladja a <strong style="color:#b2dfdb">+6%-ot</strong>, és nem csak egyetlen iroda lóg ki, matematikai értékfogadásnak minősül.</div>
         </div>
         <div style="background:#07111d;border:1px solid #1e3a2f;border-radius:8px;padding:12px">
           <div style="font-size:13px;font-weight:700;color:#b39ddb;margin-bottom:6px">🤖 AI tippek</div>
@@ -137,7 +137,7 @@
       <button class="btn-refresh" id="btn-refresh" onclick="refresh()" style="display:none">🔄 Frissítés most</button>
     </div>
     <div class="section-title" style="color:#00e676">📊 Value tippek</div>
-    <div class="section-sub">Pinnacle-alapú matematikai piaci előny (+6% felett)</div>
+    <div class="section-sub">Éles irodák konszenzusa alapján számolt piaci előny (+6% felett, több irodánál)</div>
     <div id="value-list"><div class="no-value">Kattints a frissítésre...</div></div>
     <hr class="divider">
     <div class="section-title" style="color:#b39ddb">🤖 AI elemzett tippek</div>
@@ -165,6 +165,7 @@
       <div class="stat-card"><div class="stat-label">Win %</div><div class="stat-value" style="color:#a5d6a7" id="h-wr">–</div></div>
       <div class="stat-card"><div class="stat-label">Profit (e.)</div><div class="stat-value" id="h-profit">–</div></div>
       <div class="stat-card"><div class="stat-label">ROI</div><div class="stat-value" id="h-roi">–</div></div>
+      <div class="stat-card"><div class="stat-label">Átl. CLV</div><div class="stat-value" id="h-clv">–</div></div>
     </div>
     <div id="history-list"><div class="empty">Még nincsenek rögzített tippek.</div></div>
   </div>
@@ -298,6 +299,7 @@ function valueTipHTML(t, showResult) {
       <span>Valószínűség: <b style="color:#fff">${t.prob}%</b></span>
     </div>
     ${t.kelly?`<div class="tip-kelly">📐 Kelly tét: <b>${t.kelly}%</b> a bankrollból</div>`:""}
+    ${typeof t.clv==="number"?`<div class="tip-kelly">📉 CLV: <b style="color:${t.clv>0?'#69f0ae':t.clv<0?'#ef9a9a':'#90a4ae'}">${t.clv>=0?"+":""}${t.clv}%</b> (záró fair: ${t.closingFair})</div>`:""}
     <div class="tip-note">${t.note||""}</div>
     ${showResult?`<div class="tip-actions">${resBadge(t.result)}${actionBtns(t)}</div>`:""}
   </div>`;
@@ -379,6 +381,13 @@ function renderHistory() {
   document.getElementById("h-profit").style.color = roiCol;
   document.getElementById("h-roi").textContent    = roi!=="–"?(profit>=0?"+":"")+roi+"%":"–";
   document.getElementById("h-roi").style.color    = roiCol;
+  const clvTips = history.filter(t=>typeof t.clv==="number");
+  const avgClv  = clvTips.length ? (clvTips.reduce((s,t)=>s+t.clv,0)/clvTips.length) : null;
+  const clvEl = document.getElementById("h-clv");
+  if (clvEl) {
+    clvEl.textContent = avgClv!=null ? (avgClv>=0?"+":"")+avgClv.toFixed(1)+"%" : "–";
+    clvEl.style.color = avgClv==null ? "#90a4ae" : avgClv>0 ? "#69f0ae" : avgClv<0 ? "#ef9a9a" : "#90a4ae";
+  }
 
   const el = document.getElementById("history-list");
   if (!history.length) { el.innerHTML='<div class="empty">Még nincsenek rögzített tippek.</div>'; return; }
@@ -521,6 +530,8 @@ async function refresh() {
 }
 
 let tipsEverLoaded = false;
+let tipsRetryDelay = 3000;
+let tipsErrLogged  = false;
 async function loadTips() {
   try {
     const r = await fetch("/api/tips", { cache: "no-store" });
@@ -529,13 +540,20 @@ async function loadTips() {
     valueTips = Array.isArray(d.valueTips)?d.valueTips:[];
     aiTips    = Array.isArray(d.aiTips)?d.aiTips:[];
     tipsEverLoaded = true;
+    tipsRetryDelay = 3000;
+    tipsErrLogged  = false;
     document.getElementById("last-update").textContent="Frissítve: "+new Date().toLocaleTimeString("hu-HU");
     renderTips();
   } catch(e) {
-    console.error("loadTips hiba:",e);
-    // Deploy/hálózati hiba esetén NE ürítsük ki a meglévő tippeket – megtartjuk a
-    // kijelzőt, és rövidesen újrapróbáljuk, így az oldal magától helyreáll.
-    if (!tipsEverLoaded) setTimeout(loadTips, 3000);   // első betöltés: gyors újrapróba, míg sikerül
+    // Egyszer logolunk, nem árasztjuk el a konzolt. A meglévő tippeket NEM ürítjük.
+    if (!tipsErrLogged) { console.warn("A /api/tips jelenleg nem elérhető ("+e.message+"), újrapróbálkozás a háttérben."); tipsErrLogged = true; }
+    const lu = document.getElementById("last-update");
+    if (lu && !tipsEverLoaded) lu.textContent = "⚠️ Szerver nem elérhető – újrapróbálkozás…";
+    // Amíg még sose sikerült, növekvő szünettel próbálkozunk (3→6→12…→max 60s), nem 3 mp-enként.
+    if (!tipsEverLoaded) {
+      setTimeout(loadTips, tipsRetryDelay);
+      tipsRetryDelay = Math.min(tipsRetryDelay * 2, 60000);
+    }
   }
 }
 
