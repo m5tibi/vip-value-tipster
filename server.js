@@ -62,10 +62,11 @@ const SHARP_BMS   = ["pinnacle", "pinnacle_au", "betsson", "nordicbet"];
 let history    = loadHistory();
 console.log(`History betöltve: ${history.length} tipp`);
 
-// Mai pending tippek visszaállítása szerver-újraindítás után
-const _today = todayHU();   // nap-szintű, pl. "2026. 07. 02."
-let latestTips = history.filter(t => t.type === "value" && (!t.result || t.result === "pending") && (t.addedAt || "").startsWith(_today));
-let aiTips     = history.filter(t => t.type === "ai"    && (!t.result || t.result === "pending") && (t.addedAt || "").startsWith(_today));
+// Pending (még le nem zárt) tippek visszaállítása szerver-újraindítás után.
+// FONTOS: dátumtól függetlenül minden pending tipp visszakerül, mert egy tipp
+// gyakran az előző napon lett felvéve a mai/esti meccsre – ezeknek is látszaniuk kell.
+let latestTips = history.filter(t => t.type === "value" && (!t.result || t.result === "pending"));
+let aiTips     = history.filter(t => t.type === "ai"    && (!t.result || t.result === "pending"));
 console.log(`Visszaállítva: ${latestTips.length} value + ${aiTips.length} AI tipp`);
 
 // ── Magyar idő ────────────────────────────────────────────
