@@ -158,12 +158,19 @@ function calcStats() {
   const roi       = settled.length ? ((profit/settled.length)*100).toFixed(1) : "–";
   const profitStr = settled.length ? (profit>=0?"+":"")+profit.toFixed(2) : "–";
   const roiStr    = roi!=="–" ? (profit>=0?"+":"")+roi+"%" : "–";
-  return { won, lost, push, halfWon, halfLost, pend, avg, wr, profitStr, roiStr };
+  // Closing line value – az igazi él-mutató
+  const clvTips  = history.filter(t => typeof t.clv === "number");
+  const avgClv   = clvTips.length ? (clvTips.reduce((s,t)=>s+t.clv,0)/clvTips.length).toFixed(1) : null;
+  const clvBeat  = clvTips.length ? Math.round(clvTips.filter(t=>t.clv>0).length/clvTips.length*100) : null;
+  return { won, lost, push, halfWon, halfLost, pend, avg, wr, profitStr, roiStr, avgClv, clvBeat, clvCount: clvTips.length };
 }
 
 function buildStatsMsg(title) {
-  const { won, lost, push, halfWon, halfLost, pend, avg, wr, profitStr, roiStr } = calcStats();
+  const { won, lost, push, halfWon, halfLost, pend, avg, wr, profitStr, roiStr, avgClv, clvBeat, clvCount } = calcStats();
   const pushTotal = push + halfWon + halfLost;   // a fél eredmények a visszajárhoz számítanak
+  const clvLine = avgClv != null
+    ? `📐 Átl. CLV: <b>${avgClv>=0?"+":""}${avgClv}%</b> (${clvBeat}% verte a zárót, n=${clvCount})\n`
+    : "";
   return `📈 <b>${title}</b>\n`+
     `📅 ${new Date().toLocaleDateString("hu-HU")}\n\n`+
     `📊 <b>Összesítés</b>\n`+
@@ -176,10 +183,37 @@ function buildStatsMsg(title) {
     `Win %: <b>${wr}</b>\n`+
     `Profit: <b>${profitStr} egység</b>\n`+
     `ROI: <b>${roiStr}</b>\n`+
+    clvLine+
     `Átl. value: <b>+${avg}%</b>`;
 }
 
 // ── Value tippek ──────────────────────────────────────────
+// Vig-mentes fair valószínűség több sharp iroda konszenzusából.
+// A Pinnacle-t kétszeres súllyal vesszük (leginkább éles). Visszatér:
+// { probs: {kimenetNév: valószínűség}, count } vagy null, ha nincs használható sharp.
+function sharpConsensus(sharpBMs) {
+  const acc = {};   // név -> { sum, w }
+  let count = 0;
+  for (const bm of sharpBMs) {
+    const outs = bm.markets?.[0]?.outcomes;
+    if (!outs || outs.length < 2) continue;
+    const overround = outs.reduce((s, o) => s + 1 / o.price, 0);
+    if (overround < 1.0 || overround > 1.12) continue;      // csak reális margójú vonal
+    const w = (bm.key === "pinnacle" || bm.key === "pinnacle_au") ? 2 : 1;
+    for (const o of outs) {
+      const p = (1 / o.price) / overround;                  // vig-mentes valószínűség
+      if (!acc[o.name]) acc[o.name] = { sum: 0, w: 0 };
+      acc[o.name].sum += p * w;
+      acc[o.name].w   += w;
+    }
+    count++;
+  }
+  if (!count) return null;
+  const probs = {};
+  for (const name in acc) probs[name] = acc[name].sum / acc[name].w;
+  return { probs, count };
+}
+
 async function fetchValueTips() {
   const allTips = [];
   const now     = new Date();
@@ -212,45 +246,54 @@ async function fetchValueTips() {
           !SHARP_BMS.includes(bm.key) &&
           bm.markets?.[0]?.outcomes?.every(o => o.price > 1.05 && o.price < 30)
         );
-        if (!softBMs.length) continue;
+        if (softBMs.length < 2) continue;   // legalább 2 soft iroda kell (konszenzus + anti-outlier)
 
-        const sharpBM       = sharpBMs[0];
-        const sharpOutcomes = sharpBM.markets[0].outcomes;
-        if (sharpOutcomes.length < 2) continue;
+        // Vig-mentes FAIR valószínűség több sharp iroda konszenzusából (Pinnacle dupla súllyal)
+        const consensus = sharpConsensus(sharpBMs);
+        if (!consensus) continue;
+        const { probs: fairProb, count: sharpN } = consensus;
 
-        const overround = sharpOutcomes.reduce((s, o) => s + 1 / o.price, 0);
-        if (overround < 1.0 || overround > 1.12) continue;
+        for (const name of Object.keys(fairProb)) {
+          const trueProb = fairProb[name];
+          const fairOdds = parseFloat((1 / trueProb).toFixed(2));
 
-        for (const sharpO of sharpOutcomes) {
-          let bestOdds = 0, bestBM = "";
+          // Minden soft ár erre a kimenetre, csökkenő sorrendben
+          const prices = [];
           for (const bm of softBMs) {
-            const o = bm.markets[0]?.outcomes?.find(x => x.name === sharpO.name);
-            if (o && o.price > bestOdds) { bestOdds = o.price; bestBM = bm.title; }
+            const o = bm.markets[0]?.outcomes?.find(x => x.name === name);
+            if (o) prices.push({ price: o.price, title: bm.title });
           }
-          if (!bestOdds) continue;
+          if (prices.length < 2) continue;
+          prices.sort((a, b) => b.price - a.price);
 
-          const odds = parseFloat(bestOdds.toFixed(2));
+          const odds   = parseFloat(prices[0].price.toFixed(2));
+          const bestBM = prices[0].title;
           if (odds < 1.3 || odds > 6.0) continue;
 
-          const trueProb = (1 / sharpO.price) / overround;
-          const fairOdds = parseFloat((1 / trueProb).toFixed(2));
-          const value    = parseFloat(((odds / fairOdds - 1) * 100).toFixed(1));
+          // ANTI-OUTLIER: a MÁSODIK legjobb soft ár is legyen a fair felett, hogy ne
+          // egyetlen elavult/hibás iroda hozzon félrevezető "value"-t (ez volt a fő gond).
+          if (prices[1].price <= fairOdds) continue;
+
+          const value = parseFloat(((odds / fairOdds - 1) * 100).toFixed(1));
           if (value < meta.minValue || value > 30) continue;
 
           const kelly = parseFloat((((trueProb * odds - 1) / (odds - 1)) * 0.25 * 100).toFixed(1));
           if (kelly <= 0) continue;
 
           allTips.push({
-            id: `${game.id}-${sharpO.name}-${Date.now()}`,
+            id: `${game.id}-${name}-${Date.now()}`,
             matchId: game.id,
+            sportKey,
             type: "value",
             sport: meta.sport, sportLabel: meta.label,
             match: `${game.home_team} vs ${game.away_team}`,
             commence: huTime(game.commence_time),
-            market: "1X2", pick: sharpO.name,
+            commenceISO: game.commence_time,
+            market: "1X2", pick: name,
             odds, fairOdds, prob: Math.round(trueProb * 100), value, kelly,
             live: false,
-            note: `Legjobb odds: ${bestBM} | Fair odds (${sharpBM.title}): ${fairOdds}`,
+            closingFair: null, clv: null,
+            note: `Legjobb odds: ${bestBM} | Fair (${sharpN} sharp konszenzus): ${fairOdds}`,
             addedAt: new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" }),
             result: "pending"
           });
@@ -491,6 +534,57 @@ async function checkResults() {
   else console.log("Nincs új lezárt meccs.");
 }
 
+// ── Closing line value (CLV) rögzítése ────────────────────
+// A kezdéshez közel (vagy röviddel utána) elmentjük a záró sharp fair oddsot,
+// és kiszámoljuk, mennyivel vertük a záró vonalat. Ez az igazi él-mutató:
+// tartósan pozitív átlag-CLV = valódi edge; negatív = nincs él (nem csak balszerencse).
+async function captureClosingOdds() {
+  const now = Date.now();
+  const targets = history.filter(t =>
+    t.type === "value" && t.result === "pending" &&
+    t.closingFair == null && t.matchId && t.sportKey && t.commenceISO
+  );
+  if (!targets.length) return;
+
+  // Csak azokat a sportokat kérdezzük le, ahol van a kezdés körüli ablakban lévő tipp
+  // (így nem pazaroljuk az odds API kvótát).
+  const bySport = {};
+  for (const t of targets) {
+    const mins = (new Date(t.commenceISO).getTime() - now) / 60000;
+    if (mins <= 15 && mins >= -45) (bySport[t.sportKey] = bySport[t.sportKey] || []).push(t);
+  }
+  const sportKeys = Object.keys(bySport);
+  if (!sportKeys.length) return;
+
+  let changed = false;
+  for (const sportKey of sportKeys) {
+    try {
+      const url = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h&oddsFormat=decimal&dateFormat=iso`;
+      const r = await fetch(url);
+      if (!r.ok) continue;
+      const games = await r.json();
+      for (const t of bySport[sportKey]) {
+        const game = games.find(g => g.id === t.matchId);
+        if (!game) continue;
+        const sharpBMs = (game.bookmakers || []).filter(bm =>
+          SHARP_BMS.includes(bm.key) &&
+          bm.markets?.[0]?.outcomes?.every(o => o.price > 1.05 && o.price < 30)
+        );
+        const c = sharpConsensus(sharpBMs);
+        if (!c || c.probs[t.pick] == null) continue;
+        const closingFair = parseFloat((1 / c.probs[t.pick]).toFixed(2));
+        const clv = parseFloat(((parseFloat(t.odds) / closingFair - 1) * 100).toFixed(1));
+        const patch = { closingFair, clv };
+        history    = history.map(x => x.id === t.id ? { ...x, ...patch } : x);
+        latestTips = latestTips.map(x => x.id === t.id ? { ...x, ...patch } : x);
+        changed = true;
+        console.log(`  CLV: ${t.match} / ${t.pick} → ${clv >= 0 ? "+" : ""}${clv}% (odds ${t.odds} vs záró fair ${closingFair})`);
+      }
+    } catch (e) { console.error(`CLV hiba (${sportKey}):`, e.message); }
+  }
+  if (changed) saveHistory();
+}
+
 // ── Ütemező ───────────────────────────────────────────────
 function scheduleNextFetch() {
   const { hour, minute, day } = getHungarianTime();
@@ -518,6 +612,9 @@ setInterval(() => {
     sendTelegram(buildStatsMsg("Napi statisztika"));
   }
 }, 60000);
+
+// ── CLV rögzítés – 6 percenként, csak ha van kezdés körüli value tipp ──
+setInterval(captureClosingOdds, 6 * 60 * 1000);
 
 // ── Admin hitelesítés ─────────────────────────────────────
 // Jelszó jöhet: x-admin-password header, body.password, vagy ?password= query.
