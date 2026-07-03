@@ -161,7 +161,6 @@
       <div class="stat-card"><div class="stat-label">Nyert</div><div class="stat-value" style="color:#69f0ae" id="h-won">0</div></div>
       <div class="stat-card"><div class="stat-label">Vesztett</div><div class="stat-value" style="color:#ef9a9a" id="h-lost">0</div></div>
       <div class="stat-card"><div class="stat-label">Visszajár</div><div class="stat-value" style="color:#90caf9" id="h-push">0</div></div>
-      <div class="stat-card"><div class="stat-label">Fél ny/v</div><div class="stat-value" style="color:#ffcc80;font-size:15px" id="h-half">½✅0 · ½❌0</div></div>
       <div class="stat-card"><div class="stat-label">Value átlag</div><div class="stat-value" style="color:#ffe082" id="h-avg">–</div></div>
       <div class="stat-card"><div class="stat-label">Win %</div><div class="stat-value" style="color:#a5d6a7" id="h-wr">–</div></div>
       <div class="stat-card"><div class="stat-label">Profit (e.)</div><div class="stat-value" id="h-profit">–</div></div>
@@ -373,9 +372,7 @@ function renderHistory() {
   document.getElementById("h-pend").textContent   = pend;
   document.getElementById("h-won").textContent    = won;
   document.getElementById("h-lost").textContent   = lost;
-  document.getElementById("h-push").textContent   = push;
-  const hHalf = document.getElementById("h-half");
-  if (hHalf) hHalf.textContent = "½✅"+halfWon+" · ½❌"+halfLost;
+  document.getElementById("h-push").textContent   = push + halfWon + halfLost;
   document.getElementById("h-avg").textContent    = avg!=="–"?avg+"%":"–";
   document.getElementById("h-wr").textContent     = wr;
   document.getElementById("h-profit").textContent = settled.length?(profit>=0?"+":"")+profit.toFixed(2):"–";
