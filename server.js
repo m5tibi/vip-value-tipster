@@ -160,7 +160,7 @@ function calcStats() {
 
 function buildStatsMsg(title) {
   const { won, lost, push, halfWon, halfLost, pend, avg, wr, profitStr, roiStr } = calcStats();
-  const halfLine = (halfWon || halfLost) ? `½✅ Fél nyert: <b>${halfWon}</b>\n½❌ Fél veszt: <b>${halfLost}</b>\n` : "";
+  const pushTotal = push + halfWon + halfLost;   // a fél eredmények a visszajárhoz számítanak
   return `📈 <b>${title}</b>\n`+
     `📅 ${new Date().toLocaleDateString("hu-HU")}\n\n`+
     `📊 <b>Összesítés</b>\n`+
@@ -168,8 +168,7 @@ function buildStatsMsg(title) {
     `⏳ Folyamatban: <b>${pend}</b>\n`+
     `✅ Nyert: <b>${won}</b>\n`+
     `❌ Vesztett: <b>${lost}</b>\n`+
-    halfLine+
-    `↩️ Visszajár: <b>${push}</b>\n\n`+
+    `↩️ Visszajár: <b>${pushTotal}</b>\n\n`+
     `📉 <b>Teljesítmény</b>\n`+
     `Win %: <b>${wr}</b>\n`+
     `Profit: <b>${profitStr} egység</b>\n`+
