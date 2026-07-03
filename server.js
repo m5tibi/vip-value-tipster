@@ -100,29 +100,67 @@ async function sendTelegram(text) {
   } catch (e) { console.error("Telegram hiba:", e.message); }
 }
 
+// ── Ázsiai kiértékelés ────────────────────────────────────
+// Egész/fél vonal: won/lost/push. Negyedes vonal (x.25 / x.75): a tét két fél
+// fogadásra bomlik a két szomszédos vonalon → won / half_won / push / half_lost / lost.
+// x  = realizált érték (hendikepnél: sajátGól-ellenGól; over-nél: összGól)
+// line = az a vonal, amit meg kell haladni a nyeréshez
+function settleQuarter(x, line) {
+  const L = Math.round(line * 4) / 4;            // 0.25-ös rácsra igazítás
+  if (Number.isInteger(L * 2)) {                 // egész vagy fél vonal → egy fogadás
+    return x > L ? "won" : x < L ? "lost" : "push";
+  }
+  const s1 = Math.sign(x - (L - 0.25));          // alsó fél-vonal
+  const s2 = Math.sign(x - (L + 0.25));          // felső fél-vonal
+  const sum = s1 + s2;                           // -2..+2
+  if (sum === 2)  return "won";                  // mindkét fél nyer
+  if (sum === 1)  return "half_won";             // egyik nyer, másik visszajár
+  if (sum === -1) return "half_lost";            // egyik veszt, másik visszajár
+  if (sum === 0)  return "push";                 // (negyedesnél gyakorlatilag nem fordul elő)
+  return "lost";                                 // mindkét fél veszt
+}
+
+const SETTLED = ["won", "lost", "push", "half_won", "half_lost"];
+// Egy lezárt tipp profitja egységben (1 = teljes tét).
+function tipProfit(t) {
+  const o = parseFloat(t.odds) || 0;
+  switch (t.result) {
+    case "won":       return o - 1;
+    case "half_won":  return (o - 1) / 2;
+    case "lost":      return -1;
+    case "half_lost": return -0.5;
+    default:          return 0;                  // push
+  }
+}
+function nowHu() {
+  return new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" });
+}
+
 // ── Statisztika számítás ──────────────────────────────────
 function calcStats() {
-  const won    = history.filter(t => t.result === "won").length;
-  const lost   = history.filter(t => t.result === "lost").length;
-  const push   = history.filter(t => t.result === "push").length;
-  const pend   = history.filter(t => !t.result || t.result === "pending").length;
-  const vTips  = history.filter(t => t.value);
-  const avg    = vTips.length ? (vTips.reduce((s,t) => s+t.value,0)/vTips.length).toFixed(1) : "–";
-  const wr     = (won+lost) ? ((won/(won+lost))*100).toFixed(0)+"%" : "–";
-  const closed = history.filter(t => t.result==="won"||t.result==="lost"||t.result==="push");
-  let profit   = 0;
-  closed.forEach(t => {
-    if (t.result==="won")  profit += parseFloat(t.odds)-1;
-    if (t.result==="lost") profit -= 1;
-  });
-  const roi       = closed.length ? ((profit/closed.length)*100).toFixed(1) : "–";
-  const profitStr = closed.length ? (profit>=0?"+":"")+profit.toFixed(2) : "–";
+  const won      = history.filter(t => t.result === "won").length;
+  const lost     = history.filter(t => t.result === "lost").length;
+  const push     = history.filter(t => t.result === "push").length;
+  const halfWon  = history.filter(t => t.result === "half_won").length;
+  const halfLost = history.filter(t => t.result === "half_lost").length;
+  const pend     = history.filter(t => !t.result || t.result === "pending").length;
+  const vTips    = history.filter(t => t.value);
+  const avg      = vTips.length ? (vTips.reduce((s,t) => s+t.value,0)/vTips.length).toFixed(1) : "–";
+  const settled  = history.filter(t => SETTLED.includes(t.result));
+  const profit   = settled.reduce((s,t) => s + tipProfit(t), 0);
+  // Win% – a fél eredmények fél súllyal, a visszajárók (push) kihagyva
+  const decidedW = won + halfWon * 0.5;
+  const decidedN = won + lost + halfWon + halfLost;
+  const wr        = decidedN ? ((decidedW/decidedN)*100).toFixed(0)+"%" : "–";
+  const roi       = settled.length ? ((profit/settled.length)*100).toFixed(1) : "–";
+  const profitStr = settled.length ? (profit>=0?"+":"")+profit.toFixed(2) : "–";
   const roiStr    = roi!=="–" ? (profit>=0?"+":"")+roi+"%" : "–";
-  return { won, lost, push, pend, avg, wr, profitStr, roiStr };
+  return { won, lost, push, halfWon, halfLost, pend, avg, wr, profitStr, roiStr };
 }
 
 function buildStatsMsg(title) {
-  const { won, lost, push, pend, avg, wr, profitStr, roiStr } = calcStats();
+  const { won, lost, push, halfWon, halfLost, pend, avg, wr, profitStr, roiStr } = calcStats();
+  const halfLine = (halfWon || halfLost) ? `½✅ Fél nyert: <b>${halfWon}</b>\n½❌ Fél veszt: <b>${halfLost}</b>\n` : "";
   return `📈 <b>${title}</b>\n`+
     `📅 ${new Date().toLocaleDateString("hu-HU")}\n\n`+
     `📊 <b>Összesítés</b>\n`+
@@ -130,6 +168,7 @@ function buildStatsMsg(title) {
     `⏳ Folyamatban: <b>${pend}</b>\n`+
     `✅ Nyert: <b>${won}</b>\n`+
     `❌ Vesztett: <b>${lost}</b>\n`+
+    halfLine+
     `↩️ Visszajár: <b>${push}</b>\n\n`+
     `📉 <b>Teljesítmény</b>\n`+
     `Win %: <b>${wr}</b>\n`+
@@ -383,9 +422,16 @@ async function fetchAndProcess() {
 
 // ── Eredményjelölés ───────────────────────────────────────
 async function checkResults() {
-  const pending = history.filter(t => t.result === "pending");
-  if (!pending.length) return;
-  console.log(`Eredmények ellenőrzése (${pending.length} pending)...`);
+  // Kiértékelendő: minden pending tipp, PLUSZ a nem kézzel jelölt hendikep/over tippek
+  // (utóbbiak a visszamenőleges javítás miatt – a friss meccsek eredménye a scores
+  //  ablakban (daysFrom=3) újraértékelődik, így a régi negyedes hibák maguktól javulnak).
+  const isReeval = t => {
+    const mk = (t.market || "").toLowerCase();
+    return (mk.includes("hendikep") || mk.includes("over")) && !t.manual;
+  };
+  const work = history.filter(t => t.result === "pending" || isReeval(t));
+  if (!work.length) return;
+  console.log(`Eredmények ellenőrzése (${work.length} tipp, ebből pending: ${work.filter(t=>t.result==="pending").length})...`);
   let changed = false;
 
   for (const sportKey of Object.keys(SPORT_MAP)) {
@@ -396,7 +442,7 @@ async function checkResults() {
       for (const game of games) {
         if (!game.completed || !game.scores) continue;
         const matchName = `${game.home_team} vs ${game.away_team}`;
-        const tips = pending.filter(t => t.matchId === game.id || t.match === matchName);
+        const tips = work.filter(t => t.matchId === game.id || t.match === matchName);
         if (!tips.length) continue;
 
         const homeScore = parseInt(game.scores.find(s => s.name === game.home_team)?.score || 0);
@@ -405,30 +451,35 @@ async function checkResults() {
 
         for (const tip of tips) {
           let result = null;
+          const mk = (tip.market || "").toLowerCase();
           if (tip.market === "1X2") {
             if (tip.pick === game.home_team)      result = homeScore > awayScore ? "won" : homeScore === awayScore ? "push" : "lost";
             else if (tip.pick === game.away_team) result = awayScore > homeScore ? "won" : homeScore === awayScore ? "push" : "lost";
             else if (tip.pick === "Draw")         result = homeScore === awayScore ? "won" : "lost";
-          } else if (tip.market.toLowerCase().includes("over")) {
-            const line = parseFloat(tip.market.match(/[\d.]+/)?.[0] || 0);
-            const total = homeScore + awayScore;
-            result = total > line ? "won" : total === line ? "push" : "lost";
-          } else if (tip.market.toLowerCase().includes("hendikep")) {
+          } else if (mk.includes("over")) {
+            const line  = parseFloat(tip.market.match(/[\d.]+/)?.[0] || 0);
+            result = settleQuarter(homeScore + awayScore, line);      // ázsiai over is (2.75 stb.)
+          } else if (mk.includes("hendikep")) {
             const lineMatch = tip.pick.match(/-?[\d.]+$/);
             if (!lineMatch) continue;
-            const line     = parseFloat(lineMatch[0]);
-            const isHome   = tip.pick.includes(game.home_team);
-            const adjScore = isHome ? homeScore + line : awayScore + line;
-            const oppScore = isHome ? awayScore : homeScore;
-            result = adjScore > oppScore ? "won" : adjScore === oppScore ? "push" : "lost";
-          } else if (tip.market.toLowerCase().includes("btts") || tip.market.toLowerCase().includes("mindkét")) {
+            const h      = parseFloat(lineMatch[0]);                  // pl. +0.75
+            const isHome = tip.pick.includes(game.home_team);
+            const d      = isHome ? homeScore - awayScore : awayScore - homeScore;
+            result = settleQuarter(d, -h);                            // nyer, ha (sajátGól + h) > ellenGól
+          } else if (mk.includes("btts") || mk.includes("mindkét")) {
             result = homeScore > 0 && awayScore > 0 ? "won" : "lost";
           }
           if (!result) { console.log(`    ✗ ${tip.market} / ${tip.pick} – nem sikerült kiértékelni`); continue; }
-          console.log(`    ${tip.pick} → ${result}`);
-          history    = history.map(t => t.id === tip.id ? { ...t, result } : t);
-          latestTips = latestTips.map(t => t.id === tip.id ? { ...t, result } : t);
-          aiTips     = aiTips.map(t => t.id === tip.id ? { ...t, result } : t);
+          // Ha már pontosan ez az eredmény van tárolva (a végeredménnyel együtt), ne írjuk felül
+          if (tip.result === result && tip.homeScore != null) continue;
+          if (tip.result && tip.result !== "pending" && tip.result !== result)
+            console.log(`    ↻ JAVÍTÁS: ${tip.pick} ${tip.result} → ${result}`);
+          else
+            console.log(`    ${tip.pick} → ${result}`);
+          const patch = { result, homeScore, awayScore, settledAt: nowHu() };
+          history    = history.map(t => t.id === tip.id ? { ...t, ...patch } : t);
+          latestTips = latestTips.map(t => t.id === tip.id ? { ...t, ...patch } : t);
+          aiTips     = aiTips.map(t => t.id === tip.id ? { ...t, ...patch } : t);
           changed    = true;
         }
       }
@@ -511,9 +562,10 @@ app.post("/api/refresh", async (req, res) => {
 app.patch("/api/history/:id", (req, res) => {
   if (!requireAdmin(req, res)) return;
   const { result } = req.body;
-  history    = history.map(t => t.id === req.params.id ? { ...t, result } : t);
-  latestTips = latestTips.map(t => t.id === req.params.id ? { ...t, result } : t);
-  aiTips     = aiTips.map(t => t.id === req.params.id ? { ...t, result } : t);
+  const patch = { result, manual: true };       // kézi jelölést az auto-újraértékelés nem írja felül
+  history    = history.map(t => t.id === req.params.id ? { ...t, ...patch } : t);
+  latestTips = latestTips.map(t => t.id === req.params.id ? { ...t, ...patch } : t);
+  aiTips     = aiTips.map(t => t.id === req.params.id ? { ...t, ...patch } : t);
   saveHistory();
   res.json({ ok: true });
 });
