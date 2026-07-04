@@ -13,6 +13,7 @@ const ODDS_API_KEY  = process.env.ODDS_API_KEY;
 const TG_BOT_TOKEN  = process.env.TG_BOT_TOKEN;
 const TG_CHAT_ID    = process.env.TG_CHAT_ID;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+const APIFOOTBALL_KEY = process.env.APIFOOTBALL_KEY;   // opcionális: 90 perces eredményhez
 const EOD_HOUR      = 23;
 const DATA_FILE     = "/data/history.json";
 const SCHEDULE_FILE = "/data/lastRun.json";
@@ -465,19 +466,83 @@ async function fetchAndProcess() {
   console.log(`Frissítve – ${valueTips.length} value + ${newAiTips.length} AI tipp`);
 }
 
+// ── API-Football: 90 perces (rendes idejű) eredmény ───────
+// A fogadások a rendes játékidőre dőlnek el (90' + hosszabbítás[stoppage], de
+// hosszabbítás/tizenegyes nélkül). Az odds API a hosszabbítással együtti végeredményt
+// adja, ami kieséses meccseknél hibás. Az API-Football score.fulltime a 90 perces
+// eredmény – ha be van állítva az APIFOOTBALL_KEY, ezt használjuk a kiértékeléshez.
+function normTeam(s) {
+  return (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\b(fc|cf|sc|afc|cd|ac|ss|ssc|as|rc|fk|sk|club|deportivo|united|city)\b/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+function levDist(a, b) {
+  const m = a.length, n = b.length, d = [];
+  for (let i = 0; i <= m; i++) d[i] = [i];
+  for (let j = 0; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      d[i][j] = Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+  return d[m][n];
+}
+function nameSim(a, b) {
+  if (!a || !b) return false;
+  if (a === b || a.includes(b) || b.includes(a)) return true;
+  return levDist(a, b) <= Math.max(2, Math.floor(Math.min(a.length, b.length) * 0.25));
+}
+function afMatchFixture(game, fixtures) {
+  const kt = new Date(game.commence_time).getTime();
+  const nh = normTeam(game.home_team), na = normTeam(game.away_team);
+  for (const f of fixtures) {
+    const fkt = new Date(f.fixture?.date || 0).getTime();
+    if (Math.abs(fkt - kt) > 20 * 60000) continue;                 // ±20 perc a kezdéshez horgony
+    if (nameSim(nh, normTeam(f.teams?.home?.name)) &&
+        nameSim(na, normTeam(f.teams?.away?.name))) return f;      // hazai↔hazai, vendég↔vendég
+  }
+  return null;
+}
+async function afFixturesForDate(dateStr, cache) {
+  if (!APIFOOTBALL_KEY) return null;
+  if (dateStr in cache) return cache[dateStr];
+  try {
+    const r = await fetch(`https://v3.football.api-sports.io/fixtures?date=${dateStr}`,
+      { headers: { "x-apisports-key": APIFOOTBALL_KEY } });
+    if (!r.ok) { console.log(`API-Football HTTP ${r.status}`); cache[dateStr] = null; return null; }
+    const j = await r.json();
+    cache[dateStr] = Array.isArray(j.response) ? j.response : [];
+    return cache[dateStr];
+  } catch (e) { console.error("API-Football hiba:", e.message); cache[dateStr] = null; return null; }
+}
+// Visszatér: { home, away, status } a 90 perces eredménnyel, vagy null ha nincs megbízható párosítás.
+async function regulationScore(game, cache) {
+  if (!APIFOOTBALL_KEY) return null;
+  const base = new Date(game.commence_time);
+  const dates = [base.toISOString().slice(0, 10)];
+  const nxt = new Date(base.getTime() + 6 * 3600000).toISOString().slice(0, 10);
+  if (nxt !== dates[0]) dates.push(nxt);                            // UTC éjfélen átnyúló kezdés
+  for (const d of dates) {
+    const fx = await afFixturesForDate(d, cache);
+    if (!fx) continue;
+    const f = afMatchFixture(game, fx);
+    const st = f?.fixture?.status?.short;
+    if (f && ["FT", "AET", "PEN"].includes(st) && f.score?.fulltime?.home != null) {
+      return { home: +f.score.fulltime.home, away: +f.score.fulltime.away, status: st };
+    }
+  }
+  return null;
+}
+
 // ── Eredményjelölés ───────────────────────────────────────
 async function checkResults() {
-  // Kiértékelendő: minden pending tipp, PLUSZ a nem kézzel jelölt hendikep/over tippek
-  // (utóbbiak a visszamenőleges javítás miatt – a friss meccsek eredménye a scores
-  //  ablakban (daysFrom=3) újraértékelődik, így a régi negyedes hibák maguktól javulnak).
-  const isReeval = t => {
-    const mk = (t.market || "").toLowerCase();
-    return (mk.includes("hendikep") || mk.includes("over")) && !t.manual;
-  };
-  const work = history.filter(t => t.result === "pending" || isReeval(t));
+  // Kiértékelendő: minden pending tipp, PLUSZ minden nem kézzel jelölt tipp
+  // (visszamenőleges javítás – a scores ablakban (daysFrom=3) lévő meccsek eredménye
+  //  újraértékelődik, így a korábbi hibás kiértékelések maguktól helyreállnak).
+  const work = history.filter(t => t.result === "pending" || !t.manual);
   if (!work.length) return;
   console.log(`Eredmények ellenőrzése (${work.length} tipp, ebből pending: ${work.filter(t=>t.result==="pending").length})...`);
   let changed = false;
+  const afCache = {};   // API-Football napi fixture-cache egy futásra
 
   for (const sportKey of Object.keys(SPORT_MAP)) {
     try {
@@ -490,16 +555,22 @@ async function checkResults() {
         const tips = work.filter(t => t.matchId === game.id || t.match === matchName);
         if (!tips.length) continue;
 
-        const homeScore = parseInt(game.scores.find(s => s.name === game.home_team)?.score || 0);
-        const awayScore = parseInt(game.scores.find(s => s.name === game.away_team)?.score || 0);
-        console.log(`  ${matchName}: ${homeScore}-${awayScore}`);
+        let homeScore = parseInt(game.scores.find(s => s.name === game.home_team)?.score || 0);
+        let awayScore = parseInt(game.scores.find(s => s.name === game.away_team)?.score || 0);
+        let src = "odds";
+        const reg = await regulationScore(game, afCache);   // 90 perces eredmény, ha elérhető
+        if (reg) { homeScore = reg.home; awayScore = reg.away; src = `90'(${reg.status})`; }
+        console.log(`  ${matchName}: ${homeScore}-${awayScore} [${src}]`);
 
         for (const tip of tips) {
           let result = null;
           const mk = (tip.market || "").toLowerCase();
           if (tip.market === "1X2") {
-            if (tip.pick === game.home_team)      result = homeScore > awayScore ? "won" : homeScore === awayScore ? "push" : "lost";
-            else if (tip.pick === game.away_team) result = awayScore > homeScore ? "won" : homeScore === awayScore ? "push" : "lost";
+            // 1X2 (három kimenet): csapattippnél SOSINCS push – döntetlen = vereség.
+            // (A hosszabbítás/tizenegyesek nem számítanak, a scores API rendes idő + hosszabbítás
+            //  eredményt ad; tizenegyes-döntésnél a döntetlen megmarad, tehát a csapattipp vesztes.)
+            if (tip.pick === game.home_team)      result = homeScore >  awayScore ? "won" : "lost";
+            else if (tip.pick === game.away_team) result = awayScore >  homeScore ? "won" : "lost";
             else if (tip.pick === "Draw")         result = homeScore === awayScore ? "won" : "lost";
           } else if (mk.includes("over")) {
             const line  = parseFloat(tip.market.match(/[\d.]+/)?.[0] || 0);
@@ -736,6 +807,9 @@ app.listen(PORT, () => console.log(`VIP Tipster fut: http://localhost:${PORT}`))
 if (!ADMIN_PWD) {
   console.warn("⚠️  FIGYELEM: ADMIN_PASSWORD nincs beállítva – az admin végpontok (törlés, eredményjelölés, stat-küldés, frissítés) VÉDTELENEK! Állítsd be a Render Environment Variables között.");
 }
+console.log(APIFOOTBALL_KEY
+  ? "✓ API-Football bekötve – a kiértékelés a 90 perces (rendes idejű) eredményt használja."
+  : "ℹ️  API-Football kulcs (APIFOOTBALL_KEY) nincs beállítva – a kiértékelés az odds API végeredményét használja (kieséses/hosszabbításos meccseknél pontatlan lehet).");
 
 const lastRun = loadLastRun();
 if (lastRun) console.log(`Utolsó futás: ${Math.round((Date.now() - new Date(lastRun).getTime()) / 60000)} perce`);
