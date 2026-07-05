@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>VIP Value Tipster</title>
+<title>AI Foci Tippek</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #07111d; color: #e0f7fa; font-family: sans-serif; padding: 18px 14px; }
@@ -76,7 +76,7 @@
 <div class="wrap">
   <div class="header">
     <div>
-      <div class="title">VIP Value Tipster</div>
+      <div class="title">AI Foci Tippek</div>
       <div class="sub" id="today"></div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -95,22 +95,18 @@
   <div style="margin-bottom:14px;background:#0d1b2a;border:1px solid #1e3a2f;border-radius:10px;overflow:hidden">
     <div onclick="var b=document.getElementById('guide-body');var a=document.getElementById('guide-arr');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▼':'▲'"
          style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer">
-      <div style="font-size:14px;font-weight:700;color:#00e676">📖 Hogyan működik a VIP Value Tipster?</div>
+      <div style="font-size:14px;font-weight:700;color:#00e676">📖 Hogyan működik az AI Foci Tippek?</div>
       <span id="guide-arr" style="color:#546e7a;font-size:12px">▼</span>
     </div>
     <div id="guide-body" style="display:none;padding:0 16px 16px">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px">
         <div style="background:#07111d;border:1px solid #1e3a2f;border-radius:8px;padding:12px">
-          <div style="font-size:13px;font-weight:700;color:#00e676;margin-bottom:6px">📊 Value tippek</div>
-          <div style="font-size:12px;color:#78909c;line-height:1.6">A rendszer több <strong style="color:#b2dfdb">éles fogadóiroda</strong> (elsősorban a <strong style="color:#b2dfdb">Pinnacle</strong>) árait vonja össze valós piaci eséllyé, és ehhez méri a legjobb elérhető oddsot. Ha a különbség meghaladja a <strong style="color:#b2dfdb">+6%-ot</strong>, és nem csak egyetlen iroda lóg ki, matematikai értékfogadásnak minősül.</div>
+          <div style="font-size:13px;font-weight:700;color:#b39ddb;margin-bottom:6px">🤖 AI foci tippek</div>
+          <div style="font-size:12px;color:#78909c;line-height:1.6">A Claude AI valós <strong style="color:#b2dfdb">web keresést</strong> végez, és <strong style="color:#b2dfdb">csapat forma, sérülések, motiváció, H2H előzmények</strong> alapján elemzi a napi foci meccseket, majd ad 2–3 konkrét tippet — csak a legerősebb lehetőségeket.</div>
         </div>
         <div style="background:#07111d;border:1px solid #1e3a2f;border-radius:8px;padding:12px">
-          <div style="font-size:13px;font-weight:700;color:#b39ddb;margin-bottom:6px">🤖 AI tippek</div>
-          <div style="font-size:12px;color:#78909c;line-height:1.6">A Claude AI valós web keresést végez: <strong style="color:#b2dfdb">csapat forma, sérülések, motiváció, H2H előzmények</strong> alapján elemzi a napi meccseket és ad 2–3 konkrét tippet.</div>
-        </div>
-        <div style="background:#07111d;border:1px solid #1e3a2f;border-radius:8px;padding:12px">
-          <div style="font-size:13px;font-weight:700;color:#ffe082;margin-bottom:6px">📐 Kelly Kritérium</div>
-          <div style="font-size:12px;color:#78909c;line-height:1.6">Minden value tipphez <strong style="color:#b2dfdb">negyed-Kelly</strong> tét ajánlást kapsz — ez a bankroll optimális, konzervatív elosztása a hosszú távú profithoz.</div>
+          <div style="font-size:13px;font-weight:700;color:#80cbc4;margin-bottom:6px">✅ Eredmények 90 percre</div>
+          <div style="font-size:12px;color:#78909c;line-height:1.6">A tippek a <strong style="color:#b2dfdb">rendes játékidő</strong> (90 perc) alapján dőlnek el — a hosszabbítás és a tizenegyesek nem számítanak. A kieséses meccsek is automatikusan, helyesen kerülnek kiértékelésre.</div>
         </div>
       </div>
       <div style="border-top:1px solid #1e3a2f;padding-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">
@@ -136,11 +132,7 @@
       <div class="last-update" id="last-update">Még nem futott elemzés</div>
       <button class="btn-refresh" id="btn-refresh" onclick="refresh()" style="display:none">🔄 Frissítés most</button>
     </div>
-    <div class="section-title" style="color:#00e676">📊 Value tippek</div>
-    <div class="section-sub">Éles irodák konszenzusa alapján számolt piaci előny (+6% felett, több irodánál)</div>
-    <div id="value-list"><div class="no-value">Kattints a frissítésre...</div></div>
-    <hr class="divider">
-    <div class="section-title" style="color:#b39ddb">🤖 AI elemzett tippek</div>
+    <div class="section-title" style="color:#b39ddb">🤖 AI foci tippek</div>
     <div class="section-sub">Valós web keresés alapján, forma és statisztika elemzéssel</div>
     <div id="ai-list"><div class="no-value">Kattints a frissítésre...</div></div>
   </div>
@@ -148,7 +140,7 @@
   <!-- HISTORY TAB -->
   <div id="tab-history-panel" style="display:none">
     <div class="stats-header">
-      <div style="font-weight:700;color:#00e676;font-size:16px">📊 Előzmény & statisztika</div>
+      <div style="font-weight:700;color:#00e676;font-size:16px">📊 Előzmény & statisztika<span style="font-weight:400;color:#546e7a;font-size:12px"> · csak foci, value nélkül</span></div>
       <div id="admin-tools" style="display:none;gap:8px;flex-wrap:wrap">
         <button class="btn-send" onclick="checkResults()">🔍 Eredmények</button>
         <button class="btn-send" onclick="sendStats()">📲 Küldés</button>
@@ -161,18 +153,16 @@
       <div class="stat-card"><div class="stat-label">Nyert</div><div class="stat-value" style="color:#69f0ae" id="h-won">0</div></div>
       <div class="stat-card"><div class="stat-label">Vesztett</div><div class="stat-value" style="color:#ef9a9a" id="h-lost">0</div></div>
       <div class="stat-card"><div class="stat-label">Visszajár</div><div class="stat-value" style="color:#90caf9" id="h-push">0</div></div>
-      <div class="stat-card"><div class="stat-label">Value átlag</div><div class="stat-value" style="color:#ffe082" id="h-avg">–</div></div>
       <div class="stat-card"><div class="stat-label">Win %</div><div class="stat-value" style="color:#a5d6a7" id="h-wr">–</div></div>
       <div class="stat-card"><div class="stat-label">Profit (e.)</div><div class="stat-value" id="h-profit">–</div></div>
       <div class="stat-card"><div class="stat-label">ROI</div><div class="stat-value" id="h-roi">–</div></div>
-      <div class="stat-card"><div class="stat-label">Átl. CLV</div><div class="stat-value" id="h-clv">–</div></div>
     </div>
     <div id="history-list"><div class="empty">Még nincsenek rögzített tippek.</div></div>
   </div>
 </div>
 
 <script>
-let valueTips = [], aiTips = [], history = [];
+let aiTips = [], history = [];
 let msRemaining = 0;
 let dayCounter = 0;
 
@@ -282,29 +272,6 @@ function yesterdayKey() {
   return p.length>=3 ? p[0]+" "+p[1]+" "+p[2] : s;
 }
 
-function valueTipHTML(t, showResult) {
-  return `
-  <div class="tip-card value">
-    <div class="tip-top">
-      <span class="bdg bdg-value">📊 VALUE</span>
-      <span style="font-size:13px;color:#80cbc4">${t.sportLabel||""}</span>
-      <span class="bdg bdg-v" style="background:${valueBg(t.value)};color:#0a2a1a;margin-left:auto">+${t.value.toFixed(1)}%</span>
-    </div>
-    <div class="tip-match">${t.match}</div>
-    ${t.commence?`<div class="tip-time">🕐 ${t.commence}</div>`:""}
-    <div style="margin-bottom:6px"><span class="tip-market">${t.market}</span><span class="tip-pick">${t.pick}</span></div>
-    <div class="tip-odds-row">
-      <span>Odds: <b style="color:#00e676">${t.odds}</b></span>
-      <span>Fair: <b style="color:#fff">${t.fairOdds}</b></span>
-      <span>Valószínűség: <b style="color:#fff">${t.prob}%</b></span>
-    </div>
-    ${t.kelly?`<div class="tip-kelly">📐 Kelly tét: <b>${t.kelly}%</b> a bankrollból</div>`:""}
-    ${typeof t.clv==="number"?`<div class="tip-kelly">📉 CLV: <b style="color:${t.clv>0?'#69f0ae':t.clv<0?'#ef9a9a':'#90a4ae'}">${t.clv>=0?"+":""}${t.clv}%</b> (záró fair: ${t.closingFair})</div>`:""}
-    <div class="tip-note">${t.note||""}</div>
-    ${showResult?`<div class="tip-actions">${resBadge(t.result)}${actionBtns(t)}</div>`:""}
-  </div>`;
-}
-
 function aiTipHTML(t, showResult) {
   return `
   <div class="tip-card ai">
@@ -323,18 +290,14 @@ function aiTipHTML(t, showResult) {
 }
 
 function tipHTML(t, showResult) {
-  return t.type==="ai" ? aiTipHTML(t,showResult) : valueTipHTML(t,showResult);
+  return aiTipHTML(t, showResult);
 }
 
 function renderTips() {
-  const sv = [...valueTips].filter(t=>!t.result||t.result==="pending").sort((a,b)=>parseCommence(a.commence)-parseCommence(b.commence));
   const sa = [...aiTips].filter(t=>!t.result||t.result==="pending").sort((a,b)=>parseCommence(a.commence)-parseCommence(b.commence));
-  document.getElementById("value-list").innerHTML = sv.length
-    ? sv.map(t=>valueTipHTML(t,false)).join("")
-    : `<div class="no-value">📭 Ma nincs +6% feletti value lehetőség.</div>`;
   document.getElementById("ai-list").innerHTML = sa.length
     ? sa.map(t=>aiTipHTML(t,false)).join("")
-    : `<div class="no-value">🤖 AI elemzés folyamatban vagy nincs mai befejezetlen meccs.</div>`;
+    : `<div class="no-value">🤖 Kattints a frissítésre, vagy nincs mai befejezetlen meccs.</div>`;
 }
 
 function tipProfit(t) {
@@ -355,48 +318,42 @@ function subStats(tips) {
 }
 
 function renderHistory() {
-  const won      = history.filter(t=>t.result==="won").length;
-  const lost     = history.filter(t=>t.result==="lost").length;
-  const push     = history.filter(t=>t.result==="push").length;
-  const halfWon  = history.filter(t=>t.result==="half_won").length;
-  const halfLost = history.filter(t=>t.result==="half_lost").length;
-  const vT     = history.filter(t=>t.value);
-  const avg    = vT.length?(vT.reduce((s,t)=>s+t.value,0)/vT.length).toFixed(1):"–";
+  // Csak foci AI tippek: a value tippeket és a nem-foci sportágakat kihagyjuk.
+  const isFoci = t => /soccer|foci|⚽/i.test((t.sport||"")+" "+(t.sportLabel||""));
+  const H = history.filter(t => t.type !== "value" && isFoci(t));
+
+  const won      = H.filter(t=>t.result==="won").length;
+  const lost     = H.filter(t=>t.result==="lost").length;
+  const push     = H.filter(t=>t.result==="push").length;
+  const halfWon  = H.filter(t=>t.result==="half_won").length;
+  const halfLost = H.filter(t=>t.result==="half_lost").length;
   const decN   = won+lost+halfWon+halfLost;
   const wr     = decN?(((won+halfWon*0.5)/decN)*100).toFixed(0)+"%":"–";
-  const settled = history.filter(t=>["won","lost","push","half_won","half_lost"].includes(t.result));
+  const settled = H.filter(t=>["won","lost","push","half_won","half_lost"].includes(t.result));
   const profit  = settled.reduce((a,t)=>a+tipProfit(t),0);
   const roi    = settled.length?((profit/settled.length)*100).toFixed(1):"–";
   const roiCol = profit>0?"#69f0ae":profit<0?"#ef9a9a":"#90a4ae";
 
-  const pend   = history.filter(t=>!t.result||t.result==="pending").length;
-  document.getElementById("h-total").textContent  = history.length;
+  const pend   = H.filter(t=>!t.result||t.result==="pending").length;
+  document.getElementById("h-total").textContent  = H.length;
   document.getElementById("h-pend").textContent   = pend;
   document.getElementById("h-won").textContent    = won;
   document.getElementById("h-lost").textContent   = lost;
   document.getElementById("h-push").textContent   = push + halfWon + halfLost;
-  document.getElementById("h-avg").textContent    = avg!=="–"?avg+"%":"–";
   document.getElementById("h-wr").textContent     = wr;
   document.getElementById("h-profit").textContent = settled.length?(profit>=0?"+":"")+profit.toFixed(2):"–";
   document.getElementById("h-profit").style.color = roiCol;
   document.getElementById("h-roi").textContent    = roi!=="–"?(profit>=0?"+":"")+roi+"%":"–";
   document.getElementById("h-roi").style.color    = roiCol;
-  const clvTips = history.filter(t=>typeof t.clv==="number");
-  const avgClv  = clvTips.length ? (clvTips.reduce((s,t)=>s+t.clv,0)/clvTips.length) : null;
-  const clvEl = document.getElementById("h-clv");
-  if (clvEl) {
-    clvEl.textContent = avgClv!=null ? (avgClv>=0?"+":"")+avgClv.toFixed(1)+"%" : "–";
-    clvEl.style.color = avgClv==null ? "#90a4ae" : avgClv>0 ? "#69f0ae" : avgClv<0 ? "#ef9a9a" : "#90a4ae";
-  }
 
   const el = document.getElementById("history-list");
-  if (!history.length) { el.innerHTML='<div class="empty">Még nincsenek rögzített tippek.</div>'; return; }
+  if (!H.length) { el.innerHTML='<div class="empty">Még nincsenek rögzített foci tippek.</div>'; return; }
 
   const TODAY     = todayKey();
   const YESTERDAY = yesterdayKey();
 
   const byDay = {};
-  history.forEach(t => {
+  H.forEach(t => {
     const d = getDay(t.addedAt);
     if (!byDay[d]) byDay[d] = [];
     byDay[d].push(t);
@@ -523,7 +480,7 @@ async function refresh() {
     });
     const d = await r.json();
     if (d.error) { showStatus("⛔ " + d.error, "#ef9a9a"); }
-    else { showStatus(`✅ ${d.valueTips} value + ${d.aiTips} AI tipp`); await loadTips(); }
+    else { showStatus(`✅ ${d.aiTips} AI tipp`); await loadTips(); }
   } catch(e) { showStatus("⚠️ Hiba: "+e.message,"#ef9a9a"); }
   btn.disabled=false; btn.textContent="🔄 Frissítés most";
   msRemaining=0;
@@ -537,7 +494,6 @@ async function loadTips() {
     const r = await fetch("/api/tips", { cache: "no-store" });
     if (!r.ok) throw new Error("HTTP "+r.status);
     const d = await r.json();
-    valueTips = Array.isArray(d.valueTips)?d.valueTips:[];
     aiTips    = Array.isArray(d.aiTips)?d.aiTips:[];
     tipsEverLoaded = true;
     tipsRetryDelay = 3000;
