@@ -514,36 +514,32 @@ function fdScore90(m) {
   const s = m.score || {};
   return pick(s.regularTime) || pick(s.fullTime);
 }
-async function fdMatchesForDate(dateStr, cache) {
+async function fdRecentMatches(cache) {
   if (!FOOTBALLDATA_TOKEN) return null;
-  if (dateStr in cache) return cache[dateStr];
+  if ("recent" in cache) return cache.recent;
+  const from = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10);   // utolsó ~3 nap
+  const to   = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);   // +holnap (dateTo exkluzív)
   try {
-    const to = new Date(new Date(dateStr + "T00:00:00Z").getTime() + 86400000).toISOString().slice(0, 10);
-    const r = await fetch(`https://api.football-data.org/v4/matches?dateFrom=${dateStr}&dateTo=${to}`,
+    const r = await fetch(`https://api.football-data.org/v4/matches?dateFrom=${from}&dateTo=${to}`,
       { headers: { "X-Auth-Token": FOOTBALLDATA_TOKEN } });
-    if (!r.ok) { console.log(`football-data.org HTTP ${r.status} (${dateStr})`); cache[dateStr] = null; return null; }
-    const j = await r.json().catch(() => ({}));
+    const body = await r.text();
+    if (!r.ok) { console.log(`football-data.org HTTP ${r.status}: ${body.slice(0, 200)}`); cache.recent = null; return null; }
+    const j = JSON.parse(body);
     const list = Array.isArray(j.matches) ? j.matches : [];
-    console.log(`football-data.org ${dateStr}: ${list.length} meccs`);
-    cache[dateStr] = list;
+    console.log(`football-data.org (${from}..${to}): ${list.length} meccs`);
+    cache.recent = list;
     return list;
-  } catch (e) { console.error("football-data.org hiba:", e.message); cache[dateStr] = null; return null; }
+  } catch (e) { console.error("football-data.org hiba:", e.message); cache.recent = null; return null; }
 }
 // Visszatér: { home, away, status } a 90 perces eredménnyel, vagy null ha nincs megbízható párosítás.
 async function regulationScore(game, cache) {
   if (!FOOTBALLDATA_TOKEN) return null;
-  const base = new Date(game.commence_time);
-  const dates = [base.toISOString().slice(0, 10)];
-  const nxt = new Date(base.getTime() + 6 * 3600000).toISOString().slice(0, 10);
-  if (nxt !== dates[0]) dates.push(nxt);                            // UTC éjfélen átnyúló kezdés
-  for (const d of dates) {
-    const fx = await fdMatchesForDate(d, cache);
-    if (!fx) continue;
-    const m = fdMatchFixture(game, fx);
-    if (m && m.status === "FINISHED") {
-      const sc = fdScore90(m);
-      if (sc && sc.home != null) return { home: sc.home, away: sc.away, status: m.score?.duration || "FINISHED" };
-    }
+  const fx = await fdRecentMatches(cache);
+  if (!fx) return null;
+  const m = fdMatchFixture(game, fx);   // kezdés ±20 perc + normalizált névpárosítás
+  if (m && m.status === "FINISHED") {
+    const sc = fdScore90(m);
+    if (sc && sc.home != null) return { home: sc.home, away: sc.away, status: m.score?.duration || "FINISHED" };
   }
   return null;
 }
