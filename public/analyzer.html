@@ -261,10 +261,10 @@ function analyze(){
   // Főoldali tippek lekérése kontextushoz
   fetch('/api/tips').then(function(r){return r.json();}).catch(function(){return {valueTips:[],aiTips:[]};})
   .then(function(td){
-    var allTips=(td.valueTips||[]).concat(td.aiTips||[]);
+    var allTips=(td.aiTips||[]);
     var tipsCtx='';
     if(allTips.length){
-      tipsCtx='\n\nA VIP Value Tipster főoldalán ma az alábbi tippek szerepelnek (NE mondj ezeknek ellent, hacsak nem egyértelmű hiba):\n';
+      tipsCtx='\n\nAz AI Foci Tippek főoldalán ma az alábbi tippek szerepelnek (NE mondj ezeknek ellent, hacsak nem egyértelmű hiba):\n';
       for(var i=0;i<allTips.length;i++){
         var t=allTips[i];
         tipsCtx+='- '+t.match+': '+t.market+' → '+t.pick+' @ '+t.odds+'\n';
