@@ -131,6 +131,12 @@
     <div class="section-title" style="color:#b39ddb">🤖 AI foci tippek</div>
     <div class="section-sub">Valós web keresés alapján, forma és statisztika elemzéssel</div>
     <div id="ai-list"><div class="no-value">📭 Jelenleg nincs kiadott tipp.</div></div>
+    <div id="combo-wrap" style="display:none">
+      <hr class="divider">
+      <div class="section-title" style="color:#ffcc80">🎰 Kombi tippek</div>
+      <div class="section-sub">Csak az izgalom kedvéért — külön kezelve a statisztikában</div>
+      <div id="combo-list"></div>
+    </div>
   </div>
 
   <!-- HISTORY TAB -->
@@ -153,12 +159,23 @@
       <div class="stat-card"><div class="stat-label">Profit (e.)</div><div class="stat-value" id="h-profit">–</div></div>
       <div class="stat-card"><div class="stat-label">ROI</div><div class="stat-value" id="h-roi">–</div></div>
     </div>
+    <div id="combo-stats" style="display:none;background:#0d1b2a;border:1px solid #5d4037;border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-weight:700;color:#ffcc80;font-size:14px;margin-bottom:8px">🎰 Kombi tippek (külön)</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:#cfd8dc">
+        <span>✅ <b id="c-won">0</b></span>
+        <span>❌ <b id="c-lost">0</b></span>
+        <span>⏳ <b id="c-pend">0</b></span>
+        <span>Profit: <b id="c-profit">–</b></span>
+        <span>ROI: <b id="c-roi">–</b></span>
+      </div>
+      <div id="combo-history" style="margin-top:10px"></div>
+    </div>
     <div id="history-list"><div class="empty">Még nincsenek rögzített tippek.</div></div>
   </div>
 </div>
 
 <script>
-let aiTips = [], history = [];
+let aiTips = [], comboTips = [], history = [];
 let msRemaining = 0;
 let dayCounter = 0;
 
@@ -285,8 +302,28 @@ function aiTipHTML(t, showResult) {
   </div>`;
 }
 
+function comboCardHTML(c, showResult) {
+  const legs = (c.legs||[]).map(l =>
+    `<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#cfd8dc;padding:3px 0;border-bottom:1px solid #16223d">
+       <span>${l.match} — <b>${l.pick}</b></span><span style="color:#90a4ae">${l.odds}</span>
+     </div>`).join("");
+  const payoutLine = (showResult && typeof c.comboPayout==="number")
+    ? `<div style="font-size:12px;color:#90a4ae;margin-top:4px">Kifizetés: x${c.comboPayout}</div>` : "";
+  return `
+  <div class="tip-card" style="border-color:#5d4037">
+    <div class="tip-top">
+      <span class="bdg" style="background:#4e342e;color:#ffcc80">🎰 ${c.legN} LÁBAS KOMBI</span>
+      <span class="bdg" style="background:#3e2723;color:#ffcc80;margin-left:auto">Össz odds: ${c.odds}</span>
+    </div>
+    <div style="margin:6px 0">${legs}</div>
+    <div class="tip-note" style="color:#8d6e63">💡 ${c.note||"Csak az izgalom kedvéért"}</div>
+    ${payoutLine}
+    ${showResult?`<div class="tip-actions">${resBadge(c.result)}</div>`:""}
+  </div>`;
+}
+
 function tipHTML(t, showResult) {
-  return aiTipHTML(t, showResult);
+  return t.type==="combo" ? comboCardHTML(t, showResult) : aiTipHTML(t, showResult);
 }
 
 function renderTips() {
@@ -294,6 +331,14 @@ function renderTips() {
   document.getElementById("ai-list").innerHTML = sa.length
     ? sa.map(t=>aiTipHTML(t,false)).join("")
     : `<div class="no-value">📭 Jelenleg nincs kiadott tipp.</div>`;
+  const sc = [...comboTips].filter(t=>!t.result||t.result==="pending");
+  const wrap = document.getElementById("combo-wrap");
+  if (sc.length) {
+    wrap.style.display = "";
+    document.getElementById("combo-list").innerHTML = sc.map(c=>comboCardHTML(c,false)).join("");
+  } else {
+    wrap.style.display = "none";
+  }
 }
 
 function tipProfit(t) {
@@ -314,9 +359,35 @@ function subStats(tips) {
 }
 
 function renderHistory() {
+  // ── Kombi statisztika (külön a singlektől) ──
+  const combos = history.filter(t => t.type === "combo");
+  const cStats = document.getElementById("combo-stats");
+  if (combos.length) {
+    cStats.style.display = "";
+    const cWon  = combos.filter(t=>t.result==="won").length;
+    const cLost = combos.filter(t=>t.result==="lost").length;
+    const cPend = combos.filter(t=>!t.result||t.result==="pending").length;
+    const cSet  = combos.filter(t=>["won","lost","push"].includes(t.result));
+    const cProfit = cSet.reduce((a,t)=>{
+      const payout = typeof t.comboPayout==="number" ? t.comboPayout : (t.result==="won"?parseFloat(t.odds):t.result==="push"?1:0);
+      return a + (payout - 1);
+    },0);
+    const cRoi = cSet.length ? (cProfit/cSet.length*100).toFixed(1) : null;
+    const cCol = cProfit>0?"#69f0ae":cProfit<0?"#ef9a9a":"#90a4ae";
+    document.getElementById("c-won").textContent  = cWon;
+    document.getElementById("c-lost").textContent = cLost;
+    document.getElementById("c-pend").textContent = cPend;
+    const cp=document.getElementById("c-profit"); cp.textContent=cSet.length?(cProfit>=0?"+":"")+cProfit.toFixed(2):"–"; cp.style.color=cCol;
+    const cr=document.getElementById("c-roi");    cr.textContent=cRoi!=null?(cProfit>=0?"+":"")+cRoi+"%":"–"; cr.style.color=cCol;
+    const sorted=[...combos].sort((a,b)=>(b.addedAt||"").localeCompare(a.addedAt||""));
+    document.getElementById("combo-history").innerHTML = sorted.map(c=>comboCardHTML(c,true)).join("");
+  } else {
+    cStats.style.display = "none";
+  }
+
   // Csak foci AI tippek: a value tippeket és a nem-foci sportágakat kihagyjuk.
   const isFoci = t => /soccer|foci|⚽/i.test((t.sport||"")+" "+(t.sportLabel||""));
-  const H = history.filter(t => t.type !== "value" && isFoci(t));
+  const H = history.filter(t => t.type !== "value" && t.type !== "combo" && isFoci(t));
 
   const won      = H.filter(t=>t.result==="won").length;
   const lost     = H.filter(t=>t.result==="lost").length;
@@ -491,6 +562,7 @@ async function loadTips() {
     if (!r.ok) throw new Error("HTTP "+r.status);
     const d = await r.json();
     aiTips    = Array.isArray(d.aiTips)?d.aiTips:[];
+    comboTips = Array.isArray(d.comboTips)?d.comboTips:[];
     tipsEverLoaded = true;
     tipsRetryDelay = 3000;
     tipsErrLogged  = false;
