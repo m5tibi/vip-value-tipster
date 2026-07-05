@@ -508,10 +508,15 @@ async function afFixturesForDate(dateStr, cache) {
   try {
     const r = await fetch(`https://v3.football.api-sports.io/fixtures?date=${dateStr}`,
       { headers: { "x-apisports-key": APIFOOTBALL_KEY } });
-    if (!r.ok) { console.log(`API-Football HTTP ${r.status}`); cache[dateStr] = null; return null; }
-    const j = await r.json();
-    cache[dateStr] = Array.isArray(j.response) ? j.response : [];
-    return cache[dateStr];
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { console.log(`API-Football HTTP ${r.status} (${dateStr})`); cache[dateStr] = null; return null; }
+    const errs = j.errors;
+    const hasErr = errs && (Array.isArray(errs) ? errs.length : Object.keys(errs).length);
+    if (hasErr) { console.log(`API-Football hibaüzenet (${dateStr}): ${JSON.stringify(errs)}`); cache[dateStr] = null; return null; }
+    const list = Array.isArray(j.response) ? j.response : [];
+    console.log(`API-Football ${dateStr}: ${list.length} meccs`);
+    cache[dateStr] = list;
+    return list;
   } catch (e) { console.error("API-Football hiba:", e.message); cache[dateStr] = null; return null; }
 }
 // Visszatér: { home, away, status } a 90 perces eredménnyel, vagy null ha nincs megbízható párosítás.
@@ -807,9 +812,26 @@ app.listen(PORT, () => console.log(`VIP Tipster fut: http://localhost:${PORT}`))
 if (!ADMIN_PWD) {
   console.warn("⚠️  FIGYELEM: ADMIN_PASSWORD nincs beállítva – az admin végpontok (törlés, eredményjelölés, stat-küldés, frissítés) VÉDTELENEK! Állítsd be a Render Environment Variables között.");
 }
-console.log(APIFOOTBALL_KEY
-  ? "✓ API-Football bekötve – a kiértékelés a 90 perces (rendes idejű) eredményt használja."
-  : "ℹ️  API-Football kulcs (APIFOOTBALL_KEY) nincs beállítva – a kiértékelés az odds API végeredményét használja (kieséses/hosszabbításos meccseknél pontatlan lehet).");
+if (APIFOOTBALL_KEY) {
+  (async () => {
+    try {
+      const r = await fetch("https://v3.football.api-sports.io/status", { headers: { "x-apisports-key": APIFOOTBALL_KEY } });
+      const j = await r.json().catch(() => ({}));
+      const errs = j.errors;
+      const hasErr = errs && (Array.isArray(errs) ? errs.length : Object.keys(errs).length);
+      if (!r.ok || hasErr) {
+        console.warn(`⚠️  API-Football kulcs NEM működik a közvetlen végponton (HTTP ${r.status}) – hiba: ${JSON.stringify(errs || {})}. Ha RapidAPI-n fizettél elő, a kulcs csak a RapidAPI végponton jó – szólj, és átírom a kódot arra.`);
+        return;
+      }
+      const sub = j.response?.subscription, req = j.response?.requests;
+      console.log(`✓ API-Football bekötve – plan: ${sub?.plan}, aktív: ${sub?.active}, kérések ma: ${req?.current}/${req?.limit_day}. A kiértékelés a 90 perces eredményt használja.`);
+    } catch (e) {
+      console.warn("⚠️  API-Football státusz-ellenőrzés sikertelen:", e.message);
+    }
+  })();
+} else {
+  console.log("ℹ️  API-Football kulcs (APIFOOTBALL_KEY) nincs beállítva – a kiértékelés az odds API végeredményét használja (kieséses/hosszabbításos meccseknél pontatlan lehet).");
+}
 
 const lastRun = loadLastRun();
 if (lastRun) console.log(`Utolsó futás: ${Math.round((Date.now() - new Date(lastRun).getTime()) / 60000)} perce`);
