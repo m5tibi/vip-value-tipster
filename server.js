@@ -379,13 +379,11 @@ async function fetchAndProcess() {
   // élő tippjeit is, nem csak a mostani futás eredményét (így egy új lekérdezés hozzáad, nem cserél).
   aiTips = history.filter(t => t.type === "ai" && (!t.result || t.result === "pending"));
 
-  // Kombi tippek (külön, csak az izgalom kedvéért) – csak ha jött új single ebben a futásban
-  let freshCombos = [];
-  if (fresh.length) {
-    const combos = buildCombos(aiTips);
-    freshCombos = combos.filter(c => !history.some(t => t.id === c.id));
-    if (freshCombos.length) { history = [...freshCombos, ...history]; saveHistory(); }
-  }
+  // Kombi tippek (külön, csak az izgalom kedvéért) – a jelenlegi élő (pending) singlekből,
+  // KÜLÖNBÖZŐ meccsekről. Minden lekérdezéskor összeáll, duplikátumot nem gyárt.
+  const combos = buildCombos(aiTips);
+  const freshCombos = combos.filter(c => !history.some(t => t.id === c.id));
+  if (freshCombos.length) { history = [...freshCombos, ...history]; saveHistory(); }
   comboTips = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
 
   let msg = `🏆 <b>AI Foci Tippek – ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</b>\n\n`;
