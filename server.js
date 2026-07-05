@@ -14,7 +14,6 @@ const TG_BOT_TOKEN  = process.env.TG_BOT_TOKEN;
 const TG_CHAT_ID    = process.env.TG_CHAT_ID;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const FOOTBALLDATA_TOKEN = process.env.FOOTBALLDATA_TOKEN;   // opcionális: 90 perces eredményhez (football-data.org)
-const EOD_HOUR      = 23;
 const DATA_FILE     = "/data/history.json";
 const SCHEDULE_FILE = "/data/lastRun.json";
 
@@ -514,32 +513,46 @@ function fdScore90(m) {
   const s = m.score || {};
   return pick(s.regularTime) || pick(s.fullTime);
 }
-async function fdRecentMatches(cache) {
+async function fdMatchesForDate(dateStr, cache) {
   if (!FOOTBALLDATA_TOKEN) return null;
-  if ("recent" in cache) return cache.recent;
-  const from = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10);   // utolsó ~3 nap
-  const to   = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);   // +holnap (dateTo exkluzív)
-  try {
-    const r = await fetch(`https://api.football-data.org/v4/matches?dateFrom=${from}&dateTo=${to}`,
-      { headers: { "X-Auth-Token": FOOTBALLDATA_TOKEN } });
-    const body = await r.text();
-    if (!r.ok) { console.log(`football-data.org HTTP ${r.status}: ${body.slice(0, 200)}`); cache.recent = null; return null; }
-    const j = JSON.parse(body);
-    const list = Array.isArray(j.matches) ? j.matches : [];
-    console.log(`football-data.org (${from}..${to}): ${list.length} meccs`);
-    cache.recent = list;
-    return list;
-  } catch (e) { console.error("football-data.org hiba:", e.message); cache.recent = null; return null; }
+  if (dateStr in cache) return cache[dateStr];
+  const to = new Date(new Date(dateStr + "T00:00:00Z").getTime() + 86400000).toISOString().slice(0, 10);
+  const url = `https://api.football-data.org/v4/matches?dateFrom=${dateStr}&dateTo=${to}`;   // 1 napos ablak (ingyenes csomag ezt engedi)
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const r = await fetch(url, { headers: { "X-Auth-Token": FOOTBALLDATA_TOKEN } });
+      const body = await r.text();
+      if (r.ok) {
+        const list = Array.isArray(JSON.parse(body).matches) ? JSON.parse(body).matches : [];
+        console.log(`football-data.org ${dateStr}: ${list.length} meccs`);
+        cache[dateStr] = list;
+        return list;
+      }
+      if (attempt === 1) { await new Promise(res => setTimeout(res, 1500)); continue; }   // átmeneti hiba → 1 újrapróba
+      console.log(`football-data.org HTTP ${r.status} (${dateStr}): ${body.slice(0, 150)}`);
+    } catch (e) {
+      if (attempt === 1) { await new Promise(res => setTimeout(res, 1500)); continue; }
+      console.error(`football-data.org hiba (${dateStr}):`, e.message);
+    }
+  }
+  cache[dateStr] = null;
+  return null;
 }
 // Visszatér: { home, away, status } a 90 perces eredménnyel, vagy null ha nincs megbízható párosítás.
 async function regulationScore(game, cache) {
   if (!FOOTBALLDATA_TOKEN) return null;
-  const fx = await fdRecentMatches(cache);
-  if (!fx) return null;
-  const m = fdMatchFixture(game, fx);   // kezdés ±20 perc + normalizált névpárosítás
-  if (m && m.status === "FINISHED") {
-    const sc = fdScore90(m);
-    if (sc && sc.home != null) return { home: sc.home, away: sc.away, status: m.score?.duration || "FINISHED" };
+  const base = new Date(game.commence_time);
+  const dates = [base.toISOString().slice(0, 10)];
+  const nxt = new Date(base.getTime() + 6 * 3600000).toISOString().slice(0, 10);
+  if (nxt !== dates[0]) dates.push(nxt);                            // UTC éjfélen átnyúló kezdés
+  for (const d of dates) {
+    const fx = await fdMatchesForDate(d, cache);
+    if (!fx) continue;
+    const m = fdMatchFixture(game, fx);
+    if (m && m.status === "FINISHED") {
+      const sc = fdScore90(m);
+      if (sc && sc.home != null) return { home: sc.home, away: sc.away, status: m.score?.duration || "FINISHED" };
+    }
   }
   return null;
 }
@@ -687,11 +700,19 @@ function scheduleNextFetch() {
   setTimeout(() => { fetchAndProcess(); scheduleNextFetch(); }, minsUntilNext * 60 * 1000);
 }
 
-// ── Napi stat ─────────────────────────────────────────────
-setInterval(() => {
+// ── Napnyitó: 00:03 eredmény-ellenőrzés, 00:05 statisztika (magyar idő) ──
+let _lastCheckDay = "", _lastStatsDay = "";
+setInterval(async () => {
   const { hour, minute } = getHungarianTime();
-  if (hour === EOD_HOUR && minute === 0) {
-    sendTelegram(buildStatsMsg("Napi statisztika"));
+  const dayKey = todayHU();                       // naponta egyszer, dupla lefutás ellen
+  if (hour === 0 && minute === 3 && _lastCheckDay !== dayKey) {
+    _lastCheckDay = dayKey;
+    console.log("Napnyitó automatikus eredmény-ellenőrzés...");
+    await checkResults();
+  }
+  if (hour === 0 && minute === 5 && _lastStatsDay !== dayKey) {
+    _lastStatsDay = dayKey;
+    await sendTelegram(buildStatsMsg("Napi statisztika"));
   }
 }, 60000);
 
