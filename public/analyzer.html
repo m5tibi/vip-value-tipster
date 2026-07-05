@@ -310,7 +310,7 @@ function analyze(){
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':S.claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body:JSON.stringify({
-        model:'claude-sonnet-4-6',max_tokens:4000,
+        model:'claude-sonnet-4-6',max_tokens:6000,
         tools:[{type:'web_search_20250305',name:'web_search'}],
         messages:[{role:'user',content:prompt}]
       })
@@ -318,7 +318,7 @@ function analyze(){
     .then(function(d){
       var texts=[];
       if(d.content){for(var i=0;i<d.content.length;i++){if(d.content[i].type==='text')texts.push(d.content[i].text);}}
-      var ai=texts.length?texts[texts.length-1]:'Elemzés sikertelen.';
+      var ai=texts.length?texts.map(function(s){return (s||'').trim();}).filter(Boolean).join('\n\n'):'Elemzés sikertelen.';
       ai=ai.replace(/VERDIKT\s*:\s*AJANLOTT/gi,'VERDIKT: \u2705 AJÁNLOTT')
            .replace(/VERDIKT\s*:\s*NEM AJANLOTT/gi,'VERDIKT: \u274C NEM AJÁNLOTT')
            .replace(/VERDIKT\s*:\s*BIZONYTALAN/gi,'VERDIKT: \u26A0\uFE0F BIZONYTALAN')
