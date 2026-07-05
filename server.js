@@ -310,26 +310,30 @@ async function fetchAndProcess() {
   }
 
   const newAiTips = await fetchAiTips(matchList);
-  aiTips = newAiTips;
 
+  // Új tippek hozzáadása a history-hoz (a meglévők megtartásával)
   const existingIds = new Set(history.map(t => t.id));
-  const fresh = aiTips.filter(t => !existingIds.has(t.id));
+  const fresh = newAiTips.filter(t => !existingIds.has(t.id));
   if (fresh.length) { history = [...fresh, ...history]; saveHistory(); }
   saveLastRun();
 
+  // A főoldal MINDEN még le nem zárt (pending) AI tippet mutasson – a korábbi futások
+  // élő tippjeit is, nem csak a mostani futás eredményét (így egy új lekérdezés hozzáad, nem cserél).
+  aiTips = history.filter(t => t.type === "ai" && (!t.result || t.result === "pending"));
+
   let msg = `🏆 <b>AI Foci Tippek – ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</b>\n\n`;
-  if (newAiTips.length) {
-    msg += `🤖 <b>AI ELEMZETT TIPPEK</b>\n<i>Web keresés, forma és statisztika alapján</i>\n\n`;
-    newAiTips.forEach(t => {
+  if (fresh.length) {
+    msg += `🤖 <b>ÚJ AI TIPPEK</b>\n<i>Web keresés, forma és statisztika alapján</i>\n\n`;
+    fresh.forEach(t => {
       msg += `${t.sportLabel} <b>${t.match}</b>\n`;
       if (t.commence) msg += `🕐 ${t.commence}\n`;
       msg += `📌 ${t.market} → <b>${t.pick}</b>\n💰 Odds: ${t.odds}\n💡 ${t.note}\n\n`;
     });
   } else {
-    msg += `Ma nincs kiadott tipp.\n`;
+    msg += `Ebben a futásban nincs új tipp.\n`;
   }
   await sendTelegram(msg);
-  console.log(`Frissítve – ${newAiTips.length} AI tipp`);
+  console.log(`Frissítve – ${fresh.length} új AI tipp (összes élő: ${aiTips.length})`);
 }
 
 // ── football-data.org: 90 perces (rendes idejű) eredmény ──
