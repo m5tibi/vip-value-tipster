@@ -65,8 +65,9 @@ console.log(`History betöltve: ${history.length} tipp`);
 // FONTOS: dátumtól függetlenül minden pending tipp visszakerül, mert egy tipp
 // gyakran az előző napon lett felvéve a mai/esti meccsre – ezeknek is látszaniuk kell.
 let latestTips = [];   // (megszűnt value tippek – üresen tartva a kompatibilitásért)
-let aiTips     = history.filter(t => t.type === "ai" && (!t.result || t.result === "pending"));
-console.log(`Visszaállítva: ${aiTips.length} AI tipp`);
+let aiTips     = history.filter(t => t.type === "ai"    && (!t.result || t.result === "pending"));
+let comboTips  = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
+console.log(`Visszaállítva: ${aiTips.length} AI tipp + ${comboTips.length} kombi`);
 
 // ── Magyar idő ────────────────────────────────────────────
 function getHungarianTime() {
@@ -165,9 +166,34 @@ function calcStats() {
   return { total: tips.length, won, lost, push, halfWon, halfLost, pend, wr, profitStr, roiStr };
 }
 
+// Egy kombi profitja egységben (comboPayout - 1); lezáratlannál 0.
+function comboProfit(t) {
+  if (!SETTLED.includes(t.result)) return 0;
+  const payout = t.comboPayout != null ? t.comboPayout
+               : (t.result === "won" ? (parseFloat(t.odds) || 0) : t.result === "push" ? 1 : 0);
+  return payout - 1;
+}
+// ── Kombi statisztika (külön a singlektől) ────────────────
+function calcComboStats() {
+  const c       = history.filter(t => t.type === "combo");
+  const settled = c.filter(t => SETTLED.includes(t.result));
+  const won     = c.filter(t => t.result === "won").length;
+  const lost    = c.filter(t => t.result === "lost").length;
+  const pend    = c.filter(t => !t.result || t.result === "pending").length;
+  const profit  = settled.reduce((s,t) => s + comboProfit(t), 0);
+  const roi     = settled.length ? ((profit/settled.length)*100).toFixed(1) : "–";
+  return { total: c.length, won, lost, pend, settled: settled.length,
+    profitStr: settled.length ? (profit>=0?"+":"")+profit.toFixed(2) : "–",
+    roiStr: roi!=="–" ? (profit>=0?"+":"")+roi+"%" : "–" };
+}
+
 function buildStatsMsg(title) {
   const { total, won, lost, push, halfWon, halfLost, pend, wr, profitStr, roiStr } = calcStats();
   const pushTotal = push + halfWon + halfLost;   // a fél eredmények a visszajárhoz számítanak
+  const cs = calcComboStats();
+  const comboSection = cs.total ? `\n\n🎰 <b>Kombi tippek</b> <i>(külön)</i>\n`+
+    `Nyert/Vesztett: <b>${cs.won}</b> / <b>${cs.lost}</b> (folyamatban: ${cs.pend})\n`+
+    `Profit: <b>${cs.profitStr} egység</b> · ROI: <b>${cs.roiStr}</b>` : "";
   return `📈 <b>${title}</b>\n`+
     `📅 ${new Date().toLocaleDateString("hu-HU")}\n`+
     `<i>Csak foci tippek (value nélkül)</i>\n\n`+
@@ -180,7 +206,8 @@ function buildStatsMsg(title) {
     `📉 <b>Teljesítmény</b>\n`+
     `Win %: <b>${wr}</b>\n`+
     `Profit: <b>${profitStr} egység</b>\n`+
-    `ROI: <b>${roiStr}</b>`;
+    `ROI: <b>${roiStr}</b>`+
+    comboSection;
 }
 
 // ── AI tippek ─────────────────────────────────────────────
@@ -234,6 +261,37 @@ Válaszolj KIZÁRÓLAG JSON tömbként, semmi más szöveg nélkül:
       result: "pending"
     }));
   } catch (e) { console.error("AI tipp hiba:", e.message); return []; }
+}
+
+// ── Kombi tippek (csak az izgalom kedvéért) ───────────────
+// 2-es és 3-as kötések a pending single tippekből, KÜLÖNBÖZŐ meccsekről.
+// Meccsenként a legbiztonságosabb (legalacsonyabb oddsú) lábat választjuk.
+// Minden láb a forrás single tippre hivatkozik (singleId) → a kiértékelés a single
+// 90 perces lezárását használja, a kombi csak összegzi a lábak eredményét.
+function buildCombos(singles) {
+  const byMatch = {};
+  for (const t of singles) {
+    if (!byMatch[t.match] || t.odds < byMatch[t.match].odds) byMatch[t.match] = t;
+  }
+  const pool = Object.values(byMatch).sort((a, b) => a.odds - b.odds);   // legbiztosabb elöl
+  const mk = (tips, n) => {
+    const legs = tips.map(t => ({
+      singleId: t.id, match: t.match, sportLabel: t.sportLabel,
+      market: t.market, pick: t.pick, odds: t.odds, commence: t.commence || null
+    }));
+    const odds = parseFloat(legs.reduce((p, l) => p * l.odds, 1).toFixed(2));
+    const id   = "combo-" + n + "-" + legs.map(l => l.singleId).sort().join("_");
+    return {
+      id, type: "combo", legN: n, legs, odds, comboPayout: null,
+      note: `${n} lábas kötés – csak az izgalom kedvéért`,
+      addedAt: new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" }),
+      result: "pending"
+    };
+  };
+  const combos = [];
+  if (pool.length >= 2) combos.push(mk(pool.slice(0, 2), 2));
+  if (pool.length >= 3) combos.push(mk(pool.slice(0, 3), 3));
+  return combos;
 }
 
 // ── Fő frissítő ───────────────────────────────────────────
@@ -321,6 +379,15 @@ async function fetchAndProcess() {
   // élő tippjeit is, nem csak a mostani futás eredményét (így egy új lekérdezés hozzáad, nem cserél).
   aiTips = history.filter(t => t.type === "ai" && (!t.result || t.result === "pending"));
 
+  // Kombi tippek (külön, csak az izgalom kedvéért) – csak ha jött új single ebben a futásban
+  let freshCombos = [];
+  if (fresh.length) {
+    const combos = buildCombos(aiTips);
+    freshCombos = combos.filter(c => !history.some(t => t.id === c.id));
+    if (freshCombos.length) { history = [...freshCombos, ...history]; saveHistory(); }
+  }
+  comboTips = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
+
   let msg = `🏆 <b>AI Foci Tippek – ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</b>\n\n`;
   if (fresh.length) {
     msg += `🤖 <b>ÚJ AI TIPPEK</b>\n<i>Web keresés, forma és statisztika alapján</i>\n\n`;
@@ -332,8 +399,16 @@ async function fetchAndProcess() {
   } else {
     msg += `Ebben a futásban nincs új tipp.\n`;
   }
+  if (freshCombos.length) {
+    msg += `\n🎰 <b>KOMBI TIPPEK</b> <i>(csak az izgalom kedvéért)</i>\n\n`;
+    freshCombos.forEach(c => {
+      msg += `<b>${c.legN} lábas kötés – Össz odds: ${c.odds}</b>\n`;
+      c.legs.forEach(l => { msg += `  • ${l.match}: ${l.pick} (${l.odds})\n`; });
+      msg += `\n`;
+    });
+  }
   await sendTelegram(msg);
-  console.log(`Frissítve – ${fresh.length} új AI tipp (összes élő: ${aiTips.length})`);
+  console.log(`Frissítve – ${fresh.length} új AI tipp, ${freshCombos.length} új kombi (élő: ${aiTips.length} single, ${comboTips.length} kombi)`);
 }
 
 // ── football-data.org: 90 perces (rendes idejű) eredmény ──
@@ -496,6 +571,30 @@ async function checkResults() {
       }
     } catch (e) { console.error(`Scores hiba (${sportKey}):`, e.message); }
   }
+
+  // ── Kombik kiértékelése a lábak (single tippek) eredménye alapján ──
+  for (const combo of history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"))) {
+    const singles = combo.legs.map(leg => history.find(t => t.id === leg.singleId));
+    if (singles.some(s => !s || !s.result || s.result === "pending")) continue;   // van még nyitott láb
+    const mults = singles.map((s, i) => {
+      const o = parseFloat(combo.legs[i].odds) || 0;
+      switch (s.result) {
+        case "won":       return o;             // nyertes láb: az odds
+        case "half_won":  return (1 + o) / 2;   // fél nyerés
+        case "push":      return 1;             // visszajár: kiesik a szorzatból
+        case "half_lost": return 0.5;           // fél veszteség
+        default:          return 0;             // vesztes láb → az egész kombi bukik
+      }
+    });
+    const payout = mults.reduce((a, b) => a * b, 1);
+    const result = payout > 1.0001 ? "won" : payout < 0.9999 ? "lost" : "push";
+    const patch  = { result, comboPayout: parseFloat(payout.toFixed(2)), settledAt: nowHu() };
+    history   = history.map(t => t.id === combo.id ? { ...t, ...patch } : t);
+    comboTips = comboTips.map(t => t.id === combo.id ? { ...t, ...patch } : t);
+    changed = true;
+    console.log(`  KOMBI (${combo.legN} lábas) → ${result} (kifizetés x${patch.comboPayout})`);
+  }
+
   if (changed) { saveHistory(); console.log("Eredmények mentve ✓"); }
   else console.log("Nincs új lezárt meccs.");
 }
@@ -552,7 +651,7 @@ function requireAdmin(req, res) {
 }
 
 // ── API végpontok ─────────────────────────────────────────
-app.get("/api/tips",    (req, res) => res.json({ aiTips }));
+app.get("/api/tips",    (req, res) => res.json({ aiTips, comboTips }));
 app.get("/api/history", (req, res) => res.json(history));
 
 app.get("/api/status", (req, res) => {
@@ -594,6 +693,7 @@ app.delete("/api/history", (req, res) => {
   history    = [];
   latestTips = [];
   aiTips     = [];
+  comboTips  = [];
   saveHistory();
   console.log("History törölve ✓");
   res.json({ ok: true });
