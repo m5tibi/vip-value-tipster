@@ -1,486 +1,561 @@
 <!DOCTYPE html>
 <html lang="hu">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VIP Fogadás Elemző</title>
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{background:#0c0e14;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;min-height:100vh}
-    .hdr{background:linear-gradient(135deg,#1a1d2e,#12141f);border-bottom:1px solid #2a2d3e;padding:16px 22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
-    .htitle{font-size:19px;font-weight:800;background:linear-gradient(90deg,#a78bfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-    .hsub{font-size:11px;color:#6b7280;margin-top:2px}
-    .hright{display:flex;align-items:center;gap:8px}
-    .back{background:#1a1d2e;border:1px solid #2a2d3e;border-radius:8px;padding:7px 13px;font-size:12px;font-weight:600;color:#94a3b8;text-decoration:none}
-    .bdg{display:inline-flex;align-items:center;gap:5px;border-radius:20px;padding:5px 11px}
-    .dot{width:6px;height:6px;border-radius:50%}
-    .tabs{display:flex;gap:4px;padding:12px 22px 0;border-bottom:1px solid #1e2130}
-    .body{padding:20px 22px;max-width:700px;margin:0 auto}
-    .card{background:#12141f;border:1px solid #1e2130;border-radius:12px;padding:18px;margin-bottom:14px}
-    .lbl{font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:block}
-    .inp{width:100%;background:#1a1d2e;border:1px solid #2a2d3e;border-radius:8px;padding:10px 14px;color:#e2e8f0;font-size:14px;outline:none}
-    .inp::placeholder{color:#4b5563}
-    .tarea{width:100%;background:#1a1d2e;border:1px solid #2a2d3e;border-radius:10px;padding:14px;color:#e2e8f0;font-size:15px;outline:none;resize:vertical;min-height:100px;line-height:1.6;font-family:inherit}
-    .tarea::placeholder{color:#4b5563}
-    .tarea:focus{border-color:#7c3aed88}
-    .btn{border:none;border-radius:9px;font-weight:700;cursor:pointer}
-    .btn-p{background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff}
-    .btn-off{background:#1e2130;color:#4b5563;cursor:not-allowed}
-    .btn-del{background:#1f0707;border:1px solid #f8717133;color:#f87171}
-    .bfull{width:100%;padding:14px;font-size:15px}
-    .bsm{padding:9px 14px;font-size:13px}
-    .ex-btn{display:inline-block;background:#1a1d2e;border:1px solid #2a2d3e;border-radius:20px;padding:5px 12px;font-size:12px;color:#94a3b8;cursor:pointer;margin:4px 4px 4px 0}
-    .sec-hdr{font-weight:700;font-size:13px;color:#a78bfa;margin-top:16px;margin-bottom:5px;padding-bottom:6px;border-bottom:1px solid #1e2130}
-    .aitext{font-size:14px;line-height:1.8;color:#cbd5e1}
-    .verdict-box{margin-top:16px;padding:14px 18px;border-radius:10px;text-align:center;font-size:17px;font-weight:800}
-    .div{border-top:1px solid #1e2130;padding-top:14px;margin-top:8px}
-    .fbw{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px}
-    .kmask{background:#1a1d2e;border-radius:8px;padding:10px 14px;font-family:monospace;font-size:13px;color:#6b7280;letter-spacing:1px;margin-bottom:12px}
-    .pwrap{position:relative}
-    .ptgl{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#6b7280;cursor:pointer;font-size:16px}
-    .imono{font-family:monospace;font-size:13px;padding-right:44px}
-    .ob{max-width:480px;margin:0 auto;padding:24px 22px}
-    .step{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px}
-    .snum{width:24px;height:24px;border-radius:50%;background:#7c3aed22;border:1px solid #7c3aed55;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#a78bfa;flex-shrink:0}
-    @media(max-width:600px){.body{padding:14px 16px}}
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Foci Tippek</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #07111d; color: #e0f7fa; font-family: sans-serif; padding: 18px 14px; }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .title { font-size: 20px; font-weight: 700; color: #00e676; }
+  .sub { font-size: 11px; color: #546e7a; }
+  .cd { font-size: 12px; color: #546e7a; background: #0d1b2a; border: 1px solid #1e3a2f; border-radius: 8px; padding: 4px 10px; }
+  .cd b { color: #ffe082; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
+  .tab { background: #0d1b2a; color: #80cbc4; border: 1px solid #1e3a2f; border-radius: 8px; padding: 7px 18px; font-weight: 700; font-size: 14px; cursor: pointer; }
+  .tab.active { background: #00e676; color: #07111d; border-color: #00e676; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+  .last-update { font-size: 12px; color: #546e7a; }
+  .btn-refresh { background: #00e676; color: #07111d; border: none; border-radius: 10px; padding: 9px 20px; font-weight: 700; font-size: 14px; cursor: pointer; }
+  .btn-refresh:disabled { background: #1b3a2a; color: #80cbc4; cursor: not-allowed; }
+  .section-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .section-sub { font-size: 11px; color: #546e7a; margin-bottom: 12px; }
+  .divider { border: none; border-top: 1px solid #1e3a2f; margin: 20px 0; }
+  .tip-card { border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
+  .tip-card.value { background: linear-gradient(135deg,#0d1b2a 80%,#0a2a1a 100%); border: 1px solid #1e3a2f; }
+  .tip-card.ai    { background: linear-gradient(135deg,#0d1b2a 80%,#1a1a2a 100%); border: 1px solid #2a1e3f; }
+  .tip-top { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  .tip-match { color: #e0f7fa; font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+  .tip-time { font-size: 11px; color: #546e7a; margin-bottom: 6px; }
+  .tip-market { background: #1b3a3a; border-radius: 6px; padding: 2px 9px; margin-right: 6px; color: #80cbc4; font-size: 13px; }
+  .tip-pick { color: #b2dfdb; font-size: 13px; }
+  .tip-odds-row { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: #90a4ae; margin: 6px 0; }
+  .tip-kelly { font-size: 12px; color: #ffe082; margin-top: 2px; }
+  .tip-note { color: #78909c; font-size: 12px; margin-top: 6px; line-height: 1.5; }
+  .tip-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+  .bdg { border-radius: 6px; font-weight: 700; font-size: 12px; padding: 2px 9px; display: inline-block; }
+  .bdg-value { background: #1b3a2a; color: #00e676; }
+  .bdg-ai    { background: #2a1e3f; color: #b39ddb; }
+  .bdg-won   { background: #1b5e20; color: #69f0ae; }
+  .bdg-lost  { background: #7f0000; color: #ef9a9a; }
+  .bdg-push  { background: #1a237e; color: #90caf9; }
+  .bdg-pend  { background: #263238; color: #78909c; }
+  button { cursor: pointer; font-family: sans-serif; }
+  .btn-won  { background: #1b5e20; color: #69f0ae; border: none; border-radius: 6px; padding: 3px 12px; font-size: 12px; font-weight: 600; }
+  .btn-lost { background: #7f0000; color: #ef9a9a; border: none; border-radius: 6px; padding: 3px 12px; font-size: 12px; font-weight: 600; }
+  .btn-push { background: #1a237e; color: #90caf9; border: none; border-radius: 6px; padding: 3px 12px; font-size: 12px; font-weight: 600; }
+  .btn-send { background: #1e3a2f; color: #00e676; border: 1px solid #00e676; border-radius: 8px; padding: 6px 14px; font-weight: 600; font-size: 13px; }
+  .btn-del  { background: #1a0808; color: #ef9a9a; border: 1px solid #7f0000; border-radius: 8px; padding: 6px 14px; font-weight: 600; font-size: 13px; }
+  .no-value { background: #0d1b2a; border: 1px solid #1e3a2f; border-radius: 10px; padding: 14px 16px; color: #546e7a; font-size: 13px; margin-bottom: 12px; }
+  .tg-status { background: #0d1b2a; border: 1px solid #1e3a2f; border-radius: 8px; padding: 8px 14px; margin-bottom: 12px; font-size: 13px; color: #00e676; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin-bottom: 16px; }
+  .stat-card { background: #0d1b2a; border: 1px solid #1e3a2f; border-radius: 10px; padding: 10px 8px; text-align: center; }
+  .stat-label { font-size: 11px; color: #546e7a; }
+  .stat-value { font-size: 20px; font-weight: 700; color: #00e676; }
+  .empty { text-align: center; color: #37474f; padding: 30px; font-size: 14px; }
+  .section-header { font-weight: 700; font-size: 14px; margin: 16px 0 8px; padding: 8px 12px; border-radius: 8px; }
+  .day-section { margin-bottom: 6px; border: 1px solid #1e3a2f; border-radius: 10px; overflow: hidden; }
+  .day-toggle { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #0d1b2a; cursor: pointer; user-select: none; }
+  .day-toggle:hover { background: #112233; }
+  .day-label { font-size: 13px; font-weight: 700; color: #80cbc4; }
+  .day-meta { font-size: 11px; color: #546e7a; margin-right: 8px; }
+  .day-arrow { color: #546e7a; font-size: 11px; transition: transform 0.2s; }
+  .day-arrow.open { transform: rotate(180deg); }
+  .day-content { padding: 10px 10px 4px; }
+  .month-section { margin: 8px 0 6px; border: 1px solid #2a3550; border-radius: 10px; overflow: hidden; }
+  .month-toggle { display: flex; justify-content: space-between; align-items: center; padding: 11px 14px; background: #101a30; cursor: pointer; user-select: none; }
+  .month-toggle:hover { background: #16223d; }
+  .month-label { font-size: 13px; font-weight: 700; color: #b39ddb; }
+  .month-content { padding: 6px 6px 2px; }
+  .stats-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+</style>
 </head>
 <body>
-<div id="root"><div style="padding:40px;text-align:center;color:#6b7280">Betöltés...</div></div>
+<div class="wrap">
+  <div class="header">
+    <div>
+      <div class="title">AI Foci Tippek</div>
+      <div class="sub" id="today"></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    </div>
+  </div>
+
+  <div id="tg-status" class="tg-status" style="display:none"></div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('tips')">📊 Mai tippek</button>
+    <button class="tab" onclick="switchTab('history')">📁 Előzmények</button>
+    <a href="/analyzer.html" style="text-decoration:none;padding:7px 18px;background:#0d1b2a;color:#80cbc4;border:1px solid #1e3a2f;border-radius:8px;font-weight:700;font-size:14px">⚡ Elemző</a>
+  </div>
+
+  <!-- Kinyitható leírás -->
+  <div style="margin-bottom:14px;background:#0d1b2a;border:1px solid #1e3a2f;border-radius:10px;overflow:hidden">
+    <div onclick="var b=document.getElementById('guide-body');var a=document.getElementById('guide-arr');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▼':'▲'"
+         style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer">
+      <div style="font-size:14px;font-weight:700;color:#00e676">📖 Hogyan működik az AI Foci Tippek?</div>
+      <span id="guide-arr" style="color:#546e7a;font-size:12px">▼</span>
+    </div>
+    <div id="guide-body" style="display:none;padding:0 16px 16px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px">
+        <div style="background:#07111d;border:1px solid #1e3a2f;border-radius:8px;padding:12px">
+          <div style="font-size:13px;font-weight:700;color:#b39ddb;margin-bottom:6px">🤖 AI foci tippek</div>
+          <div style="font-size:12px;color:#78909c;line-height:1.6">A Claude AI valós <strong style="color:#b2dfdb">web keresést</strong> végez, és <strong style="color:#b2dfdb">csapat forma, sérülések, motiváció, H2H előzmények</strong> alapján elemzi a napi foci meccseket, majd ad 2–3 konkrét tippet — csak a legerősebb lehetőségeket.</div>
+        </div>
+      </div>
+      <div style="border-top:1px solid #1e3a2f;padding-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">
+        <div style="font-size:12px;color:#546e7a;line-height:1.7">
+          🔄 <strong style="color:#80cbc4">Mikor frissül?</strong><br>
+          A rendszer <strong style="color:#e0f7fa">csak manuálisan</strong> frissül az admin által. Az új tippek és elemzések akkor jelennek meg, amikor a rendszergazda elindítja a frissítést.
+        </div>
+        <div style="font-size:12px;color:#546e7a;line-height:1.7">
+          🕐 <strong style="color:#80cbc4">Mikor érdemes ellenőrizni?</strong><br>
+          Legjobb <strong style="color:#e0f7fa">mérkőzések előtt 1–3 órával</strong> visszanézni — a frissítés általában délelőtt vagy kora délután történik.
+        </div>
+        <div style="font-size:12px;color:#546e7a;line-height:1.7">
+          💰 <strong style="color:#80cbc4">Mennyibe kerül?</strong><br>
+          Az előfizetők számára <strong style="color:#00e676">ingyenes</strong> — a rendszer fenntartási költségét a havi előfizetési díj fedezi.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TIPS TAB -->
+  <div id="tab-tips">
+    <div class="toolbar">
+      <div class="last-update" id="last-update">Még nem futott elemzés</div>
+      <button class="btn-refresh" id="btn-refresh" onclick="refresh()" style="display:none">🔄 Frissítés most</button>
+    </div>
+    <div class="section-title" style="color:#b39ddb">🤖 AI foci tippek</div>
+    <div class="section-sub">Valós web keresés alapján, forma és statisztika elemzéssel</div>
+    <div id="ai-list"><div class="no-value">📭 Jelenleg nincs kiadott tipp.</div></div>
+  </div>
+
+  <!-- HISTORY TAB -->
+  <div id="tab-history-panel" style="display:none">
+    <div class="stats-header">
+      <div style="font-weight:700;color:#00e676;font-size:16px">📊 Előzmény & statisztika</div>
+      <div id="admin-tools" style="display:none;gap:8px;flex-wrap:wrap">
+        <button class="btn-send" onclick="checkResults()">🔍 Eredmények</button>
+        <button class="btn-send" onclick="sendStats()">📲 Küldés</button>
+        <button class="btn-del"  onclick="clearHistory()">🗑️ Törlés</button>
+      </div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Összes</div><div class="stat-value" id="h-total">0</div></div>
+      <div class="stat-card"><div class="stat-label">Folyamatban</div><div class="stat-value" style="color:#90caf9" id="h-pend">0</div></div>
+      <div class="stat-card"><div class="stat-label">Nyert</div><div class="stat-value" style="color:#69f0ae" id="h-won">0</div></div>
+      <div class="stat-card"><div class="stat-label">Vesztett</div><div class="stat-value" style="color:#ef9a9a" id="h-lost">0</div></div>
+      <div class="stat-card"><div class="stat-label">Visszajár</div><div class="stat-value" style="color:#90caf9" id="h-push">0</div></div>
+      <div class="stat-card"><div class="stat-label">Win %</div><div class="stat-value" style="color:#a5d6a7" id="h-wr">–</div></div>
+      <div class="stat-card"><div class="stat-label">Profit (e.)</div><div class="stat-value" id="h-profit">–</div></div>
+      <div class="stat-card"><div class="stat-label">ROI</div><div class="stat-value" id="h-roi">–</div></div>
+    </div>
+    <div id="history-list"><div class="empty">Még nincsenek rögzített tippek.</div></div>
+  </div>
+</div>
+
 <script>
-// ── Biztonságos localStorage ──────────────────────────────
-var KS='vbt_ck', HS='vbt_ah3';
-function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
-function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
-function lsRemove(k){try{localStorage.removeItem(k);}catch(e){}}
+let aiTips = [], history = [];
+let msRemaining = 0;
+let dayCounter = 0;
 
-// ── Állapot ───────────────────────────────────────────────
-var S={
-  screen:'loading', tab:'analyzer',
-  claudeKey:'', keyIn:'', savingKey:false, keyMsg:null,
-  query:'', loading:false, result:null,
-  history:[], expanded:null
-};
-
-var EXAMPLES=[
-  'Belgium - Szenegal; mindket csapat szerez golt + Over 2.5',
-  'Brazilia - Argentina; hazai gyozelem',
-  'Real Madrid - Barcelona; Over 3.5 gol',
-  'Franciaorszag - Marokko; dontetlen vagy hazai gyozelem'
-];
-
-// ── Segédfüggvények ───────────────────────────────────────
-function esc(s){
-  return String(s||'')
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;');
-}
-
-function mk(k){return k.slice(0,14)+'................'+k.slice(-4);}
-
-function simpleHash(s){
-  var h=0;
-  for(var i=0;i<s.length;i++){h=Math.imul(31,h)+s.charCodeAt(i)|0;}
-  return Math.abs(h).toString(36);
-}
-
-function getUid(){return S.claudeKey?simpleHash(S.claudeKey):'';}
-
-function tabSt(name){
-  var a=S.tab===name;
-  return 'style="padding:8px 15px;font-size:13px;font-weight:600;border:none;'+
-    'border-radius:8px 8px 0 0;cursor:pointer;'+
-    'background:'+(a?'#1e2130':'transparent')+';'+
-    'color:'+(a?'#a78bfa':'#6b7280')+'"';
-}
-
-// ── AI szöveg renderelő ───────────────────────────────────
-function renderAI(text){
-  if(!text) return '';
-  // Szekciófejlécek azonosítása (emoji prefixek)
-  var HEADS=['MECCS','HAZAI','VENDEG','H2H','SERULES','FOGADASI','KONTEXTUS','FORMA','ELOZMENYEK','ERTEKELES'];
-  var lines=text.split('\n');
-  var out='';
-  for(var i=0;i<lines.length;i++){
-    var line=lines[i];
-    if(!line.trim()){out+='<br>';continue;}
-    // Elválasztó vonalak kihagyása
-    if(/^[-=]{3,}$/.test(line.trim())){continue;}
-    // Szekciófejléc detektálása: nagybetűs kulcsszóra végződő sor
-    var safe=esc(line);
-    var upper=line.toUpperCase();
-    var isHead=false;
-    for(var j=0;j<HEADS.length;j++){
-      if(upper.indexOf(HEADS[j])!==-1 && line.trim().length<80 &&
-        (line.indexOf(':')===line.length-1 || /^[^\w]/.test(line))){
-        isHead=true; break;
-      }
-    }
-    // Markdown bold kezelése
-    var fmt=safe.replace(/\*\*([^*]+)\*\*/g,'<strong style="color:#e2e8f0">$1</strong>');
-    if(isHead){
-      out+='<div class="sec-hdr">'+fmt+'</div>';
-    } else {
-      out+='<div style="margin-bottom:4px">'+fmt+'</div>';
-    }
+// Admin mód beállítása URL param alapján
+(function(){
+  var p = new URLSearchParams(window.location.search).get('admin');
+  if (p) {
+    localStorage.setItem('vbt_admin', '1');
+    localStorage.setItem('vbt_admin_pwd', p);
+    window.history.replaceState({}, '', '/');
   }
-  return out;
+})();
+function isAdmin() { return localStorage.getItem('vbt_admin') === '1'; }
+function getAdminPwd() { return localStorage.getItem('vbt_admin_pwd') || ''; }
+function adminHeaders(json) {
+  const h = { "x-admin-password": getAdminPwd() };
+  if (json) h["Content-Type"] = "application/json";
+  return h;
+}
+async function handleAdminResp(r, okMsg) {
+  if (r.status === 403) {
+    showStatus("⛔ Nincs admin jogosultság. Nyisd meg az oldalt így: ?admin=JELSZÓ", "#ef9a9a");
+    return false;
+  }
+  if (okMsg) showStatus(okMsg);
+  return true;
 }
 
-// ── Verdikt kinyerése ─────────────────────────────────────
-function getVerdict(ai){
-  if(!ai) return null;
-  var m=ai.match(/VERDIKT\s*:\s*([\u2705\u26A0\u274C][^\n\r]*)/);
-  if(m) return m[1].trim();
-  if(ai.indexOf('AJANLOTT')!==-1||ai.indexOf('AJÁNLOTT')!==-1) return '\u2705 AJÁNLOTT';
-  if(ai.indexOf('BIZONYTALAN')!==-1) return '\u26A0\uFE0F BIZONYTALAN';
-  if(ai.indexOf('NEM AJANLOTT')!==-1||ai.indexOf('NEM AJÁNLOTT')!==-1) return '\u274C NEM AJÁNLOTT';
-  return null;
+document.getElementById("today").textContent = new Date().toLocaleDateString("hu-HU", {year:"numeric",month:"long",day:"numeric"});
+
+function showStatus(msg, color) {
+  const el = document.getElementById("tg-status");
+  el.textContent = msg; el.style.color = color||"#00e676"; el.style.display = "block";
+  setTimeout(() => el.style.display = "none", 4000);
 }
 
-function verdictStyle(v){
-  if(!v) return '';
-  if(v.indexOf('\u2705')!==-1) return 'background:#4ade8018;border:2px solid #4ade8055;color:#4ade80';
-  if(v.indexOf('\u274C')!==-1) return 'background:#f8717118;border:2px solid #f8717155;color:#f87171';
-  return 'background:#fbbf2418;border:2px solid #fbbf2455;color:#fbbf24';
+function switchTab(t) {
+  document.getElementById("tab-tips").style.display          = t==="tips" ? "" : "none";
+  document.getElementById("tab-history-panel").style.display = t==="history" ? "" : "none";
+  document.querySelectorAll(".tab").forEach((b,i) => b.classList.toggle("active",(i===0)===(t==="tips")));
+  if (t==="history") loadHistory();
 }
 
-function stripVerdict(ai){
-  return ai.replace(/\n*VERDIKT\s*:.*$/,'').trim();
+function valueBg(v) { return v>=15?"#00e676":v>=8?"#69f0ae":"#b9f6ca"; }
+
+function resBadge(r) {
+  if (!r||r==="pending") return `<span class="bdg bdg-pend">⏳ Folyamatban</span>`;
+  if (r==="won")       return `<span class="bdg bdg-won">✅ Nyert</span>`;
+  if (r==="half_won")  return `<span class="bdg" style="background:#1b5e20;color:#a5d6a7">½✅ Fél nyert</span>`;
+  if (r==="push")      return `<span class="bdg bdg-push">↩️ Visszajár</span>`;
+  if (r==="half_lost") return `<span class="bdg" style="background:#4e342e;color:#ffab91">½❌ Fél veszt</span>`;
+  return `<span class="bdg bdg-lost">❌ Vesztett</span>`;
 }
 
-// ── Render ────────────────────────────────────────────────
-function R(){
-  try{
-    var howItWorks=
-    '<div class="card" style="border-color:#1e2130;margin-bottom:14px">'+
-    '<div style="font-size:13px;font-weight:700;color:#a78bfa;margin-bottom:10px">Hogyan használd?</div>'+
-    '<div style="font-size:13px;color:#6b7280;line-height:1.7">'+
-    'Írj be bármely foci meccset és fogadási opciót szabad szövegként. A Claude rákeres az aktuális formára, H2H előzményekre, sérülésekre — és javaslatot ad.<br><br>'+
-    '<strong style="color:#94a3b8">Javasolt formátum:</strong> Csapat1 - Csapat2; fogadási opció<br>'+
-    '<span style="color:#4b5563">Pl.: Belgium - Szenegál; mindkét csapat szerez gólt + Over 2.5</span>'+
-    '</div></div>';
+function needsPush(market) {
+  const m = (market||"").toLowerCase();
+  return m.includes("hendikep")||m.includes("over");
+}
 
-    var html=howItWorks+(S.screen==='onboarding'?rOnboard():rApp());
-    document.getElementById('root').innerHTML=html;
-  }catch(e){
-    document.getElementById('root').innerHTML='<div style="padding:20px;color:#f87171">Hiba: '+esc(String(e))+'</div>';
+function actionBtns(t) {
+  if (!isAdmin()) return "";
+  if (t.result && t.result!=="pending") return "";
+  const pb = needsPush(t.market)
+    ? `<button class="btn-push" onclick="setResult('${t.id}','half_won')">½✅</button>
+       <button class="btn-push" onclick="setResult('${t.id}','push')">↩️</button>
+       <button class="btn-push" onclick="setResult('${t.id}','half_lost')">½❌</button>`
+    : "";
+  return `<button class="btn-won" onclick="setResult('${t.id}','won')">✅ Nyert</button>
+          <button class="btn-lost" onclick="setResult('${t.id}','lost')">❌ Vesztett</button>${pb}`;
+}
+
+function parseCommence(c) {
+  if (!c) return 999999999;
+  const m = c.match(/(\d+)[.\-]?\s*(\d+)[.\-]?\s*(\d+):(\d+)/);
+  if (!m) return 999999999;
+  return parseInt(m[1])*1000000+parseInt(m[2])*10000+parseInt(m[3])*100+parseInt(m[4]);
+}
+
+function getDay(addedAt) {
+  if (!addedAt) return "–";
+  const p = addedAt.split(" ");
+  if (p.length >= 3) return p[0]+" "+p[1]+" "+p[2];
+  return "–";
+}
+
+const HU_MONTHS = ["január","február","március","április","május","június","július","augusztus","szeptember","október","november","december"];
+function monthKeyOf(dayKey) {
+  const p = dayKey.split(" ");                 // ["2026.","07.","02."]
+  return p.length>=2 ? p[0]+" "+p[1] : dayKey; // "2026. 07."
+}
+function monthLabel(monthKey) {
+  const p = monthKey.split(" ");
+  const y = (p[0]||"").replace(".","");
+  const mNum = parseInt((p[1]||"").replace(".",""),10);
+  const name = HU_MONTHS[mNum-1] || (p[1]||"");
+  return y+". "+name;                          // "2026. július"
+}
+
+function todayKey() {
+  const s = new Date().toLocaleString("hu-HU",{timeZone:"Europe/Budapest"});
+  const p = s.split(" ");
+  return p.length>=3 ? p[0]+" "+p[1]+" "+p[2] : s;
+}
+function yesterdayKey() {
+  const s = new Date(Date.now()-86400000).toLocaleString("hu-HU",{timeZone:"Europe/Budapest"});
+  const p = s.split(" ");
+  return p.length>=3 ? p[0]+" "+p[1]+" "+p[2] : s;
+}
+
+function aiTipHTML(t, showResult) {
+  return `
+  <div class="tip-card ai">
+    <div class="tip-top">
+      <span class="bdg bdg-ai">🤖 AI</span>
+      <span style="font-size:13px;color:#b39ddb">${t.sportLabel||""}</span>
+      <span class="bdg" style="background:#1565c0;color:#90caf9;margin-left:auto">PRE-MATCH</span>
+    </div>
+    <div class="tip-match">${t.match}</div>
+    ${t.commence?`<div class="tip-time">🕐 ${t.commence}</div>`:""}
+    <div style="margin-bottom:6px"><span class="tip-market">${t.market}</span><span class="tip-pick">${t.pick}</span></div>
+    <div class="tip-odds-row"><span>Odds: <b style="color:#b39ddb">${t.odds}</b></span></div>
+    <div class="tip-note">💡 ${t.note||""}</div>
+    ${showResult?`<div class="tip-actions">${resBadge(t.result)}${actionBtns(t)}</div>`:""}
+  </div>`;
+}
+
+function tipHTML(t, showResult) {
+  return aiTipHTML(t, showResult);
+}
+
+function renderTips() {
+  const sa = [...aiTips].filter(t=>!t.result||t.result==="pending").sort((a,b)=>parseCommence(a.commence)-parseCommence(b.commence));
+  document.getElementById("ai-list").innerHTML = sa.length
+    ? sa.map(t=>aiTipHTML(t,false)).join("")
+    : `<div class="no-value">📭 Jelenleg nincs kiadott tipp.</div>`;
+}
+
+function tipProfit(t) {
+  const o = parseFloat(t.odds)||0;
+  switch (t.result) {
+    case "won":       return o-1;
+    case "half_won":  return (o-1)/2;
+    case "lost":      return -1;
+    case "half_lost": return -0.5;
+    default:          return 0;   // push / pending
   }
 }
-
-// ── localStorage sync ─────────────────────────────────────
-window.addEventListener('DOMContentLoaded',function(){
-  try{
-    var k=lsGet(KS);
-    var h=lsGet(HS);
-    if(k) S.claudeKey=k;
-    if(h) S.history=JSON.parse(h)||[];
-  }catch(e){}
-  S.screen=S.claudeKey?'app':'onboarding';
-  R();
-  if(S.claudeKey) syncHistory();
-});
-
-function syncHistory(){
-  var uid=getUid();
-  if(!uid) return;
-  fetch('/api/analyzer-history?uid='+uid)
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if(Array.isArray(d)&&d.length){
-        S.history=d;
-        lsSet(HS,JSON.stringify(d));
-        R();
-      }
-    }).catch(function(){});
+function subStats(tips) {
+  const s = tips.filter(t=>["won","lost","push","half_won","half_lost"].includes(t.result));
+  const profit = s.reduce((a,t)=>a+tipProfit(t),0);
+  const roi = s.length ? (profit/s.length)*100 : 0;
+  return { profit, roi, settled: s.length };
 }
 
-function saveEntry(entry){
-  var uid=getUid();
-  if(!uid) return;
-  fetch('/api/analyzer-history',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({uid:uid,entry:entry})
-  }).catch(function(){});
-}
+function renderHistory() {
+  // Csak foci AI tippek: a value tippeket és a nem-foci sportágakat kihagyjuk.
+  const isFoci = t => /soccer|foci|⚽/i.test((t.sport||"")+" "+(t.sportLabel||""));
+  const H = history.filter(t => t.type !== "value" && isFoci(t));
 
-function clearServerHistory(){
-  var uid=getUid();
-  if(!uid) return;
-  fetch('/api/analyzer-history?uid='+uid,{method:'DELETE'}).catch(function(){});
-}
+  const won      = H.filter(t=>t.result==="won").length;
+  const lost     = H.filter(t=>t.result==="lost").length;
+  const push     = H.filter(t=>t.result==="push").length;
+  const halfWon  = H.filter(t=>t.result==="half_won").length;
+  const halfLost = H.filter(t=>t.result==="half_lost").length;
+  const decN   = won+lost+halfWon+halfLost;
+  const wr     = decN?(((won+halfWon*0.5)/decN)*100).toFixed(0)+"%":"–";
+  const settled = H.filter(t=>["won","lost","push","half_won","half_lost"].includes(t.result));
+  const profit  = settled.reduce((a,t)=>a+tipProfit(t),0);
+  const roi    = settled.length?((profit/settled.length)*100).toFixed(1):"–";
+  const roiCol = profit>0?"#69f0ae":profit<0?"#ef9a9a":"#90a4ae";
 
-// ── API kulcs ─────────────────────────────────────────────
-function saveKey(){
-  if(!S.keyIn.trim()){S.keyMsg='error';R();return;}
-  S.savingKey=true;S.keyMsg=null;R();
-  fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':S.keyIn,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:10,messages:[{role:'user',content:'Hi'}]})
-  }).then(function(r){
-    if(r.ok){
-      lsSet(KS,S.keyIn);
-      S.claudeKey=S.keyIn;
-      S.keyIn='';
-      S.savingKey=false;
-      S.screen='app';
-      R();
-      syncHistory();
-    } else {
-      S.keyMsg='error';
-      S.savingKey=false;
-      R();
-    }
-  }).catch(function(){ S.keyMsg='error'; S.savingKey=false; R(); });
-}
+  const pend   = H.filter(t=>!t.result||t.result==="pending").length;
+  document.getElementById("h-total").textContent  = H.length;
+  document.getElementById("h-pend").textContent   = pend;
+  document.getElementById("h-won").textContent    = won;
+  document.getElementById("h-lost").textContent   = lost;
+  document.getElementById("h-push").textContent   = push + halfWon + halfLost;
+  document.getElementById("h-wr").textContent     = wr;
+  document.getElementById("h-profit").textContent = settled.length?(profit>=0?"+":"")+profit.toFixed(2):"–";
+  document.getElementById("h-profit").style.color = roiCol;
+  document.getElementById("h-roi").textContent    = roi!=="–"?(profit>=0?"+":"")+roi+"%":"–";
+  document.getElementById("h-roi").style.color    = roiCol;
 
-function delKey(){lsRemove(KS);S.claudeKey='';S.keyIn='';S.keyMsg=null;S.screen='onboarding';R();}
+  const el = document.getElementById("history-list");
+  if (!H.length) { el.innerHTML='<div class="empty">Még nincsenek rögzített foci tippek.</div>'; return; }
 
-// ── Példa betöltése ───────────────────────────────────────
-function setEx(idx){
-  S.query=EXAMPLES[idx];
-  R();
-  setTimeout(function(){
-    var el=document.getElementById('qi');
-    if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}
-  },50);
-}
+  const TODAY     = todayKey();
+  const YESTERDAY = yesterdayKey();
 
-// ── Elemzés ───────────────────────────────────────────────
-function analyze(){
-  if(!S.claudeKey){alert('Kérlek add meg a Claude API kulcsodat a Beállítások fülön!');return;}
-  if(S.loading) return;
-  var q=(S.query||'').trim();
-  if(!q){alert('Kérlek írj be egy meccset és fogadási opciót!');return;}
-  S.loading=true;S.result=null;R();
-
-  // Főoldali tippek lekérése kontextushoz
-  fetch('/api/tips').then(function(r){return r.json();}).catch(function(){return {valueTips:[],aiTips:[]};})
-  .then(function(td){
-    var allTips=(td.aiTips||[]);
-    var tipsCtx='';
-    if(allTips.length){
-      tipsCtx='\n\nAz AI Foci Tippek főoldalán ma az alábbi tippek szerepelnek (NE mondj ezeknek ellent, hacsak nem egyértelmű hiba):\n';
-      for(var i=0;i<allTips.length;i++){
-        var t=allTips[i];
-        tipsCtx+='- '+t.match+': '+t.market+' → '+t.pick+' @ '+t.odds+'\n';
-      }
-    }
-
-    var prompt=
-      'Te egy profi labdarúgás-fogadási elemző vagy.\n\n'+
-      'FONTOS: Ha nem tudsz labdarúgó meccset és fogadási opciót azonosítani a kérésből, vagy ha a kérés nem focival kapcsolatos, NE kezdj elemzésbe! Helyette írd pontosan ezt:\n'+
-      'NEM ÉRTEM: [rövid magyarázat, és javaslat a helyes formátumra, pl.: "Csapat1 - Csapat2; fogadási opció"]\n\n'+
-      'A felhasználó kérése:\n"'+q+'"\n'+
-      tipsCtx+'\n\n'+
-      'Ha felismerted a meccset és az opciót, adj elemzést PONTOSAN ebben a struktúrában:\n\n'+
-      'MECCS KONTEXTUS:\n[Torna, forduló, tét — 1-2 mondat]\n\n'+
-      'HAZAI CSAPAT FORMA:\n[Utolsó 5 meccs konkrét eredményekkel, gólátlag]\n\n'+
-      'VENDÉG CSAPAT FORMA:\n[Utolsó 5 meccs konkrét eredményekkel, gólátlag]\n\n'+
-      'H2H ELŐZMÉNYEK:\n[Utolsó 3-5 találkozó eredménye, gólátlag]\n\n'+
-      'SÉRÜLÉSEK / HIÁNYZÓK:\n[Mindkét csapat fontos hiányzói]\n\n'+
-      'FOGADÁSI OPCIÓ ÉRTÉKELÉSE:\n[A konkrét opció részletes elemzése — 4-5 mondat]\n\n'+
-      'Egy üres sor után add meg a verdiktet pontosan így:\n'+
-      'VERDIKT: AJANLOTT\n'+
-      'vagy: VERDIKT: BIZONYTALAN\n'+
-      'vagy: VERDIKT: NEM AJANLOTT\n\n'+
-      'Szabályok: ne használj csillag formázást, adj valódi számokat. Magyar nyelven, szakszerűen.';
-
-    fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':S.claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-6',max_tokens:4000,
-        tools:[{type:'web_search_20250305',name:'web_search'}],
-        messages:[{role:'user',content:prompt}]
-      })
-    }).then(function(r){return r.json();})
-    .then(function(d){
-      var texts=[];
-      if(d.content){for(var i=0;i<d.content.length;i++){if(d.content[i].type==='text')texts.push(d.content[i].text);}}
-      var ai=texts.length?texts[texts.length-1]:'Elemzés sikertelen.';
-      ai=ai.replace(/VERDIKT\s*:\s*AJANLOTT/gi,'VERDIKT: \u2705 AJÁNLOTT')
-           .replace(/VERDIKT\s*:\s*NEM AJANLOTT/gi,'VERDIKT: \u274C NEM AJÁNLOTT')
-           .replace(/VERDIKT\s*:\s*BIZONYTALAN/gi,'VERDIKT: \u26A0\uFE0F BIZONYTALAN')
-           .replace(/VERDIKT\s*:\s*AJ\u00C1NLOTT/gi,'VERDIKT: \u2705 AJÁNLOTT')
-           .replace(/VERDIKT\s*:\s*NEM AJ\u00C1NLOTT/gi,'VERDIKT: \u274C NEM AJÁNLOTT');
-      var unclear=ai.indexOf('NEM ÉRTEM:')!==-1||ai.indexOf('NEM ERTEM:')!==-1;
-      var entry={id:Date.now(),ts:new Date().toLocaleString('hu-HU'),query:q,ai:ai,unclear:unclear};
-      S.result=entry;
-      if(!unclear){
-        S.history=[entry].concat(S.history).slice(0,50);
-        lsSet(HS,JSON.stringify(S.history));
-        saveEntry(entry);
-      }
-      S.loading=false;R();
-    }).catch(function(e){
-      S.result={error:true,msg:'Hiba: '+String(e)};
-      S.loading=false;R();
-    });
+  const byDay = {};
+  H.forEach(t => {
+    const d = getDay(t.addedAt);
+    if (!byDay[d]) byDay[d] = [];
+    byDay[d].push(t);
   });
+
+  function makeDaySection(day, tips, defaultOpen) {
+    const id      = "ds-"+(dayCounter++);
+    const pending = tips.filter(t=>!t.result||t.result==="pending").sort((a,b)=>parseCommence(a.commence)-parseCommence(b.commence));
+    const done    = tips.filter(t=>t.result&&t.result!=="pending").sort((a,b)=>parseCommence(a.commence)-parseCommence(b.commence));
+    const sorted  = [...pending,...done];
+    const dWon    = done.filter(t=>t.result==="won").length;
+    const dLost   = done.filter(t=>t.result==="lost").length;
+    const meta    = sorted.length+" tipp"+(done.length?" · ✅"+dWon+" ❌"+dLost:"");
+    let label     = "📅 "+day;
+    if (day===TODAY)     label += ' <span style="color:#00e676;font-size:11px">(ma)</span>';
+    else if (day===YESTERDAY) label += ' <span style="color:#ffe082;font-size:11px">(tegnap)</span>';
+    else                 label += ' <span style="color:#546e7a;font-size:11px">(archív)</span>';
+    return `
+    <div class="day-section">
+      <div class="day-toggle" onclick="toggleDay('${id}')">
+        <span class="day-label">${label}</span>
+        <span style="display:flex;align-items:center;gap:6px">
+          <span class="day-meta">${meta}</span>
+          <span class="day-arrow ${defaultOpen?"open":""}" id="arr-${id}">▼</span>
+        </span>
+      </div>
+      <div class="day-content" id="${id}" style="display:${defaultOpen?"":"none"}">
+        ${sorted.map(t=>tipHTML(t,true)).join("")}
+      </div>
+    </div>`;
+  }
+
+  // Egy korábbi hónap: napokra bontva, összecsukva (alapból zárva).
+  function makeMonthSection(monthKey, tips) {
+    const id = "ms-"+(dayCounter++);
+    const byDay = {};
+    tips.forEach(t=>{ const d=getDay(t.addedAt); if(!byDay[d]) byDay[d]=[]; byDay[d].push(t); });
+    const mWon  = tips.filter(t=>t.result==="won").length;
+    const mLost = tips.filter(t=>t.result==="lost").length;
+    const st    = subStats(tips);
+    const pCol  = st.profit>0?"#69f0ae":st.profit<0?"#ef9a9a":"#90a4ae";
+    const pChip = st.settled
+      ? ` · <b style="color:${pCol}">${st.profit>=0?"+":""}${st.profit.toFixed(2)}e</b> · ROI <b style="color:${pCol}">${st.profit>=0?"+":""}${st.roi.toFixed(1)}%</b>`
+      : "";
+    const meta  = tips.length+" tipp · ✅"+mWon+" ❌"+mLost+pChip;
+    const inner = Object.keys(byDay).sort((a,b)=>b.localeCompare(a))
+      .map(day=>makeDaySection(day, byDay[day], false)).join("");
+    return `
+    <div class="month-section">
+      <div class="month-toggle" onclick="toggleDay('${id}')">
+        <span class="month-label">🗓️ ${monthLabel(monthKey)}</span>
+        <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+          <span class="day-meta">${meta}</span>
+          <span class="day-arrow" id="arr-${id}">▼</span>
+        </span>
+      </div>
+      <div class="month-content" id="${id}" style="display:none">
+        ${inner}
+      </div>
+    </div>`;
+  }
+
+  dayCounter = 0;
+  const pending = history.filter(t=>!t.result||t.result==="pending");
+  const done    = history.filter(t=>t.result&&t.result!=="pending");
+
+  const pendingByDay = {};
+  pending.forEach(t=>{ const d=getDay(t.addedAt); if(!pendingByDay[d]) pendingByDay[d]=[]; pendingByDay[d].push(t); });
+
+  const doneByDay = {};
+  done.forEach(t=>{ const d=getDay(t.addedAt); if(!doneByDay[d]) doneByDay[d]=[]; doneByDay[d].push(t); });
+
+  let html = "";
+  if (pending.length) {
+    html += `<div class="section-header" style="background:#0d2a3a;color:#90caf9">⏳ Folyamatban lévő tippek</div>`;
+    Object.keys(pendingByDay).sort((a,b)=>b.localeCompare(a)).forEach(day => {
+      html += makeDaySection(day, pendingByDay[day], true);
+    });
+  }
+  if (done.length) {
+    html += `<div class="section-header" style="background:#0d1b2a;color:#80cbc4;margin-top:8px">📋 Lezárt tippek</div>`;
+    const currentMonth = monthKeyOf(todayKey());
+
+    // Napokat hónapokba soroljuk
+    const monthsToDays = {};
+    Object.keys(doneByDay).forEach(day => {
+      const mk = monthKeyOf(day);
+      if (!monthsToDays[mk]) monthsToDays[mk] = [];
+      monthsToDays[mk].push(day);
+    });
+
+    // Aktuális hónap: napok közvetlenül (mint eddig)
+    (monthsToDays[currentMonth] || []).sort((a,b)=>b.localeCompare(a)).forEach(day => {
+      html += makeDaySection(day, doneByDay[day], false);
+    });
+
+    // Korábbi hónapok: hónaponként összecsukva, legfrissebb elöl
+    Object.keys(monthsToDays).filter(mk => mk !== currentMonth)
+      .sort((a,b)=>b.localeCompare(a)).forEach(mk => {
+        const monthTips = [];
+        monthsToDays[mk].forEach(day => monthTips.push(...doneByDay[day]));
+        html += makeMonthSection(mk, monthTips);
+      });
+  }
+  el.innerHTML = html;
 }
 
-// ── HTML renderelők ───────────────────────────────────────
-function rHdr(){
-  var badge=S.claudeKey?
-    '<div class="bdg" style="background:#0a3b1a;border:1px solid #4ade8033">'+
-    '<div class="dot" style="background:#4ade80"></div>'+
-    '<span style="font-size:11px;color:#4ade80;font-weight:600">Claude</span></div>':'';
-  return '<div class="hdr">'+
-    '<div><div class="htitle">VIP Fogadás Elemző</div><div class="hsub">AI meccs elemzés</div></div>'+
-    '<div class="hright">'+badge+'<a class="back" href="/">← Főoldal</a></div>'+
-    '</div>';
+function toggleDay(id) {
+  const c = document.getElementById(id);
+  const a = document.getElementById("arr-"+id);
+  const open = c.style.display!=="none";
+  c.style.display = open?"none":"";
+  a.classList.toggle("open",!open);
 }
 
-function rOnboard(){
-  var steps=[
-    ['1','Menj a console.anthropic.com oldalra'],
-    ['2','Regisztrálj ingyenesen'],
-    ['3','API Keys menü → Create Key'],
-    ['4','Másold ki — csak egyszer látható!'],
-    ['5','Mentsd el biztonságos helyre'],
-    ['6','Illeszd be az alábbi mezőbe']
-  ];
-  var sh='';
-  for(var i=0;i<steps.length;i++){
-    sh+='<div class="step"><div class="snum">'+steps[i][0]+'</div>'+
-        '<div style="font-size:13px;color:#cbd5e1;padding-top:4px">'+steps[i][1]+'</div></div>';
-  }
-  return rHdr()+
-    '<div class="ob">'+
-    '<div class="card" style="border-color:#7c3aed44;margin-bottom:16px">'+
-    '<div style="font-size:16px;font-weight:700;margin-bottom:8px">Üdvözöllek!</div>'+
-    '<div style="font-size:14px;color:#94a3b8;line-height:1.65">Ez az elemző a saját '+
-    '<strong style="color:#e2e8f0">Claude API kulcsoddal</strong> működik. Írd be bármely '+
-    'foci meccset és fogadási opciót — az AI rákeres és elvégzi az elemzést.</div></div>'+
-    '<div class="card" style="margin-bottom:16px">'+
-    '<div style="font-size:12px;font-weight:700;color:#a78bfa;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px">Hogyan szerezz API kulcsot?</div>'+
-    sh+'</div>'+
-    '<div class="card">'+
-    '<label class="lbl">Claude API Kulcs</label>'+
-    '<div class="pwrap"><input id="ob-key" class="inp imono" type="password" placeholder="sk-ant-api03-..." oninput="S.keyIn=this.value;S.keyMsg=null">'+
-    '<button class="ptgl" onclick="pwt(\'ob-key\',this)">&#128065;</button></div>'+
-    (S.keyMsg==='ok'?'<div style="margin-top:8px;font-size:12px;color:#4ade80">Kulcs érvényes!</div>':'')+
-    (S.keyMsg==='error'?'<div style="margin-top:8px;font-size:12px;color:#f87171">Érvénytelen kulcs.</div>':'')+
-    '<button class="btn bfull btn-p" style="margin-top:14px" onclick="saveKey()">'+
-    (S.savingKey?'Ellenőrzés...':'Kulcs tesztelése és mentése')+'</button>'+
-    '<div style="margin-top:12px;font-size:11px;color:#4b5563;text-align:center;line-height:1.5">'+
-    'Csak a böngésződben tárolódik. Soha nem kerül a szerverre.</div>'+
-    '</div></div>';
+async function refresh() {
+  const btn = document.getElementById("btn-refresh");
+  btn.disabled=true; btn.textContent="Elemzés folyamatban...";
+  try {
+    const r = await fetch("/api/refresh", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({password: getAdminPwd()})
+    });
+    const d = await r.json();
+    if (d.error) { showStatus("⛔ " + d.error, "#ef9a9a"); }
+    else { showStatus(`✅ ${d.aiTips} AI tipp`); await loadTips(); }
+  } catch(e) { showStatus("⚠️ Hiba: "+e.message,"#ef9a9a"); }
+  btn.disabled=false; btn.textContent="🔄 Frissítés most";
+  msRemaining=0;
 }
 
-function rAnalyzer(){
-  var canGo=!!S.claudeKey&&!S.loading;
-  var exBtns='';
-  for(var i=0;i<EXAMPLES.length;i++){
-    exBtns+='<button class="ex-btn" onclick="setEx('+i+')">'+esc(EXAMPLES[i])+'</button>';
+let tipsEverLoaded = false;
+let tipsRetryDelay = 3000;
+let tipsErrLogged  = false;
+async function loadTips() {
+  try {
+    const r = await fetch("/api/tips", { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP "+r.status);
+    const d = await r.json();
+    aiTips    = Array.isArray(d.aiTips)?d.aiTips:[];
+    tipsEverLoaded = true;
+    tipsRetryDelay = 3000;
+    tipsErrLogged  = false;
+    document.getElementById("last-update").textContent="Frissítve: "+new Date().toLocaleTimeString("hu-HU");
+    renderTips();
+  } catch(e) {
+    // Egyszer logolunk, nem árasztjuk el a konzolt. A meglévő tippeket NEM ürítjük.
+    if (!tipsErrLogged) { console.warn("A /api/tips jelenleg nem elérhető ("+e.message+"), újrapróbálkozás a háttérben."); tipsErrLogged = true; }
+    const lu = document.getElementById("last-update");
+    if (lu && !tipsEverLoaded) lu.textContent = "⚠️ Szerver nem elérhető – újrapróbálkozás…";
+    // Amíg még sose sikerült, növekvő szünettel próbálkozunk (3→6→12…→max 60s), nem 3 mp-enként.
+    if (!tipsEverLoaded) {
+      setTimeout(loadTips, tipsRetryDelay);
+      tipsRetryDelay = Math.min(tipsRetryDelay * 2, 60000);
+    }
   }
-  var html=
-    '<div class="card" style="border-color:#7c3aed33">'+
-    '<label class="lbl">Meccs és fogadási opció</label>'+
-    '<textarea id="qi" class="tarea" placeholder="Pl.: Belgium - Szenegal; mindket csapat szerez golt + Over 2.5&#10;Pl.: Real Madrid - Barcelona; hazai gyozelem" oninput="S.query=this.value">'+esc(S.query)+'</textarea>'+
-    '<div style="margin-top:10px"><div style="font-size:11px;color:#4b5563;margin-bottom:6px">Példák:</div>'+exBtns+'</div>'+
-    '</div>'+
-    (!S.claudeKey?'<div class="card" style="border-color:#fbbf2433;color:#fbbf24;font-size:13px;text-align:center;margin-bottom:14px">'+
-    'API kulcs hiányzik — add meg a Beállítások fülön</div>':'')+
-    '<button class="btn bfull '+(canGo?'btn-p':'btn-off')+'" onclick="analyze()">'+
-    (S.loading?'Elemzés folyamatban...':'Elemzés indítása')+'</button>'+
-    '<div style="margin-top:8px;font-size:11px;color:#374151;text-align:center">'+
-    'Egy elemzés kb. 40-50 Ft (~$0.10-0.15) a saját Anthropic számládra</div>';
-
-  if(S.result&&S.result.unclear){
-    html+='<div class="card" style="margin-top:14px;border-color:#fbbf2433">'+
-      '<div style="font-size:13px;font-weight:700;color:#fbbf24;margin-bottom:8px">Nem értem a kérést</div>'+
-      '<div style="font-size:13px;color:#94a3b8;line-height:1.7">'+esc(S.result.ai.replace(/NEM \u00C9RTEM:/gi,'').replace(/NEM ERTEM:/gi,'').trim())+'</div>'+
-      '</div>';
-  }
-  if(S.result&&!S.result.error&&!S.result.unclear){
-    var r=S.result;
-    var v=getVerdict(r.ai);
-    var body=stripVerdict(r.ai);
-    html+='<div class="card" style="margin-top:16px;border-color:#a78bfa33">'+
-      '<div style="font-size:15px;font-weight:700;color:#e2e8f0;margin-bottom:4px">'+esc(r.query)+'</div>'+
-      '<div style="font-size:12px;color:#6b7280;margin-bottom:14px">'+r.ts+'</div>'+
-      '<div class="div">'+
-      '<div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">AI Elemzés</div>'+
-      '<div class="aitext">'+renderAI(body)+'</div>'+
-      (v?'<div class="verdict-box" style="'+verdictStyle(v)+'">'+esc(v)+'</div>':'')+
-      '</div></div>';
-  }
-  if(S.result&&S.result.error){
-    html+='<div class="card" style="margin-top:14px;border-color:#f8717133;color:#f87171;font-size:14px">'+
-      esc(S.result.msg||'Hiba az elemzés során.')+'</div>';
-  }
-  return html;
 }
 
-function rHistory(){
-  if(!S.history.length){
-    return '<div style="text-align:center;color:#6b7280;padding:50px 20px;font-size:14px">Még nincs mentett elemzés.</div>';
-  }
-  var html='<button class="btn btn-del bsm" style="margin-bottom:14px" '+
-    'onclick="if(confirm(\'Törölni az összes előzményt?\')){S.history=[];lsRemove(\''+HS+'\');clearServerHistory();R()}">'+
-    'Előzmények törlése</button>';
-  for(var i=0;i<S.history.length;i++){
-    var h=S.history[i];
-    var isExp=S.expanded===i;
-    var v=getVerdict(h.ai||'');
-    var title=h.query||(h.match?(h.match+(h.tip?' — '+h.tip:'')):'Elemzés');
-    var vhtml=v?'<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;'+verdictStyle(v)+'">'+esc(v)+'</span>':'';
-    html+='<div class="card" style="cursor:pointer;border-color:'+(isExp?'#a78bfa44':'#1e2130')+'" onclick="S.expanded=S.expanded==='+i+'?null:'+i+';R()">'+
-      '<div class="fbw">'+
-      '<div><div style="font-size:14px;font-weight:600;color:#e2e8f0">'+esc(title)+'</div>'+
-      '<div style="font-size:12px;color:#6b7280;margin-top:2px">'+esc(h.ts||'')+'</div></div>'+
-      vhtml+'</div>'+
-      (isExp&&h.ai?'<div class="div" style="margin-top:10px"><div class="aitext" style="font-size:13px">'+renderAI(stripVerdict(h.ai))+'</div>'+
-      (v?'<div class="verdict-box" style="margin-top:12px;'+verdictStyle(v)+'">'+esc(v)+'</div>':'')+
-      '</div>':'')+
-      '</div>';
-  }
-  return html;
+async function loadHistory() {
+  try {
+    const r = await fetch("/api/history");
+    history = await r.json();
+    renderHistory();
+  } catch(e) { console.error("loadHistory hiba:",e); }
 }
 
-function rSettings(){
-  return '<div class="card" style="border-color:'+(S.claudeKey?'#4ade8033':'#2a2d3e')+'">'+
-    '<div class="fbw" style="margin-bottom:14px">'+
-    '<div style="font-size:15px;font-weight:700">Claude API kulcs</div>'+
-    '<div style="display:inline-flex;align-items:center;gap:5px;background:'+(S.claudeKey?'#0a3b1a':'#1a1d2e')+
-    ';border:1px solid '+(S.claudeKey?'#4ade8033':'#2a2d3e')+';border-radius:20px;padding:4px 10px">'+
-    '<div class="dot" style="background:'+(S.claudeKey?'#4ade80':'#4b5563')+'"></div>'+
-    '<span style="font-size:11px;color:'+(S.claudeKey?'#4ade80':'#4b5563')+';font-weight:600">'+
-    (S.claudeKey?'Aktív':'Nincs beállítva')+'</span></div></div>'+
-    (S.claudeKey?'<div class="kmask">'+mk(S.claudeKey)+'</div>':'')+
-    '<label class="lbl">'+(S.claudeKey?'Kulcs frissítése':'Kulcs megadása')+'</label>'+
-    '<div class="pwrap"><input id="st-key" class="inp imono" type="password" placeholder="sk-ant-api03-..." oninput="S.keyIn=this.value;S.keyMsg=null">'+
-    '<button class="ptgl" onclick="pwt(\'st-key\',this)">&#128065;</button></div>'+
-    (S.keyMsg==='ok'?'<div style="margin-top:8px;font-size:12px;color:#4ade80">Kulcs mentve!</div>':'')+
-    (S.keyMsg==='error'?'<div style="margin-top:8px;font-size:12px;color:#f87171">Érvénytelen kulcs.</div>':'')+
-    '<button class="btn bfull bsm btn-p" style="margin-top:12px" onclick="saveKey()">'+
-    (S.savingKey?'Ellenőrzés...':'Kulcs mentése')+'</button>'+
-    (S.claudeKey?'<button class="btn bfull btn-del bsm" style="margin-top:8px" onclick="delKey()">Kulcs törlése</button>':'')+
-    '<div style="margin-top:12px;font-size:11px;color:#4b5563;text-align:center;line-height:1.5">'+
-    'Csak a böngésződben tárolódik. Soha nem kerül a szerverre.</div></div>';
+async function setResult(id, result) {
+  const r = await fetch(`/api/history/${id}`,{method:"PATCH",headers:adminHeaders(true),body:JSON.stringify({result})});
+  if (!(await handleAdminResp(r))) return;
+  await loadHistory();
 }
 
-function rApp(){
-  var tabs='<div class="tabs">'+
-    '<button '+tabSt('analyzer')+' onclick="S.tab=\'analyzer\';R()">Elemzés</button>'+
-    '<button '+tabSt('history')+' onclick="S.tab=\'history\';R()">Előzmények ('+S.history.length+')</button>'+
-    '<button '+tabSt('settings')+' onclick="S.tab=\'settings\';R()">Beállítások</button>'+
-    '</div>';
-  var content=S.tab==='analyzer'?rAnalyzer():S.tab==='history'?rHistory():rSettings();
-  return rHdr()+tabs+'<div class="body">'+content+'</div>';
+async function checkResults() {
+  showStatus("🔍 Eredmények ellenőrzése...");
+  const r = await fetch("/api/check-results", { method: "POST", headers: adminHeaders() });
+  if (!(await handleAdminResp(r))) return;
+  await loadHistory();
+  showStatus("✅ Eredmények frissítve");
 }
 
-function pwt(id,btn){
-  var el=document.getElementById(id);
-  if(!el) return;
-  el.type=(el.type==='password')?'text':'password';
-  btn.innerHTML=(el.type==='password')?'&#128065;':'&#128584;';
+async function sendStats() {
+  const r = await fetch("/api/stats/send",{method:"POST", headers: adminHeaders()});
+  await handleAdminResp(r, "✅ Statisztika elküldve Telegramon");
+}
+
+async function clearHistory() {
+  if (!confirm("Biztosan törlöd az összes előzményt? Ez nem visszavonható!")) return;
+  const r = await fetch("/api/history",{method:"DELETE", headers: adminHeaders()});
+  if (!(await handleAdminResp(r))) return;
+  history=[];
+  renderHistory();
+  showStatus("🗑️ Előzmények törölve");
+}
+
+async function loadStatus() {}
+
+loadStatus();
+loadTips();
+// Önjavító frissítés: percenként, és amikor a fül újra aktív lesz (pl. deploy után).
+// Így az esetleg elhalt betöltés magától helyreáll, nem kell kézi oldalfrissítés.
+setInterval(() => { if (document.visibilityState === "visible") loadTips(); }, 60000);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") loadTips(); });
+if (isAdmin()) {
+  document.getElementById('btn-refresh').style.display = '';
+  document.getElementById('admin-tools').style.display = 'flex';
 }
 </script>
 </body>
