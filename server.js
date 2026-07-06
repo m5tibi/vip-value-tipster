@@ -211,81 +211,97 @@ function buildStatsMsg(title) {
 }
 
 // ── AI tippek ─────────────────────────────────────────────
-async function fetchAiTips(matchList) {
-  if (!ANTHROPIC_KEY || !matchList.length) return [];
+// Visszatér: { singles: [...], comboLegs: [...] }
+async function fetchAiTips(matchList, alreadyTipped = []) {
+  if (!ANTHROPIC_KEY || !matchList.length) return { singles: [], comboLegs: [] };
   console.log(`AI elemzés: ${matchList.length} meccs`);
 
   const matchText = matchList.map(m =>
     `- ${m.sport} | ${m.match} | Kezdés: ${m.commence}\n  Valós odds: ${m.odds.map(o => `${o.market} / ${o.name}: ${o.odds} (${o.bookmaker})`).join(", ")}`
   ).join("\n");
 
-  const prompt = `Te egy profi labdarúgás-fogadási elemző vagy. Használj web keresést hogy megtudd az aktuális formát, sérüléseket, és keretinformációkat az alábbi mai foci meccsekre, majd adj 2-3 konkrét fogadási tippet — csak akkor többet, ha valóban több erős lehetőség van. Ne erőltesd a tippszámot.
+  const skipNote = alreadyTipped.length
+    ? `\nEZEKRE A MECCSEKRE MÁR VAN SINGLE TIPP – NE adj rájuk újabb SINGLE tippet (de kombi lábnak felhasználhatod): ${alreadyTipped.join("; ")}\n`
+    : "";
+
+  const prompt = `Te egy profi labdarúgás-fogadási elemző vagy. Használj web keresést az aktuális formához, sérülésekhez és keretinformációkhoz az alábbi mai foci meccsekre.
 
 Mai meccsek (valós bookmaker oddsokkal):
 ${matchText}
+${skipNote}
+KÉT dolgot adj:
 
-Szabályok:
-- Csak OVER típusú vagy pozitív kimenetelű tippek (over gólok, hendikep győzelem, csapat győzelme)
-- NE adj under típusú tippet
-- KÖTELEZŐ: az odds mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd be
-- Adj rövid (2-3 mondatos) magyar nyelvű indoklást VALÓS adatok alapján
-- Maximum 3 tipp összesen, csak a legerősebb lehetőségeket válaszd
+1) "tippek": 2-3 ERŐS single tipp (csak a legjobbak, ne erőltesd a számot).
+   - Csak pozitív kimenetel: over gólok, hendikep győzelem, csapat győzelme. NE adj under tippet a singlekbe.
 
-Válaszolj KIZÁRÓLAG JSON tömbként, semmi más szöveg nélkül:
-[{"match":"...","sport":"soccer","sportLabel":"⚽ FIFA VB 2026","commence":"06.20. 20:00","market":"1X2","pick":"...","odds":1.85,"note":"..."}]`;
+2) "kombi_labak": 3-4 BIZTONSÁGOS, alacsony kockázatú láb KÜLÖNBÖZŐ meccsekről, kombi szelvényhez.
+   - Ezek külön-külön NEM elég értékesek single tippnek (alacsony odds, jellemzően 1.15-1.55), de kombinálva szép össz oddsot adnak.
+   - Magas valószínűségű kimenetelek: erős favorit győzelme, Over 1.5, Under 4.5, hendikep -1 / -1.5 nagy favoritnál stb.
+   - MINDEGYIK láb MÁS meccsről legyen.
+
+KÖZÖS szabályok:
+- Az "odds" mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd (a megfelelő piac/kimenet oddsát).
+- A "market" és "pick" pontosan egyezzen egy valós piaccal/kimenettel; a csapatnév a fent megadott formában szerepeljen.
+- Rövid (1-2 mondat) magyar indoklás valós adatok alapján (csak a "tippek"-hez kell note).
+
+Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
+{"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"1X2","pick":"...","odds":1.85,"note":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28}]}`;
 
   try {
-    const r    = await fetch("https://api.anthropic.com/v1/messages", {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6", max_tokens: 4000,
+        model: "claude-sonnet-4-6", max_tokens: 5000,
         tools: [{ type: "web_search_20250305", name: "web_search" }],
         messages: [{ role: "user", content: prompt }]
       })
     });
-    const data   = await r.json();
-    const blocks = data.content?.filter(b => b.type === "text") || [];
-    const block  = blocks[blocks.length - 1];
-    if (!block) { console.log("AI: nincs text blokk"); return []; }
-    const found = block.text.match(/\[[\s\S]*\]/);
-    if (!found) { console.log("AI: nem sikerült JSON-t kinyerni\n" + block.text.slice(0, 300)); return []; }
-    return JSON.parse(found[0]).map(t => ({
+    const data = await r.json();
+    const text = (data.content?.filter(b => b.type === "text").map(b => b.text) || []).join("\n");
+    const found = text.match(/\{[\s\S]*\}/);
+    if (!found) { console.log("AI: nem sikerült JSON-t kinyerni\n" + text.slice(0, 300)); return { singles: [], comboLegs: [] }; }
+    let obj;
+    try { obj = JSON.parse(found[0]); } catch { console.log("AI: JSON parse hiba"); return { singles: [], comboLegs: [] }; }
+    const singles = (Array.isArray(obj.tippek) ? obj.tippek : []).map(t => ({
       id: `ai-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: "ai", sport: t.sport, sportLabel: t.sportLabel,
       match: t.match, commence: t.commence || null,
       market: t.market, pick: t.pick, odds: t.odds,
-      fairOdds: null, prob: null, value: null, kelly: null,
       live: false, note: t.note,
-      addedAt: new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" }),
-      result: "pending"
+      addedAt: nowHu(), result: "pending"
     }));
-  } catch (e) { console.error("AI tipp hiba:", e.message); return []; }
+    const comboLegs = (Array.isArray(obj.kombi_labak) ? obj.kombi_labak : []).map(l => ({
+      match: l.match, sportLabel: l.sportLabel || "⚽",
+      market: l.market, pick: l.pick, odds: parseFloat(l.odds) || 0, commence: l.commence || null
+    })).filter(l => l.match && l.market && l.pick && l.odds > 1);
+    return { singles, comboLegs };
+  } catch (e) { console.error("AI tipp hiba:", e.message); return { singles: [], comboLegs: [] }; }
 }
 
+function comboHash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0; return h.toString(36); }
 // ── Kombi tippek (csak az izgalom kedvéért) ───────────────
-// 2-es és 3-as kötések a pending single tippekből, KÜLÖNBÖZŐ meccsekről.
-// Meccsenként a legbiztonságosabb (legalacsonyabb oddsú) lábat választjuk.
-// Minden láb a forrás single tippre hivatkozik (singleId) → a kiértékelés a single
-// 90 perces lezárását használja, a kombi csak összegzi a lábak eredményét.
-function buildCombos(singles) {
+// 2-es és 3-as kötés az AI által adott BIZTONSÁGOS kombi lábakból, KÜLÖNBÖZŐ meccsekről.
+// Minden láb önállóan, közvetlenül a meccs eredménye alapján dől el.
+function buildCombos(legs) {
   const byMatch = {};
-  for (const t of singles) {
-    if (!byMatch[t.match] || t.odds < byMatch[t.match].odds) byMatch[t.match] = t;
+  for (const l of legs) {
+    if (!l.match || !l.odds) continue;
+    if (!byMatch[l.match] || l.odds < byMatch[l.match].odds) byMatch[l.match] = l;   // meccsenként a legbiztosabb
   }
-  const pool = Object.values(byMatch).sort((a, b) => a.odds - b.odds);   // legbiztosabb elöl
-  const mk = (tips, n) => {
-    const legs = tips.map(t => ({
-      singleId: t.id, match: t.match, sportLabel: t.sportLabel,
-      market: t.market, pick: t.pick, odds: t.odds, commence: t.commence || null
+  const pool = Object.values(byMatch).sort((a, b) => a.odds - b.odds);
+  const mk = (items, n) => {
+    const legsArr = items.map(l => ({
+      match: l.match, sportLabel: l.sportLabel, market: l.market,
+      pick: l.pick, odds: l.odds, commence: l.commence || null, result: null
     }));
-    const odds = parseFloat(legs.reduce((p, l) => p * l.odds, 1).toFixed(2));
-    const id   = "combo-" + n + "-" + legs.map(l => l.singleId).sort().join("_");
+    const odds = parseFloat(legsArr.reduce((p, l) => p * l.odds, 1).toFixed(2));
+    const key  = legsArr.map(l => `${l.match}|${l.market}|${l.pick}`).sort().join("__");
+    const id   = "combo-" + n + "-" + comboHash(key);
     return {
-      id, type: "combo", legN: n, legs, odds, comboPayout: null,
+      id, type: "combo", legN: n, legs: legsArr, odds, comboPayout: null,
       note: `${n} lábas kötés – csak az izgalom kedvéért`,
-      addedAt: new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" }),
-      result: "pending"
+      addedAt: nowHu(), result: "pending"
     };
   };
   const combos = [];
@@ -314,7 +330,8 @@ async function fetchAndProcess() {
       for (const game of games) {
         const hoursUntil = (new Date(game.commence_time) - now) / 3600000;
         if (hoursUntil < 0 || hoursUntil > 24) continue;
-        if (todayAiMatches.has(`${game.home_team} vs ${game.away_team}`)) continue;
+        // (Nincs meccs-kihagyás: a teljes lista kell a kombi lábakhoz is; a single
+        //  duplikátumot a prompt + a válasz utólagos szűrése kezeli.)
 
         const validBMs = (game.bookmakers || []).filter(bm => !EXCLUDED_BM.includes(bm.key) && bm.markets?.length > 0);
         if (validBMs.length < 2) continue;
@@ -367,21 +384,23 @@ async function fetchAndProcess() {
     } catch {}
   }
 
-  const newAiTips = await fetchAiTips(matchList);
+  const { singles, comboLegs } = await fetchAiTips(matchList, [...todayAiMatches]);
 
-  // Új tippek hozzáadása a history-hoz (a meglévők megtartásával)
+  // Backstop: a már ma tippelt meccsekre ne kerüljön újabb SINGLE (a prompt mellett is szűrünk)
+  const newAiTips = singles.filter(t => !todayAiMatches.has(t.match));
+
+  // Új single tippek hozzáadása a history-hoz (a meglévők megtartásával)
   const existingIds = new Set(history.map(t => t.id));
   const fresh = newAiTips.filter(t => !existingIds.has(t.id));
   if (fresh.length) { history = [...fresh, ...history]; saveHistory(); }
   saveLastRun();
 
-  // A főoldal MINDEN még le nem zárt (pending) AI tippet mutasson – a korábbi futások
-  // élő tippjeit is, nem csak a mostani futás eredményét (így egy új lekérdezés hozzáad, nem cserél).
+  // A főoldal MINDEN még le nem zárt (pending) AI tippet mutasson (a korábbi futásokét is).
   aiTips = history.filter(t => t.type === "ai" && (!t.result || t.result === "pending"));
 
-  // Kombi tippek (külön, csak az izgalom kedvéért) – a jelenlegi élő (pending) singlekből,
-  // KÜLÖNBÖZŐ meccsekről. Minden lekérdezéskor összeáll, duplikátumot nem gyárt.
-  const combos = buildCombos(aiTips);
+  // Kombi tippek (külön, csak az izgalom kedvéért) – az AI által adott BIZTONSÁGOS kombi
+  // lábakból, KÜLÖNBÖZŐ meccsekről. Duplikátumot nem gyárt (determinisztikus id a lábakból).
+  const combos = buildCombos(comboLegs);
   const freshCombos = combos.filter(c => !history.some(t => t.id === c.id));
   if (freshCombos.length) { history = [...freshCombos, ...history]; saveHistory(); }
   comboTips = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
@@ -501,17 +520,52 @@ async function regulationScore(game, cache) {
   return null;
 }
 
+// Egy piac kiértékelése a 90 perces eredmény alapján. Visszatér:
+// won / lost / push / half_won / half_lost, vagy null ha nem értelmezhető.
+function settleMarket(market, pick, homeTeam, awayTeam, homeScore, awayScore) {
+  const mk = (market || "").toLowerCase();
+  if (market === "1X2") {
+    // Három kimenet: csapattippnél döntetlen = vereség (push nincs).
+    if (pick === homeTeam) return homeScore >  awayScore ? "won" : "lost";
+    if (pick === awayTeam) return awayScore >  homeScore ? "won" : "lost";
+    if (pick === "Draw")   return homeScore === awayScore ? "won" : "lost";
+    return null;
+  }
+  if (mk.includes("over")) {
+    const line = parseFloat(market.match(/[\d.]+/)?.[0] || 0);
+    return settleQuarter(homeScore + awayScore, line);            // ázsiai over is (2.75 stb.)
+  }
+  if (mk.includes("under")) {
+    const line = parseFloat(market.match(/[\d.]+/)?.[0] || 0);
+    const r = settleQuarter(homeScore + awayScore, line);         // Under = az Over ellentettje
+    return r === "won" ? "lost" : r === "lost" ? "won"
+         : r === "half_won" ? "half_lost" : r === "half_lost" ? "half_won" : r;
+  }
+  if (mk.includes("hendikep") || mk.includes("handicap")) {
+    const lineMatch = (pick || "").match(/-?[\d.]+$/);
+    if (!lineMatch) return null;
+    const h      = parseFloat(lineMatch[0]);                      // pl. +0.75 / -1.5
+    const isHome = pick.includes(homeTeam);
+    const d      = isHome ? homeScore - awayScore : awayScore - homeScore;
+    return settleQuarter(d, -h);
+  }
+  if (mk.includes("btts") || mk.includes("mindkét")) {
+    return homeScore > 0 && awayScore > 0 ? "won" : "lost";
+  }
+  return null;
+}
+
 // ── Eredményjelölés ───────────────────────────────────────
 async function checkResults() {
-  // Kiértékelendő: minden pending tipp, PLUSZ minden nem kézzel jelölt tipp
-  // (visszamenőleges javítás – a scores ablakban (daysFrom=3) lévő meccsek eredménye
-  //  újraértékelődik, így a korábbi hibás kiértékelések maguktól helyreállnak).
-  const work = history.filter(t => t.result === "pending" || !t.manual);
-  if (!work.length) return;
-  console.log(`Eredmények ellenőrzése (${work.length} tipp, ebből pending: ${work.filter(t=>t.result==="pending").length})...`);
+  const pendingSingles = history.filter(t => t.type === "ai"    && (t.result === "pending" || !t.manual));
+  const pendingCombos  = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
+  if (!pendingSingles.length && !pendingCombos.length) return;
+  console.log(`Eredmények ellenőrzése (${pendingSingles.length} single, ${pendingCombos.length} kombi)...`);
   let changed = false;
-  const fdCache = {};   // football-data.org napi meccs-cache egy futásra
+  const fdCache = {};
 
+  // 1. Befejezett meccsek 90 perces eredményének összegyűjtése (meccsnév → eredmény)
+  const completed = {};
   for (const sportKey of Object.keys(SPORT_MAP)) {
     try {
       const r = await fetch(`https://api.the-odds-api.com/v4/sports/${sportKey}/scores/?apiKey=${ODDS_API_KEY}&daysFrom=3`);
@@ -520,82 +574,64 @@ async function checkResults() {
       for (const game of games) {
         if (!game.completed || !game.scores) continue;
         const matchName = `${game.home_team} vs ${game.away_team}`;
-        const tips = work.filter(t => t.matchId === game.id || t.match === matchName);
-        if (!tips.length) continue;
-
         let homeScore = parseInt(game.scores.find(s => s.name === game.home_team)?.score || 0);
         let awayScore = parseInt(game.scores.find(s => s.name === game.away_team)?.score || 0);
         let src = "odds";
-        const reg = await regulationScore(game, fdCache);   // 90 perces eredmény, ha elérhető
+        const reg = await regulationScore(game, fdCache);
         if (reg) { homeScore = reg.home; awayScore = reg.away; src = `90'(${reg.status})`; }
-        console.log(`  ${matchName}: ${homeScore}-${awayScore} [${src}]`);
-
-        for (const tip of tips) {
-          let result = null;
-          const mk = (tip.market || "").toLowerCase();
-          if (tip.market === "1X2") {
-            // 1X2 (három kimenet): csapattippnél SOSINCS push – döntetlen = vereség.
-            // (A hosszabbítás/tizenegyesek nem számítanak, a scores API rendes idő + hosszabbítás
-            //  eredményt ad; tizenegyes-döntésnél a döntetlen megmarad, tehát a csapattipp vesztes.)
-            if (tip.pick === game.home_team)      result = homeScore >  awayScore ? "won" : "lost";
-            else if (tip.pick === game.away_team) result = awayScore >  homeScore ? "won" : "lost";
-            else if (tip.pick === "Draw")         result = homeScore === awayScore ? "won" : "lost";
-          } else if (mk.includes("over")) {
-            const line  = parseFloat(tip.market.match(/[\d.]+/)?.[0] || 0);
-            result = settleQuarter(homeScore + awayScore, line);      // ázsiai over is (2.75 stb.)
-          } else if (mk.includes("hendikep")) {
-            const lineMatch = tip.pick.match(/-?[\d.]+$/);
-            if (!lineMatch) continue;
-            const h      = parseFloat(lineMatch[0]);                  // pl. +0.75
-            const isHome = tip.pick.includes(game.home_team);
-            const d      = isHome ? homeScore - awayScore : awayScore - homeScore;
-            result = settleQuarter(d, -h);                            // nyer, ha (sajátGól + h) > ellenGól
-          } else if (mk.includes("btts") || mk.includes("mindkét")) {
-            result = homeScore > 0 && awayScore > 0 ? "won" : "lost";
-          }
-          if (!result) { console.log(`    ✗ ${tip.market} / ${tip.pick} – nem sikerült kiértékelni`); continue; }
-          // Ha már pontosan ez az eredmény van tárolva (a végeredménnyel együtt), ne írjuk felül
-          if (tip.result === result && tip.homeScore != null) continue;
-          if (tip.result && tip.result !== "pending" && tip.result !== result)
-            console.log(`    ↻ JAVÍTÁS: ${tip.pick} ${tip.result} → ${result}`);
-          else
-            console.log(`    ${tip.pick} → ${result}`);
-          const patch = { result, homeScore, awayScore, settledAt: nowHu() };
-          history    = history.map(t => t.id === tip.id ? { ...t, ...patch } : t);
-          latestTips = latestTips.map(t => t.id === tip.id ? { ...t, ...patch } : t);
-          aiTips     = aiTips.map(t => t.id === tip.id ? { ...t, ...patch } : t);
-          changed    = true;
-        }
+        completed[matchName] = { home_team: game.home_team, away_team: game.away_team, homeScore, awayScore, id: game.id, src };
       }
     } catch (e) { console.error(`Scores hiba (${sportKey}):`, e.message); }
   }
 
-  // ── Kombik kiértékelése a lábak (single tippek) eredménye alapján ──
-  for (const combo of history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"))) {
-    const singles = combo.legs.map(leg => history.find(t => t.id === leg.singleId));
-    if (singles.some(s => !s || !s.result || s.result === "pending")) continue;   // van még nyitott láb
-    const mults = singles.map((s, i) => {
+  const findGame = tip => completed[tip.match] || Object.values(completed).find(g => g.id === tip.matchId);
+
+  // 2. Single tippek kiértékelése
+  for (const tip of pendingSingles) {
+    const g = findGame(tip);
+    if (!g) continue;
+    const result = settleMarket(tip.market, tip.pick, g.home_team, g.away_team, g.homeScore, g.awayScore);
+    if (!result) { console.log(`    ✗ ${tip.market}/${tip.pick} – nem értékelhető`); continue; }
+    if (tip.result === result && tip.homeScore != null) continue;
+    const fix = tip.result && tip.result !== "pending" && tip.result !== result ? " (JAVÍTÁS)" : "";
+    console.log(`  ${g.home_team} vs ${g.away_team}: ${g.homeScore}-${g.awayScore} [${g.src}] · ${tip.pick} → ${result}${fix}`);
+    const patch = { result, homeScore: g.homeScore, awayScore: g.awayScore, settledAt: nowHu() };
+    history = history.map(t => t.id === tip.id ? { ...t, ...patch } : t);
+    aiTips  = aiTips.map(t => t.id === tip.id ? { ...t, ...patch } : t);
+    changed = true;
+  }
+
+  // 3. Kombik – MINDEN láb önállóan a meccs eredménye alapján
+  for (const combo of pendingCombos) {
+    const legRes = combo.legs.map(leg => {
+      const g = completed[leg.match];
+      return g ? settleMarket(leg.market, leg.pick, g.home_team, g.away_team, g.homeScore, g.awayScore) : null;
+    });
+    if (legRes.some(r => !r)) continue;   // van még nyitott / nem értékelhető láb
+    const mults = legRes.map((r, i) => {
       const o = parseFloat(combo.legs[i].odds) || 0;
-      switch (s.result) {
-        case "won":       return o;             // nyertes láb: az odds
-        case "half_won":  return (1 + o) / 2;   // fél nyerés
-        case "push":      return 1;             // visszajár: kiesik a szorzatból
-        case "half_lost": return 0.5;           // fél veszteség
-        default:          return 0;             // vesztes láb → az egész kombi bukik
+      switch (r) {
+        case "won":       return o;
+        case "half_won":  return (1 + o) / 2;
+        case "push":      return 1;
+        case "half_lost": return 0.5;
+        default:          return 0;       // lost
       }
     });
     const payout = mults.reduce((a, b) => a * b, 1);
     const result = payout > 1.0001 ? "won" : payout < 0.9999 ? "lost" : "push";
-    const patch  = { result, comboPayout: parseFloat(payout.toFixed(2)), settledAt: nowHu() };
+    const legs   = combo.legs.map((l, i) => ({ ...l, result: legRes[i] }));   // lábak eredménye a megjelenítéshez
+    const patch  = { result, comboPayout: parseFloat(payout.toFixed(2)), legs, settledAt: nowHu() };
     history   = history.map(t => t.id === combo.id ? { ...t, ...patch } : t);
     comboTips = comboTips.map(t => t.id === combo.id ? { ...t, ...patch } : t);
     changed = true;
-    console.log(`  KOMBI (${combo.legN} lábas) → ${result} (kifizetés x${patch.comboPayout})`);
+    console.log(`  KOMBI (${combo.legN} lábas) → ${result} (x${patch.comboPayout})`);
   }
 
   if (changed) { saveHistory(); console.log("Eredmények mentve ✓"); }
   else console.log("Nincs új lezárt meccs.");
 }
+
 
 // ── Ütemező ───────────────────────────────────────────────
 function scheduleNextFetch() {
