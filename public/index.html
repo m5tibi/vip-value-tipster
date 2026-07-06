@@ -134,7 +134,7 @@
     <div id="combo-wrap" style="display:none">
       <hr class="divider">
       <div class="section-title" style="color:#ffcc80">🎰 Kombi tippek</div>
-      <div class="section-sub">Csak az izgalom kedvéért — külön kezelve a statisztikában</div>
+      <div class="section-sub">Biztonságosabb lábakból, több meccsről — csak az izgalom kedvéért (külön statisztika)</div>
       <div id="combo-list"></div>
     </div>
   </div>
@@ -303,9 +303,10 @@ function aiTipHTML(t, showResult) {
 }
 
 function comboCardHTML(c, showResult) {
+  const legIcon = r => r==="won"?"✅":r==="lost"?"❌":r==="push"?"↩️":r==="half_won"?"½✅":r==="half_lost"?"½❌":"⏳";
   const legs = (c.legs||[]).map(l =>
     `<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#cfd8dc;padding:3px 0;border-bottom:1px solid #16223d">
-       <span>${l.match} — <b>${l.pick}</b></span><span style="color:#90a4ae">${l.odds}</span>
+       <span>${showResult&&l.result?legIcon(l.result)+" ":""}${l.match} — <b>${l.pick}</b> <span style="color:#78909c">(${l.market})</span></span><span style="color:#90a4ae">${l.odds}</span>
      </div>`).join("");
   const payoutLine = (showResult && typeof c.comboPayout==="number")
     ? `<div style="font-size:12px;color:#90a4ae;margin-top:4px">Kifizetés: x${c.comboPayout}</div>` : "";
