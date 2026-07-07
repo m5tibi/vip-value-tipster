@@ -320,6 +320,7 @@ function comboCardHTML(c, showResult) {
     <div class="tip-note" style="color:#8d6e63">💡 ${c.note||"Csak az izgalom kedvéért"}</div>
     ${payoutLine}
     ${showResult?`<div class="tip-actions">${resBadge(c.result)}</div>`:""}
+    ${isAdmin()?`<button class="btn-del" style="margin-top:6px;font-size:11px;padding:4px 10px" onclick="deleteTip('${c.id}')">🗑️ Kombi törlése</button>`:""}
   </div>`;
 }
 
@@ -616,6 +617,15 @@ async function clearHistory() {
   history=[];
   renderHistory();
   showStatus("🗑️ Előzmények törölve");
+}
+
+async function deleteTip(id) {
+  if (!confirm("Biztosan törlöd ezt a tippet?")) return;
+  const r = await fetch("/api/history/"+encodeURIComponent(id),{method:"DELETE", headers: adminHeaders()});
+  if (!(await handleAdminResp(r))) return;
+  await loadTips();
+  await loadHistory();
+  showStatus("🗑️ Tipp törölve");
 }
 
 async function loadStatus() {}
