@@ -61,6 +61,26 @@ const EXCLUDED_BM = ["betfair_ex_eu", "betfair_ex_uk", "matchbook", "betfair_sb_
 let history    = loadHistory();
 console.log(`History betöltve: ${history.length} tipp`);
 
+// Meglévő duplikált kombik eltávolítása (azonos láb-halmaz). Lezártat előnyben tartunk,
+// egyébként a legrégebbit; a duplikátumokat töröljük.
+(function dedupeExistingCombos() {
+  const combos = history.filter(t => t.type === "combo").sort((a, b) => {
+    const sa = (a.result && a.result !== "pending") ? 0 : 1;
+    const sb = (b.result && b.result !== "pending") ? 0 : 1;
+    return sa - sb || (a.addedAt || "").localeCompare(b.addedAt || "");
+  });
+  const seen = new Set(), remove = new Set();
+  for (const c of combos) {
+    const k = comboKey(c);
+    if (seen.has(k)) remove.add(c.id); else seen.add(k);
+  }
+  if (remove.size) {
+    history = history.filter(t => !remove.has(t.id));
+    saveHistory();
+    console.log(`Duplikált kombik eltávolítva: ${remove.size}`);
+  }
+})();
+
 // Pending (még le nem zárt) AI tippek visszaállítása szerver-újraindítás után.
 // FONTOS: dátumtól függetlenül minden pending tipp visszakerül, mert egy tipp
 // gyakran az előző napon lett felvéve a mai/esti meccsre – ezeknek is látszaniuk kell.
@@ -280,6 +300,8 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
 }
 
 function comboHash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0; return h.toString(36); }
+// Egy kombi láb-halmaz kulcsa (sorrendtől független) – ez alapján dedupolunk.
+function comboKey(c) { return (c.legs || []).map(l => `${l.match}|${l.market}|${l.pick}`).sort().join("__"); }
 // ── Kombi tippek (csak az izgalom kedvéért) ───────────────
 // 2-es és 3-as kötés az AI által adott BIZTONSÁGOS kombi lábakból, KÜLÖNBÖZŐ meccsekről.
 // Minden láb önállóan, közvetlenül a meccs eredménye alapján dől el.
@@ -296,8 +318,7 @@ function buildCombos(legs) {
       pick: l.pick, odds: l.odds, commence: l.commence || null, result: null
     }));
     const odds = parseFloat(legsArr.reduce((p, l) => p * l.odds, 1).toFixed(2));
-    const key  = legsArr.map(l => `${l.match}|${l.market}|${l.pick}`).sort().join("__");
-    const id   = "combo-" + n + "-" + comboHash(key);
+    const id   = "combo-" + n + "-" + comboHash(comboKey({ legs: legsArr }));
     return {
       id, type: "combo", legN: n, legs: legsArr, odds, comboPayout: null,
       note: `${n} lábas kötés – csak az izgalom kedvéért`,
@@ -398,11 +419,15 @@ async function fetchAndProcess() {
   // A főoldal MINDEN még le nem zárt (pending) AI tippet mutasson (a korábbi futásokét is).
   aiTips = history.filter(t => t.type === "ai" && (!t.result || t.result === "pending"));
 
-  // Kombi tippek (külön, csak az izgalom kedvéért) – az AI által adott BIZTONSÁGOS kombi
-  // lábakból, KÜLÖNBÖZŐ meccsekről. Duplikátumot nem gyárt (determinisztikus id a lábakból).
-  const combos = buildCombos(comboLegs);
-  const freshCombos = combos.filter(c => !history.some(t => t.id === c.id));
-  if (freshCombos.length) { history = [...freshCombos, ...history]; saveHistory(); }
+  // Kombi tippek (külön, csak az izgalom kedvéért) – CSAK akkor, ha ebben a futásban
+  // jött ÚJ single tipp. Ha nincs új single, nem keletkezik (ismétlődő) kombi sem.
+  // Dedup a LÁB-HALMAZ alapján (nem az id alapján), így a régi sémás duplikátumot is elkapja.
+  let freshCombos = [];
+  if (fresh.length) {
+    const existingKeys = new Set(history.filter(t => t.type === "combo").map(comboKey));
+    freshCombos = buildCombos(comboLegs).filter(c => !existingKeys.has(comboKey(c)));
+    if (freshCombos.length) { history = [...freshCombos, ...history]; saveHistory(); }
+  }
   comboTips = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
 
   let msg = `🏆 <b>AI Foci Tippek – ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</b>\n\n`;
