@@ -419,15 +419,12 @@ async function fetchAndProcess() {
   // A főoldal MINDEN még le nem zárt (pending) AI tippet mutasson (a korábbi futásokét is).
   aiTips = history.filter(t => t.type === "ai" && (!t.result || t.result === "pending"));
 
-  // Kombi tippek (külön, csak az izgalom kedvéért) – CSAK akkor, ha ebben a futásban
-  // jött ÚJ single tipp. Ha nincs új single, nem keletkezik (ismétlődő) kombi sem.
-  // Dedup a LÁB-HALMAZ alapján (nem az id alapján), így a régi sémás duplikátumot is elkapja.
-  let freshCombos = [];
-  if (fresh.length) {
-    const existingKeys = new Set(history.filter(t => t.type === "combo").map(comboKey));
-    freshCombos = buildCombos(comboLegs).filter(c => !existingKeys.has(comboKey(c)));
-    if (freshCombos.length) { history = [...freshCombos, ...history]; saveHistory(); }
-  }
+  // Kombi tippek (külön, csak az izgalom kedvéért) – az AI biztonságos lábaiból.
+  // Új single nélkül is jöhet friss kombi, de a KORÁBBIVAL azonos láb-halmazú NEM
+  // duplikálódik (a dedup a lábakat nézi, nem az azonosítót).
+  const existingKeys = new Set(history.filter(t => t.type === "combo").map(comboKey));
+  const freshCombos = buildCombos(comboLegs).filter(c => !existingKeys.has(comboKey(c)));
+  if (freshCombos.length) { history = [...freshCombos, ...history]; saveHistory(); }
   comboTips = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
 
   let msg = `🏆 <b>AI Foci Tippek – ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</b>\n\n`;
