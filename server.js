@@ -755,6 +755,20 @@ app.delete("/api/history", (req, res) => {
   res.json({ ok: true });
 });
 
+// Egyetlen tipp/kombi törlése azonosító alapján
+app.delete("/api/history/:id", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const id = req.params.id;
+  const before = history.length;
+  history   = history.filter(t => t.id !== id);
+  aiTips    = aiTips.filter(t => t.id !== id);
+  comboTips = comboTips.filter(t => t.id !== id);
+  const removed = before - history.length;
+  if (removed) saveHistory();
+  console.log(`Tipp törölve (${id}): ${removed} db`);
+  res.json({ ok: true, removed });
+});
+
 app.post("/api/check-results", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   await checkResults();
