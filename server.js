@@ -289,6 +289,7 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       match: t.match, commence: t.commence || null,
       market: t.market, pick: t.pick, odds: t.odds,
       live: false, note: t.note,
+      approved: false, sent: false,
       addedAt: nowHu(), result: "pending"
     }));
     const comboLegs = (Array.isArray(obj.kombi_labak) ? obj.kombi_labak : []).map(l => ({
@@ -322,6 +323,7 @@ function buildCombos(legs) {
     return {
       id, type: "combo", legN: n, legs: legsArr, odds, comboPayout: null,
       note: `${n} lábas kötés – csak az izgalom kedvéért`,
+      approved: false, sent: false,
       addedAt: nowHu(), result: "pending"
     };
   };
@@ -330,6 +332,9 @@ function buildCombos(legs) {
   if (pool.length >= 3) combos.push(mk(pool.slice(0, 3), 3));
   return combos;
 }
+
+// Régi tippeknek nincs approved mezőjük → azokat jóváhagyottnak tekintjük (visszafelé kompatibilitás).
+const isApproved = t => t.approved !== false;
 
 // ── Fő frissítő ───────────────────────────────────────────
 async function fetchAndProcess() {
@@ -427,27 +432,9 @@ async function fetchAndProcess() {
   if (freshCombos.length) { history = [...freshCombos, ...history]; saveHistory(); }
   comboTips = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
 
-  let msg = `🏆 <b>AI Foci Tippek – ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</b>\n\n`;
-  if (fresh.length) {
-    msg += `🤖 <b>ÚJ AI TIPPEK</b>\n<i>Web keresés, forma és statisztika alapján</i>\n\n`;
-    fresh.forEach(t => {
-      msg += `${t.sportLabel} <b>${t.match}</b>\n`;
-      if (t.commence) msg += `🕐 ${t.commence}\n`;
-      msg += `📌 ${t.market} → <b>${t.pick}</b>\n💰 Odds: ${t.odds}\n💡 ${t.note}\n\n`;
-    });
-  } else {
-    msg += `Ebben a futásban nincs új tipp.\n`;
-  }
-  if (freshCombos.length) {
-    msg += `\n🎰 <b>KOMBI TIPPEK</b> <i>(csak az izgalom kedvéért)</i>\n\n`;
-    freshCombos.forEach(c => {
-      msg += `<b>${c.legN} lábas kötés – Össz odds: ${c.odds}</b>\n`;
-      c.legs.forEach(l => { msg += `  • ${l.match}: ${l.pick} (${l.odds})\n`; });
-      msg += `\n`;
-    });
-  }
-  await sendTelegram(msg);
-  console.log(`Frissítve – ${fresh.length} új AI tipp, ${freshCombos.length} új kombi (élő: ${aiTips.length} single, ${comboTips.length} kombi)`);
+  // NINCS automatikus Telegram – az új tippek jóváhagyásra várnak (a felhasználók nem látják),
+  // és csak kézi indításra, jóváhagyás után mennek ki (POST /api/tips/send).
+  console.log(`Frissítve – ${fresh.length} új AI tipp, ${freshCombos.length} új kombi (jóváhagyásra várnak)`);
 }
 
 // ── football-data.org: 90 perces (rendes idejű) eredmény ──
@@ -675,8 +662,9 @@ function scheduleNextFetch() {
   setTimeout(() => { fetchAndProcess(); scheduleNextFetch(); }, minsUntilNext * 60 * 1000);
 }
 
-// ── Napnyitó: 00:03 eredmény-ellenőrzés, 00:05 statisztika (magyar idő) ──
-let _lastCheckDay = "", _lastStatsDay = "";
+// ── Napnyitó: 00:03 automatikus eredmény-ellenőrzés (magyar idő). Telegram NEM megy ki
+//    automatikusan – sem tipp, sem statisztika; azok csak kézi indításra. ──
+let _lastCheckDay = "";
 setInterval(async () => {
   const { hour, minute } = getHungarianTime();
   const dayKey = todayHU();                       // naponta egyszer, dupla lefutás ellen
@@ -684,10 +672,6 @@ setInterval(async () => {
     _lastCheckDay = dayKey;
     console.log("Napnyitó automatikus eredmény-ellenőrzés...");
     await checkResults();
-  }
-  if (hour === 0 && minute === 5 && _lastStatsDay !== dayKey) {
-    _lastStatsDay = dayKey;
-    await sendTelegram(buildStatsMsg("Napi statisztika"));
   }
 }, 60000);
 
@@ -707,8 +691,23 @@ function requireAdmin(req, res) {
 }
 
 // ── API végpontok ─────────────────────────────────────────
-app.get("/api/tips",    (req, res) => res.json({ aiTips, comboTips }));
-app.get("/api/history", (req, res) => res.json(history));
+// Admin (helyes jelszóval) MINDEN tippet lát (jóváhagyásra várókat is); a felhasználók
+// csak a jóváhagyottakat. A jelszó jöhet x-admin-password headerben vagy ?password= query-ben.
+function isAdminReq(req) {
+  const pwd = req.get("x-admin-password") || req.query?.password;
+  return !!ADMIN_PWD && pwd === ADMIN_PWD;
+}
+app.get("/api/tips", (req, res) => {
+  const admin = isAdminReq(req);
+  res.json({
+    aiTips:    admin ? aiTips    : aiTips.filter(isApproved),
+    comboTips: admin ? comboTips : comboTips.filter(isApproved),
+    admin
+  });
+});
+app.get("/api/history", (req, res) => {
+  res.json(isAdminReq(req) ? history : history.filter(isApproved));
+});
 
 app.get("/api/status", (req, res) => {
   const { hour, minute, day } = getHungarianTime();
@@ -767,6 +766,53 @@ app.delete("/api/history/:id", (req, res) => {
   if (removed) saveHistory();
   console.log(`Tipp törölve (${id}): ${removed} db`);
   res.json({ ok: true, removed });
+});
+
+// Tipp jóváhagyása (ettől lesz publikus)
+app.patch("/api/history/:id/approve", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const id = req.params.id;
+  const set = t => t.id === id ? { ...t, approved: true } : t;
+  history   = history.map(set);
+  aiTips    = aiTips.map(set);
+  comboTips = comboTips.map(set);
+  saveHistory();
+  res.json({ ok: true });
+});
+
+// Jóváhagyott, még el nem küldött tippek kézi kiküldése Telegramra
+app.post("/api/tips/send", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const singlesToSend = history.filter(t => t.type === "ai"    && isApproved(t) && !t.sent && (!t.result || t.result === "pending"));
+  const combosToSend  = history.filter(t => t.type === "combo" && isApproved(t) && !t.sent && (!t.result || t.result === "pending"));
+  if (!singlesToSend.length && !combosToSend.length) {
+    return res.json({ ok: true, sent: 0, message: "Nincs kiküldendő (jóváhagyott, még el nem küldött) tipp." });
+  }
+  let msg = `🏆 <b>AI Foci Tippek – ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</b>\n\n`;
+  if (singlesToSend.length) {
+    msg += `🤖 <b>TIPPEK</b>\n<i>Web keresés, forma és statisztika alapján</i>\n\n`;
+    singlesToSend.forEach(t => {
+      msg += `${t.sportLabel} <b>${t.match}</b>\n`;
+      if (t.commence) msg += `🕐 ${t.commence}\n`;
+      msg += `📌 ${t.market} → <b>${t.pick}</b>\n💰 Odds: ${t.odds}\n💡 ${t.note}\n\n`;
+    });
+  }
+  if (combosToSend.length) {
+    msg += `\n🎰 <b>KOMBI TIPPEK</b> <i>(csak az izgalom kedvéért)</i>\n\n`;
+    combosToSend.forEach(c => {
+      msg += `<b>${c.legN} lábas kötés – Össz odds: ${c.odds}</b>\n`;
+      c.legs.forEach(l => { msg += `  • ${l.match}: ${l.pick} (${l.odds})\n`; });
+      msg += `\n`;
+    });
+  }
+  await sendTelegram(msg);
+  const sentIds = new Set([...singlesToSend, ...combosToSend].map(t => t.id));
+  const mark = t => sentIds.has(t.id) ? { ...t, sent: true } : t;
+  history = history.map(mark); aiTips = aiTips.map(mark); comboTips = comboTips.map(mark);
+  saveHistory();
+  const total = singlesToSend.length + combosToSend.length;
+  console.log(`Tippek kiküldve Telegramra: ${total}`);
+  res.json({ ok: true, sent: total });
 });
 
 app.post("/api/check-results", async (req, res) => {
