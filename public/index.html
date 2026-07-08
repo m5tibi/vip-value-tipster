@@ -126,6 +126,7 @@
   <div id="tab-tips">
     <div class="toolbar">
       <div class="last-update" id="last-update">Még nem futott elemzés</div>
+      <button class="btn-send" id="btn-send-tips" onclick="sendTips()" style="display:none">📤 Jóváhagyottak küldése</button>
       <button class="btn-refresh" id="btn-refresh" onclick="refresh()" style="display:none">🔄 Frissítés most</button>
     </div>
     <div class="section-title" style="color:#b39ddb">🤖 AI foci tippek</div>
@@ -145,7 +146,7 @@
       <div style="font-weight:700;color:#00e676;font-size:16px">📊 Előzmény & statisztika</div>
       <div id="admin-tools" style="display:none;gap:8px;flex-wrap:wrap">
         <button class="btn-send" onclick="checkResults()">🔍 Eredmények</button>
-        <button class="btn-send" onclick="sendStats()">📲 Küldés</button>
+        <button class="btn-send" onclick="sendStats()">📲 Statisztika</button>
         <button class="btn-del"  onclick="clearHistory()">🗑️ Törlés</button>
       </div>
     </div>
@@ -285,6 +286,19 @@ function yesterdayKey() {
   return p.length>=3 ? p[0]+" "+p[1]+" "+p[2] : s;
 }
 
+function adminTipControls(t) {
+  if (!isAdmin()) return "";
+  const approved = t.approved !== false;
+  const badge = approved
+    ? `<span style="color:#69f0ae;font-size:11px;font-weight:700">✅ Jóváhagyva (publikus)</span>`
+    : `<span style="color:#ffb74d;font-size:11px;font-weight:700">⏳ Jóváhagyásra vár (rejtett)</span>`;
+  const approveBtn = approved ? "" : `<button class="btn-won" style="font-size:11px;padding:4px 10px" onclick="approveTip('${t.id}')">✅ Jóváhagyás</button>`;
+  return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #2a3550">
+    ${badge}${approveBtn}
+    <button class="btn-del" style="font-size:11px;padding:4px 10px" onclick="deleteTip('${t.id}')">🗑️ Törlés</button>
+  </div>`;
+}
+
 function aiTipHTML(t, showResult) {
   return `
   <div class="tip-card ai">
@@ -299,6 +313,7 @@ function aiTipHTML(t, showResult) {
     <div class="tip-odds-row"><span>Odds: <b style="color:#b39ddb">${t.odds}</b></span></div>
     <div class="tip-note">💡 ${t.note||""}</div>
     ${showResult?`<div class="tip-actions">${resBadge(t.result)}${actionBtns(t)}</div>`:""}
+    ${adminTipControls(t)}
   </div>`;
 }
 
@@ -320,7 +335,7 @@ function comboCardHTML(c, showResult) {
     <div class="tip-note" style="color:#8d6e63">💡 ${c.note||"Csak az izgalom kedvéért"}</div>
     ${payoutLine}
     ${showResult?`<div class="tip-actions">${resBadge(c.result)}</div>`:""}
-    ${isAdmin()?`<button class="btn-del" style="margin-top:6px;font-size:11px;padding:4px 10px" onclick="deleteTip('${c.id}')">🗑️ Kombi törlése</button>`:""}
+    ${adminTipControls(c)}
   </div>`;
 }
 
@@ -560,7 +575,7 @@ let tipsRetryDelay = 3000;
 let tipsErrLogged  = false;
 async function loadTips() {
   try {
-    const r = await fetch("/api/tips", { cache: "no-store" });
+    const r = await fetch("/api/tips", { cache: "no-store", headers: isAdmin()?adminHeaders():{} });
     if (!r.ok) throw new Error("HTTP "+r.status);
     const d = await r.json();
     aiTips    = Array.isArray(d.aiTips)?d.aiTips:[];
@@ -585,7 +600,7 @@ async function loadTips() {
 
 async function loadHistory() {
   try {
-    const r = await fetch("/api/history");
+    const r = await fetch("/api/history", { headers: isAdmin()?adminHeaders():{} });
     history = await r.json();
     renderHistory();
   } catch(e) { console.error("loadHistory hiba:",e); }
@@ -628,6 +643,21 @@ async function deleteTip(id) {
   showStatus("🗑️ Tipp törölve");
 }
 
+async function approveTip(id) {
+  const r = await fetch("/api/history/"+encodeURIComponent(id)+"/approve",{method:"PATCH", headers: adminHeaders()});
+  if (!(await handleAdminResp(r))) return;
+  await loadTips();
+  await loadHistory();
+  showStatus("✅ Tipp jóváhagyva");
+}
+
+async function sendTips() {
+  const r = await fetch("/api/tips/send",{method:"POST", headers: adminHeaders()});
+  if (!(await handleAdminResp(r))) return;
+  const d = await r.json().catch(()=>({}));
+  showStatus(d.sent ? `📤 ${d.sent} tipp kiküldve Telegramra` : "Nincs kiküldendő jóváhagyott tipp");
+}
+
 async function loadStatus() {}
 
 loadStatus();
@@ -638,6 +668,7 @@ setInterval(() => { if (document.visibilityState === "visible") loadTips(); }, 6
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") loadTips(); });
 if (isAdmin()) {
   document.getElementById('btn-refresh').style.display = '';
+  document.getElementById('btn-send-tips').style.display = '';
   document.getElementById('admin-tools').style.display = 'flex';
 }
 </script>
