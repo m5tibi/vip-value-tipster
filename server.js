@@ -45,15 +45,50 @@ function saveLastRun() {
 
 // ── Sport térkép (csak foci) ──────────────────────────────
 const SPORT_MAP = {
-  "soccer_fifa_world_cup":             { sport: "soccer", label: "⚽ FIFA VB 2026",    minValue: 6 },
-  "soccer_uefa_champs_league":         { sport: "soccer", label: "⚽ BL",               minValue: 6 },
-  "soccer_epl":                        { sport: "soccer", label: "⚽ Premier League",    minValue: 6 },
-  "soccer_germany_bundesliga":         { sport: "soccer", label: "⚽ Bundesliga",        minValue: 6 },
-  "soccer_spain_la_liga":              { sport: "soccer", label: "⚽ La Liga",           minValue: 6 },
-  "soccer_italy_serie_a":              { sport: "soccer", label: "⚽ Serie A",           minValue: 6 },
-  "soccer_france_ligue_one":           { sport: "soccer", label: "⚽ Ligue 1",           minValue: 6 },
-  "soccer_conmebol_copa_libertadores": { sport: "soccer", label: "⚽ Copa Libertadores", minValue: 7 },
-  "soccer_conmebol_copa_sudamericana": { sport: "soccer", label: "⚽ Copa Sudamericana", minValue: 7 },
+  // Nemzetközi / kupák
+  "soccer_fifa_world_cup":               { sport: "soccer", label: "⚽ FIFA VB 2026" },
+  "soccer_uefa_champs_league":           { sport: "soccer", label: "⚽ BL" },
+  "soccer_uefa_europa_league":           { sport: "soccer", label: "⚽ EL" },
+  "soccer_uefa_europa_conference_league":{ sport: "soccer", label: "⚽ Konferencia Liga" },
+  "soccer_uefa_nations_league":          { sport: "soccer", label: "⚽ Nemzetek Ligája" },
+  "soccer_conmebol_copa_libertadores":   { sport: "soccer", label: "⚽ Copa Libertadores" },
+  "soccer_conmebol_copa_sudamericana":   { sport: "soccer", label: "⚽ Copa Sudamericana" },
+  // Anglia
+  "soccer_epl":                          { sport: "soccer", label: "⚽ Premier League" },
+  "soccer_efl_champ":                    { sport: "soccer", label: "⚽ Championship" },
+  "soccer_england_league1":              { sport: "soccer", label: "⚽ League One" },
+  "soccer_england_league2":              { sport: "soccer", label: "⚽ League Two" },
+  // Németország
+  "soccer_germany_bundesliga":           { sport: "soccer", label: "⚽ Bundesliga" },
+  "soccer_germany_bundesliga2":          { sport: "soccer", label: "⚽ 2. Bundesliga" },
+  // Spanyolország
+  "soccer_spain_la_liga":                { sport: "soccer", label: "⚽ La Liga" },
+  "soccer_spain_segunda_division":       { sport: "soccer", label: "⚽ La Liga 2" },
+  // Olaszország
+  "soccer_italy_serie_a":                { sport: "soccer", label: "⚽ Serie A" },
+  "soccer_italy_serie_b":                { sport: "soccer", label: "⚽ Serie B" },
+  // Franciaország
+  "soccer_france_ligue_one":             { sport: "soccer", label: "⚽ Ligue 1" },
+  "soccer_france_ligue_two":             { sport: "soccer", label: "⚽ Ligue 2" },
+  // Egyéb európai élvonalak
+  "soccer_netherlands_eredivisie":       { sport: "soccer", label: "⚽ Eredivisie" },
+  "soccer_portugal_primeira_liga":       { sport: "soccer", label: "⚽ Primeira Liga" },
+  "soccer_belgium_first_div":            { sport: "soccer", label: "⚽ Belga élvonal" },
+  "soccer_turkey_super_league":          { sport: "soccer", label: "⚽ Török Szuperliga" },
+  "soccer_greece_super_league":          { sport: "soccer", label: "⚽ Görög Szuperliga" },
+  "soccer_switzerland_superleague":      { sport: "soccer", label: "⚽ Svájci Superliga" },
+  "soccer_austria_bundesliga":           { sport: "soccer", label: "⚽ Osztrák Bundesliga" },
+  "soccer_denmark_superliga":            { sport: "soccer", label: "⚽ Dán Superliga" },
+  "soccer_norway_eliteserien":           { sport: "soccer", label: "⚽ Norvég Eliteserien" },
+  "soccer_sweden_allsvenskan":           { sport: "soccer", label: "⚽ Svéd Allsvenskan" },
+  "soccer_poland_ekstraklasa":           { sport: "soccer", label: "⚽ Lengyel Ekstraklasa" },
+  // Amerika / Ázsia / Óceánia
+  "soccer_brazil_campeonato":            { sport: "soccer", label: "⚽ Brazil Serie A" },
+  "soccer_argentina_primera_division":   { sport: "soccer", label: "⚽ Argentin Primera" },
+  "soccer_usa_mls":                      { sport: "soccer", label: "⚽ MLS" },
+  "soccer_mexico_ligamx":                { sport: "soccer", label: "⚽ Liga MX" },
+  "soccer_japan_j_league":               { sport: "soccer", label: "⚽ J1 League" },
+  "soccer_australia_aleague":            { sport: "soccer", label: "⚽ A-League" },
 };
 
 const EXCLUDED_BM = ["betfair_ex_eu", "betfair_ex_uk", "matchbook", "betfair_sb_uk", "smarkets"];
@@ -432,8 +467,13 @@ async function fetchAndProcess() {
   if (freshCombos.length) { history = [...freshCombos, ...history]; saveHistory(); }
   comboTips = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
 
-  // NINCS automatikus Telegram – az új tippek jóváhagyásra várnak (a felhasználók nem látják),
-  // és csak kézi indításra, jóváhagyás után mennek ki (POST /api/tips/send).
+  // Státusz-értesítés Telegramra (a tippek TARTALMA NEM megy ki – az csak jóváhagyás után,
+  // a "📤 Jóváhagyottak küldése" gombbal). Ez csak egy heads-up, hogy lefutott a lekérdezés.
+  const total = fresh.length + freshCombos.length;
+  const statusMsg = total
+    ? `🔔 <b>Lekérdezés lefutott</b>\n${fresh.length} új tipp${freshCombos.length ? ` + ${freshCombos.length} kombi` : ""} vár jóváhagyásra a felületen.`
+    : `🔔 <b>Lekérdezés lefutott</b>\nNincs új tipp.`;
+  await sendTelegram(statusMsg);
   console.log(`Frissítve – ${fresh.length} új AI tipp, ${freshCombos.length} új kombi (jóváhagyásra várnak)`);
 }
 
