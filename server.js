@@ -382,10 +382,24 @@ async function fetchAndProcess() {
   );
 
   const matchList = [];
+  let scannedLeagues = 0, oddsCalls = 0;
   for (const [sportKey, meta] of Object.entries(SPORT_MAP)) {
     try {
+      // 1) INGYENES esemény-lekérdezés (/events = 0 kredit): van-e meccs a köv. 24 órában?
+      const er = await fetch(`https://api.the-odds-api.com/v4/sports/${sportKey}/events?apiKey=${ODDS_API_KEY}&dateFormat=iso`);
+      scannedLeagues++;
+      if (!er.ok) continue;
+      const events = await er.json();
+      const hasUpcoming = (Array.isArray(events) ? events : []).some(e => {
+        const h = (new Date(e.commence_time) - now) / 3600000;
+        return h >= 0 && h <= 24;
+      });
+      if (!hasUpcoming) continue;   // nincs közelgő meccs → NEM kérünk (drága) oddsot
+
+      // 2) Csak most kérünk oddsot (3 kredit/liga), mert van közelgő meccs
       const url   = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h,totals,spreads&oddsFormat=decimal&dateFormat=iso`;
       const r     = await fetch(url);
+      oddsCalls++;
       if (!r.ok) continue;
       const games = await r.json();
       for (const game of games) {
@@ -444,6 +458,7 @@ async function fetchAndProcess() {
       }
     } catch {}
   }
+  console.log(`Ligák átnézve (ingyenes): ${scannedLeagues} · odds-hívás (fizetős, ~3 kredit/liga): ${oddsCalls} · feldolgozható meccs: ${matchList.length}`);
 
   const { singles, comboLegs } = await fetchAiTips(matchList, [...todayAiMatches]);
 
