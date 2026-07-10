@@ -129,13 +129,13 @@
       <button class="btn-send" id="btn-send-tips" onclick="sendTips()" style="display:none">📤 Jóváhagyottak küldése</button>
       <button class="btn-refresh" id="btn-refresh" onclick="refresh()" style="display:none">🔄 Frissítés most</button>
     </div>
-    <div class="section-title" style="color:#b39ddb">🤖 AI foci tippek</div>
+    <div class="section-title" style="color:#b39ddb">🤖 Single tippek</div>
     <div class="section-sub">Valós web keresés alapján, forma és statisztika elemzéssel</div>
     <div id="ai-list"><div class="no-value">📭 Jelenleg nincs kiadott tipp.</div></div>
     <div id="combo-wrap" style="display:none">
       <hr class="divider">
       <div class="section-title" style="color:#ffcc80">🎰 Kombi tippek</div>
-      <div class="section-sub">Biztonságosabb lábakból, több meccsről — csak az izgalom kedvéért (külön statisztika)</div>
+      <div class="section-sub">Biztonságosabb lábakból, több különböző meccsről</div>
       <div id="combo-list"></div>
     </div>
   </div>
@@ -161,7 +161,7 @@
       <div class="stat-card"><div class="stat-label">ROI</div><div class="stat-value" id="h-roi">–</div></div>
     </div>
     <div id="combo-stats" style="display:none;background:#0d1b2a;border:1px solid #5d4037;border-radius:10px;padding:12px;margin-bottom:12px">
-      <div style="font-weight:700;color:#ffcc80;font-size:14px;margin-bottom:8px">🎰 Kombi tippek (külön)</div>
+      <div style="font-weight:700;color:#ffcc80;font-size:14px;margin-bottom:8px">🎰 Kombi tippek</div>
       <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:#cfd8dc">
         <span>✅ <b id="c-won">0</b></span>
         <span>❌ <b id="c-lost">0</b></span>
@@ -332,7 +332,6 @@ function comboCardHTML(c, showResult) {
       <span class="bdg" style="background:#3e2723;color:#ffcc80;margin-left:auto">Össz odds: ${c.odds}</span>
     </div>
     <div style="margin:6px 0">${legs}</div>
-    <div class="tip-note" style="color:#8d6e63">💡 ${c.note||"Csak az izgalom kedvéért"}</div>
     ${payoutLine}
     ${showResult?`<div class="tip-actions">${resBadge(c.result)}</div>`:""}
     ${adminTipControls(c)}
@@ -501,7 +500,7 @@ function renderHistory() {
   }
 
   // Egy tipplista (single VAGY kombi) nap/hónap szerinti rendszerezett HTML-je.
-  function groupedHtml(tipsArr) {
+  function groupedHtml(tipsArr, kind) {
     const pending = tipsArr.filter(t=>!t.result||t.result==="pending");
     const done    = tipsArr.filter(t=>t.result&&t.result!=="pending");
     const pendingByDay = {};
@@ -511,13 +510,13 @@ function renderHistory() {
 
     let html = "";
     if (pending.length) {
-      html += `<div class="section-header" style="background:#0d2a3a;color:#90caf9">⏳ Folyamatban lévő tippek</div>`;
+      html += `<div class="section-header" style="background:#0d2a3a;color:#90caf9">⏳ Folyamatban lévő ${kind} tippek</div>`;
       Object.keys(pendingByDay).sort((a,b)=>b.localeCompare(a)).forEach(day => {
         html += makeDaySection(day, pendingByDay[day], true);
       });
     }
     if (done.length) {
-      html += `<div class="section-header" style="background:#0d1b2a;color:#80cbc4;margin-top:8px">📋 Lezárt tippek</div>`;
+      html += `<div class="section-header" style="background:#0d1b2a;color:#80cbc4;margin-top:8px">📋 Lezárt ${kind} tippek</div>`;
       const currentMonth = monthKeyOf(todayKey());
       const monthsToDays = {};
       Object.keys(doneByDay).forEach(day => {
@@ -539,9 +538,9 @@ function renderHistory() {
   }
 
   dayCounter = 0;
-  el.innerHTML = H.length ? groupedHtml(H) : '<div class="empty">Még nincsenek rögzített foci tippek.</div>';
+  el.innerHTML = H.length ? groupedHtml(H, "single") : '<div class="empty">Még nincsenek rögzített foci tippek.</div>';
   const comboHist = document.getElementById("combo-history");
-  if (comboHist) comboHist.innerHTML = combos.length ? groupedHtml(combos) : "";
+  if (comboHist) comboHist.innerHTML = combos.length ? groupedHtml(combos, "kombi") : "";
 }
 
 function toggleDay(id) {
