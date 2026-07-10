@@ -292,8 +292,8 @@ KÉT dolgot adj:
    - Lehetőleg KÜLÖNBÖZŐ meccsekről legyenek. Ha csak 1 meccs van elérhető, akkor csak 1 tippet adj.
    - Csak pozitív kimenetel: over gólok, hendikep győzelem, csapat győzelme. NE adj under tippet a singlekbe.
 
-2) "kombi_labak": 3-4 BIZTONSÁGOS, alacsony kockázatú láb kombi szelvényhez.
-   - MINDEGYIK láb MÁS meccsről legyen – használj annyi különböző meccset, amennyi elérhető (legalább 2, hogy összeálljon a kötés). Ha van elég meccs, adj 3-4 lábat különböző meccsekről.
+2) "kombi_labak": 4-6 BIZTONSÁGOS, alacsony kockázatú láb kombi szelvényekhez.
+   - MINDEGYIK láb MÁS meccsről legyen – használj annyi különböző meccset, amennyi elérhető (legalább 2, hogy összeálljon egy kötés; ha van elég meccs, adj 4-6 lábat, hogy több, NEM átfedő kötés is kijöjjön).
    - Ezek külön-külön NEM elég értékesek single tippnek (alacsony odds, jellemzően 1.15-1.55), de kombinálva szép össz oddsot adnak.
    - Magas valószínűségű kimenetelek: erős favorit győzelme, Over 1.5, Under 4.5, hendikep -1 / -1.5 nagy favoritnál stb.
 
@@ -345,16 +345,29 @@ function comboHash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h
 // Egy kombi láb-halmaz kulcsa (sorrendtől független) – ez alapján dedupolunk.
 function comboKey(c) { return (c.legs || []).map(l => `${l.match}|${l.market}|${l.pick}`).sort().join("__"); }
 // ── Kombi tippek (csak az izgalom kedvéért) ───────────────
-// 2-es és 3-as kötés az AI által adott BIZTONSÁGOS kombi lábakból, KÜLÖNBÖZŐ meccsekről.
-// Minden láb önállóan, közvetlenül a meccs eredménye alapján dől el.
+// Az AI biztonságos lábaiból NEM ÁTFEDŐ (diszjunkt) 2-3 lábas kötéseket állít össze:
+// két kombi SOSE osztozik lábon (különben korreláltak lennének – ha az egyik veszít,
+// a másik sem nyerhetne). Minden láb önállóan, a meccs eredménye alapján dől el.
 function buildCombos(legs) {
   const byMatch = {};
   for (const l of legs) {
     if (!l.match || !l.odds) continue;
     if (!byMatch[l.match] || l.odds < byMatch[l.match].odds) byMatch[l.match] = l;   // meccsenként a legbiztosabb
   }
-  const pool = Object.values(byMatch).sort((a, b) => a.odds - b.odds);
-  const mk = (items, n) => {
+  const pool = Object.values(byMatch).sort((a, b) => a.odds - b.odds);   // legbiztosabb elöl
+
+  // A poolt diszjunkt darabokra bontjuk (2-3 láb/darab), egy-1-leftover nélkül.
+  const chunks = [];
+  let i = 0, remaining = pool.length;
+  while (remaining >= 2) {
+    const size = remaining === 4 ? 2 : (remaining >= 3 ? 3 : 2);   // 4 → 2+2 (ne maradjon 1 árván)
+    chunks.push(pool.slice(i, i + size));
+    i += size; remaining -= size;
+    if (chunks.length >= 3) break;   // legfeljebb 3 kombi egy futásból
+  }
+
+  const mk = items => {
+    const n = items.length;
     const legsArr = items.map(l => ({
       match: l.match, sportLabel: l.sportLabel, market: l.market,
       pick: l.pick, odds: l.odds, commence: l.commence || null, result: null
@@ -368,10 +381,7 @@ function buildCombos(legs) {
       addedAt: nowHu(), result: "pending"
     };
   };
-  const combos = [];
-  if (pool.length >= 2) combos.push(mk(pool.slice(0, 2), 2));
-  if (pool.length >= 3) combos.push(mk(pool.slice(0, 3), 3));
-  return combos;
+  return chunks.map(mk);
 }
 
 // Régi tippeknek nincs approved mezőjük → azokat jóváhagyottnak tekintjük (visszafelé kompatibilitás).
