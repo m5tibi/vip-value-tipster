@@ -92,6 +92,7 @@ const SPORT_MAP = {
 };
 
 const EXCLUDED_BM = ["betfair_ex_eu", "betfair_ex_uk", "matchbook", "betfair_sb_uk", "smarkets"];
+const WINDOW_HOURS = 36;   // meddig előre nézzen a tippekhez/kombikhoz (több meccs → kombi is összeáll)
 
 let history    = loadHistory();
 console.log(`History betöltve: ${history.length} tipp`);
@@ -279,7 +280,7 @@ async function fetchAiTips(matchList, alreadyTipped = []) {
     ? `\nEZEKRE A MECCSEKRE MÁR VAN SINGLE TIPP – NE adj rájuk újabb SINGLE tippet (de kombi lábnak felhasználhatod): ${alreadyTipped.join("; ")}\n`
     : "";
 
-  const prompt = `Te egy profi labdarúgás-fogadási elemző vagy. Használj web keresést az aktuális formához, sérülésekhez és keretinformációkhoz az alábbi mai foci meccsekre.
+  const prompt = `Te egy profi labdarúgás-fogadási elemző vagy. Használj web keresést az aktuális formához, sérülésekhez és keretinformációkhoz az alábbi közelgő foci meccsekre (a következő ~36 óra).
 
 Mai meccsek (valós bookmaker oddsokkal):
 ${matchText}
@@ -287,12 +288,14 @@ ${skipNote}
 KÉT dolgot adj:
 
 1) "tippek": 2-3 ERŐS single tipp (csak a legjobbak, ne erőltesd a számot).
+   - MECCSENKÉNT LEGFELJEBB 1 single tipp – a legerősebb piacot válaszd az adott meccsre. Ne adj több tippet ugyanarra a meccsre!
+   - Lehetőleg KÜLÖNBÖZŐ meccsekről legyenek. Ha csak 1 meccs van elérhető, akkor csak 1 tippet adj.
    - Csak pozitív kimenetel: over gólok, hendikep győzelem, csapat győzelme. NE adj under tippet a singlekbe.
 
-2) "kombi_labak": 3-4 BIZTONSÁGOS, alacsony kockázatú láb KÜLÖNBÖZŐ meccsekről, kombi szelvényhez.
+2) "kombi_labak": 3-4 BIZTONSÁGOS, alacsony kockázatú láb kombi szelvényhez.
+   - MINDEGYIK láb MÁS meccsről legyen – használj annyi különböző meccset, amennyi elérhető (legalább 2, hogy összeálljon a kötés). Ha van elég meccs, adj 3-4 lábat különböző meccsekről.
    - Ezek külön-külön NEM elég értékesek single tippnek (alacsony odds, jellemzően 1.15-1.55), de kombinálva szép össz oddsot adnak.
    - Magas valószínűségű kimenetelek: erős favorit győzelme, Over 1.5, Under 4.5, hendikep -1 / -1.5 nagy favoritnál stb.
-   - MINDEGYIK láb MÁS meccsről legyen.
 
 KÖZÖS szabályok:
 - Az "odds" mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd (a megfelelő piac/kimenet oddsát).
@@ -318,7 +321,7 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
     if (!found) { console.log("AI: nem sikerült JSON-t kinyerni\n" + text.slice(0, 300)); return { singles: [], comboLegs: [] }; }
     let obj;
     try { obj = JSON.parse(found[0]); } catch { console.log("AI: JSON parse hiba"); return { singles: [], comboLegs: [] }; }
-    const singles = (Array.isArray(obj.tippek) ? obj.tippek : []).map(t => ({
+    const singlesAll = (Array.isArray(obj.tippek) ? obj.tippek : []).map(t => ({
       id: `ai-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: "ai", sport: t.sport, sportLabel: t.sportLabel,
       match: t.match, commence: t.commence || null,
@@ -327,6 +330,9 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       approved: false, sent: false,
       addedAt: nowHu(), result: "pending"
     }));
+    // Backstop: meccsenként legfeljebb 1 single (az AI a legerősebbet teszi előre)
+    const seenMatch = new Set();
+    const singles = singlesAll.filter(t => { if (seenMatch.has(t.match)) return false; seenMatch.add(t.match); return true; });
     const comboLegs = (Array.isArray(obj.kombi_labak) ? obj.kombi_labak : []).map(l => ({
       match: l.match, sportLabel: l.sportLabel || "⚽",
       market: l.market, pick: l.pick, odds: parseFloat(l.odds) || 0, commence: l.commence || null
@@ -392,7 +398,7 @@ async function fetchAndProcess() {
       const events = await er.json();
       const hasUpcoming = (Array.isArray(events) ? events : []).some(e => {
         const h = (new Date(e.commence_time) - now) / 3600000;
-        return h >= 0 && h <= 24;
+        return h >= 0 && h <= WINDOW_HOURS;
       });
       if (!hasUpcoming) continue;   // nincs közelgő meccs → NEM kérünk (drága) oddsot
 
@@ -404,7 +410,7 @@ async function fetchAndProcess() {
       const games = await r.json();
       for (const game of games) {
         const hoursUntil = (new Date(game.commence_time) - now) / 3600000;
-        if (hoursUntil < 0 || hoursUntil > 24) continue;
+        if (hoursUntil < 0 || hoursUntil > WINDOW_HOURS) continue;
         // (Nincs meccs-kihagyás: a teljes lista kell a kombi lábakhoz is; a single
         //  duplikátumot a prompt + a válasz utólagos szűrése kezeli.)
 
@@ -717,9 +723,9 @@ function scheduleNextFetch() {
   setTimeout(() => { fetchAndProcess(); scheduleNextFetch(); }, minsUntilNext * 60 * 1000);
 }
 
-// ── Napnyitó: 00:03 automatikus eredmény-ellenőrzés (magyar idő). Telegram NEM megy ki
-//    automatikusan – sem tipp, sem statisztika; azok csak kézi indításra. ──
-let _lastCheckDay = "";
+// ── Napnyitó: 00:03 automatikus eredmény-ellenőrzés, 00:05 napi statisztika Telegramra
+//    (magyar idő). Tipptartalom NEM megy ki automatikusan – az csak jóváhagyás után, kézzel. ──
+let _lastCheckDay = "", _lastStatsDay = "";
 setInterval(async () => {
   const { hour, minute } = getHungarianTime();
   const dayKey = todayHU();                       // naponta egyszer, dupla lefutás ellen
@@ -727,6 +733,10 @@ setInterval(async () => {
     _lastCheckDay = dayKey;
     console.log("Napnyitó automatikus eredmény-ellenőrzés...");
     await checkResults();
+  }
+  if (hour === 0 && minute === 5 && _lastStatsDay !== dayKey) {
+    _lastStatsDay = dayKey;
+    await sendTelegram(buildStatsMsg("Napi statisztika"));
   }
 }, 60000);
 
