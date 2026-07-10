@@ -368,9 +368,18 @@ function tipProfit(t) {
     default:          return 0;   // push / pending
   }
 }
+// Profit tetszőleges tippre (kombit is kezel: comboPayout - 1)
+function tipProfitAny(t) {
+  if (t.type === "combo") {
+    if (!["won","lost","push"].includes(t.result)) return 0;
+    const payout = typeof t.comboPayout==="number" ? t.comboPayout : (t.result==="won"?parseFloat(t.odds):t.result==="push"?1:0);
+    return payout - 1;
+  }
+  return tipProfit(t);
+}
 function subStats(tips) {
   const s = tips.filter(t=>["won","lost","push","half_won","half_lost"].includes(t.result));
-  const profit = s.reduce((a,t)=>a+tipProfit(t),0);
+  const profit = s.reduce((a,t)=>a+tipProfitAny(t),0);
   const roi = s.length ? (profit/s.length)*100 : 0;
   return { profit, roi, settled: s.length };
 }
@@ -396,8 +405,7 @@ function renderHistory() {
     document.getElementById("c-pend").textContent = cPend;
     const cp=document.getElementById("c-profit"); cp.textContent=cSet.length?(cProfit>=0?"+":"")+cProfit.toFixed(2):"–"; cp.style.color=cCol;
     const cr=document.getElementById("c-roi");    cr.textContent=cRoi!=null?(cProfit>=0?"+":"")+cRoi+"%":"–"; cr.style.color=cCol;
-    const sorted=[...combos].sort((a,b)=>(b.addedAt||"").localeCompare(a.addedAt||""));
-    document.getElementById("combo-history").innerHTML = sorted.map(c=>comboCardHTML(c,true)).join("");
+    // (A kombi-lista nap/hónap szerint rendszerezve alább, a section-builderek után töltődik.)
   } else {
     cStats.style.display = "none";
   }
@@ -431,17 +439,9 @@ function renderHistory() {
   document.getElementById("h-roi").style.color    = roiCol;
 
   const el = document.getElementById("history-list");
-  if (!H.length) { el.innerHTML='<div class="empty">Még nincsenek rögzített foci tippek.</div>'; return; }
 
   const TODAY     = todayKey();
   const YESTERDAY = yesterdayKey();
-
-  const byDay = {};
-  H.forEach(t => {
-    const d = getDay(t.addedAt);
-    if (!byDay[d]) byDay[d] = [];
-    byDay[d].push(t);
-  });
 
   function makeDaySection(day, tips, defaultOpen) {
     const id      = "ds-"+(dayCounter++);
@@ -500,49 +500,48 @@ function renderHistory() {
     </div>`;
   }
 
-  dayCounter = 0;
-  const pending = history.filter(t=>!t.result||t.result==="pending");
-  const done    = history.filter(t=>t.result&&t.result!=="pending");
+  // Egy tipplista (single VAGY kombi) nap/hónap szerinti rendszerezett HTML-je.
+  function groupedHtml(tipsArr) {
+    const pending = tipsArr.filter(t=>!t.result||t.result==="pending");
+    const done    = tipsArr.filter(t=>t.result&&t.result!=="pending");
+    const pendingByDay = {};
+    pending.forEach(t=>{ const d=getDay(t.addedAt); if(!pendingByDay[d]) pendingByDay[d]=[]; pendingByDay[d].push(t); });
+    const doneByDay = {};
+    done.forEach(t=>{ const d=getDay(t.addedAt); if(!doneByDay[d]) doneByDay[d]=[]; doneByDay[d].push(t); });
 
-  const pendingByDay = {};
-  pending.forEach(t=>{ const d=getDay(t.addedAt); if(!pendingByDay[d]) pendingByDay[d]=[]; pendingByDay[d].push(t); });
-
-  const doneByDay = {};
-  done.forEach(t=>{ const d=getDay(t.addedAt); if(!doneByDay[d]) doneByDay[d]=[]; doneByDay[d].push(t); });
-
-  let html = "";
-  if (pending.length) {
-    html += `<div class="section-header" style="background:#0d2a3a;color:#90caf9">⏳ Folyamatban lévő tippek</div>`;
-    Object.keys(pendingByDay).sort((a,b)=>b.localeCompare(a)).forEach(day => {
-      html += makeDaySection(day, pendingByDay[day], true);
-    });
-  }
-  if (done.length) {
-    html += `<div class="section-header" style="background:#0d1b2a;color:#80cbc4;margin-top:8px">📋 Lezárt tippek</div>`;
-    const currentMonth = monthKeyOf(todayKey());
-
-    // Napokat hónapokba soroljuk
-    const monthsToDays = {};
-    Object.keys(doneByDay).forEach(day => {
-      const mk = monthKeyOf(day);
-      if (!monthsToDays[mk]) monthsToDays[mk] = [];
-      monthsToDays[mk].push(day);
-    });
-
-    // Aktuális hónap: napok közvetlenül (mint eddig)
-    (monthsToDays[currentMonth] || []).sort((a,b)=>b.localeCompare(a)).forEach(day => {
-      html += makeDaySection(day, doneByDay[day], false);
-    });
-
-    // Korábbi hónapok: hónaponként összecsukva, legfrissebb elöl
-    Object.keys(monthsToDays).filter(mk => mk !== currentMonth)
-      .sort((a,b)=>b.localeCompare(a)).forEach(mk => {
-        const monthTips = [];
-        monthsToDays[mk].forEach(day => monthTips.push(...doneByDay[day]));
-        html += makeMonthSection(mk, monthTips);
+    let html = "";
+    if (pending.length) {
+      html += `<div class="section-header" style="background:#0d2a3a;color:#90caf9">⏳ Folyamatban lévő tippek</div>`;
+      Object.keys(pendingByDay).sort((a,b)=>b.localeCompare(a)).forEach(day => {
+        html += makeDaySection(day, pendingByDay[day], true);
       });
+    }
+    if (done.length) {
+      html += `<div class="section-header" style="background:#0d1b2a;color:#80cbc4;margin-top:8px">📋 Lezárt tippek</div>`;
+      const currentMonth = monthKeyOf(todayKey());
+      const monthsToDays = {};
+      Object.keys(doneByDay).forEach(day => {
+        const mk = monthKeyOf(day);
+        if (!monthsToDays[mk]) monthsToDays[mk] = [];
+        monthsToDays[mk].push(day);
+      });
+      (monthsToDays[currentMonth] || []).sort((a,b)=>b.localeCompare(a)).forEach(day => {
+        html += makeDaySection(day, doneByDay[day], false);
+      });
+      Object.keys(monthsToDays).filter(mk => mk !== currentMonth)
+        .sort((a,b)=>b.localeCompare(a)).forEach(mk => {
+          const monthTips = [];
+          monthsToDays[mk].forEach(day => monthTips.push(...doneByDay[day]));
+          html += makeMonthSection(mk, monthTips);
+        });
+    }
+    return html;
   }
-  el.innerHTML = html;
+
+  dayCounter = 0;
+  el.innerHTML = H.length ? groupedHtml(H) : '<div class="empty">Még nincsenek rögzített foci tippek.</div>';
+  const comboHist = document.getElementById("combo-history");
+  if (comboHist) comboHist.innerHTML = combos.length ? groupedHtml(combos) : "";
 }
 
 function toggleDay(id) {
