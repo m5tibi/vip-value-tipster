@@ -93,6 +93,7 @@ const SPORT_MAP = {
 
 const EXCLUDED_BM = ["betfair_ex_eu", "betfair_ex_uk", "matchbook", "betfair_sb_uk", "smarkets"];
 const WINDOW_HOURS = 36;   // meddig előre nézzen a tippekhez/kombikhoz (több meccs → kombi is összeáll)
+const MIN_SINGLE_ODDS = 1.50;   // single tippnél minimum odds (a kombi lábakra NEM vonatkozik)
 
 let history    = loadHistory();
 console.log(`History betöltve: ${history.length} tipp`);
@@ -289,6 +290,7 @@ KÉT dolgot adj:
 
 1) "tippek": 2-3 ERŐS single tipp (csak a legjobbak, ne erőltesd a számot).
    - MECCSENKÉNT LEGFELJEBB 1 single tipp – a legerősebb piacot válaszd az adott meccsre. Ne adj több tippet ugyanarra a meccsre!
+   - CSAK legalább ${MIN_SINGLE_ODDS} oddsú single tippet adj – az ennél alacsonyabb oddsú kimenetet NE tedd single tippnek (a nagyon alacsony oddsúak a kombi lábak közé valók).
    - Lehetőleg KÜLÖNBÖZŐ meccsekről legyenek. Ha csak 1 meccs van elérhető, akkor csak 1 tippet adj.
    - Csak pozitív kimenetel: over gólok, hendikep győzelem, csapat győzelme. NE adj under tippet a singlekbe.
 
@@ -330,9 +332,11 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       approved: false, sent: false,
       addedAt: nowHu(), result: "pending"
     }));
-    // Backstop: meccsenként legfeljebb 1 single (az AI a legerősebbet teszi előre)
+    // Backstop: minimum odds szűrő + meccsenként legfeljebb 1 single (az AI a legerősebbet teszi előre)
     const seenMatch = new Set();
-    const singles = singlesAll.filter(t => { if (seenMatch.has(t.match)) return false; seenMatch.add(t.match); return true; });
+    const singles = singlesAll
+      .filter(t => (parseFloat(t.odds) || 0) >= MIN_SINGLE_ODDS)
+      .filter(t => { if (seenMatch.has(t.match)) return false; seenMatch.add(t.match); return true; });
     const comboLegs = (Array.isArray(obj.kombi_labak) ? obj.kombi_labak : []).map(l => ({
       match: l.match, sportLabel: l.sportLabel || "⚽",
       market: l.market, pick: l.pick, odds: parseFloat(l.odds) || 0, commence: l.commence || null
