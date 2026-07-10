@@ -376,7 +376,7 @@ function buildCombos(legs) {
     const id   = "combo-" + n + "-" + comboHash(comboKey({ legs: legsArr }));
     return {
       id, type: "combo", legN: n, legs: legsArr, odds, comboPayout: null,
-      note: `${n} lábas kötés – csak az izgalom kedvéért`,
+      note: `${n} lábas kötés`,
       approved: false, sent: false,
       addedAt: nowHu(), result: "pending"
     };
@@ -873,7 +873,7 @@ app.post("/api/tips/send", async (req, res) => {
     });
   }
   if (combosToSend.length) {
-    msg += `\n🎰 <b>KOMBI TIPPEK</b> <i>(csak az izgalom kedvéért)</i>\n\n`;
+    msg += `\n🎰 <b>KOMBI TIPPEK</b>\n\n`;
     combosToSend.forEach(c => {
       msg += `<b>${c.legN} lábas kötés – Össz odds: ${c.odds}</b>\n`;
       c.legs.forEach(l => { msg += `  • ${l.match}: ${l.pick} (${l.odds})\n`; });
