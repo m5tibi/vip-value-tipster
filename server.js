@@ -394,11 +394,12 @@ const isApproved = t => t.approved !== false;
 // ── Fő frissítő ───────────────────────────────────────────
 async function fetchAndProcess() {
   const now   = new Date();
-  const today = todayHU();
   console.log(`Elemzés indul: ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}`);
 
-  const todayAiMatches = new Set(
-    history.filter(t => t.type === "ai" && t.addedAt?.startsWith(today)).map(t => t.match)
+  // Minden MÉG LE NEM ZÁRT (pending) single tipp meccse – dátumtól függetlenül.
+  // Így egy előre (pl. tegnap) felvett, még el nem kezdődött meccsre nem ad újabb tippet.
+  const tippedMatches = new Set(
+    history.filter(t => t.type === "ai" && (!t.result || t.result === "pending")).map(t => t.match)
   );
 
   const matchList = [];
@@ -480,10 +481,10 @@ async function fetchAndProcess() {
   }
   console.log(`Ligák átnézve (ingyenes): ${scannedLeagues} · odds-hívás (fizetős, ~3 kredit/liga): ${oddsCalls} · feldolgozható meccs: ${matchList.length}`);
 
-  const { singles, comboLegs } = await fetchAiTips(matchList, [...todayAiMatches]);
+  const { singles, comboLegs } = await fetchAiTips(matchList, [...tippedMatches]);
 
   // Backstop: a már ma tippelt meccsekre ne kerüljön újabb SINGLE (a prompt mellett is szűrünk)
-  const newAiTips = singles.filter(t => !todayAiMatches.has(t.match));
+  const newAiTips = singles.filter(t => !tippedMatches.has(t.match));
 
   // Új single tippek hozzáadása a history-hoz (a meglévők megtartásával)
   const existingIds = new Set(history.map(t => t.id));
