@@ -323,10 +323,25 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
     if (!found) { console.log("AI: nem sikerült JSON-t kinyerni\n" + text.slice(0, 300)); return { singles: [], comboLegs: [] }; }
     let obj;
     try { obj = JSON.parse(found[0]); } catch { console.log("AI: JSON parse hiba"); return { singles: [], comboLegs: [] }; }
+    // A valós kezdési idő a meccslistából (odds API), nem az AI adatából
+    const realCommence = name => {
+      const exact = matchList.find(m => m.match === name);
+      if (exact) return exact.commence;
+      const parts = String(name || "").split(/\s+vs\.?\s+/i);
+      if (parts.length !== 2) return null;
+      const nh = normTeam(parts[0]), na = normTeam(parts[1]);
+      const m = matchList.find(x => {
+        const p = String(x.match).split(/\s+vs\.?\s+/i);
+        if (p.length !== 2) return false;
+        const h = normTeam(p[0]), a = normTeam(p[1]);
+        return (nameSim(nh, h) && nameSim(na, a)) || (nameSim(nh, a) && nameSim(na, h));
+      });
+      return m ? m.commence : null;
+    };
     const singlesAll = (Array.isArray(obj.tippek) ? obj.tippek : []).map(t => ({
       id: `ai-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: "ai", sport: t.sport, sportLabel: t.sportLabel,
-      match: t.match, commence: t.commence || null,
+      match: t.match, commence: realCommence(t.match) || t.commence || null,
       market: t.market, pick: t.pick, odds: t.odds,
       live: false, note: t.note,
       approved: false, sent: false,
@@ -352,7 +367,22 @@ function comboKey(c) { return (c.legs || []).map(l => `${l.match}|${l.market}|${
 // Az AI biztonságos lábaiból NEM ÁTFEDŐ (diszjunkt) 2-3 lábas kötéseket állít össze:
 // két kombi SOSE osztozik lábon (különben korreláltak lennének – ha az egyik veszít,
 // a másik sem nyerhetne). Minden láb önállóan, a meccs eredménye alapján dől el.
-function buildCombos(legs) {
+function buildCombos(legs, matchList = []) {
+  // A valós kezdési idő a meccslistából (odds API), nem az AI adatából – laza névpárosítással.
+  const realCommence = name => {
+    const exact = matchList.find(m => m.match === name);
+    if (exact) return exact.commence;
+    const parts = String(name || "").split(/\s+vs\.?\s+/i);
+    if (parts.length !== 2) return null;
+    const nh = normTeam(parts[0]), na = normTeam(parts[1]);
+    const m = matchList.find(x => {
+      const p = String(x.match).split(/\s+vs\.?\s+/i);
+      if (p.length !== 2) return false;
+      const h = normTeam(p[0]), a = normTeam(p[1]);
+      return (nameSim(nh, h) && nameSim(na, a)) || (nameSim(nh, a) && nameSim(na, h));
+    });
+    return m ? m.commence : null;
+  };
   const byMatch = {};
   for (const l of legs) {
     if (!l.match || !l.odds) continue;
@@ -374,7 +404,7 @@ function buildCombos(legs) {
     const n = items.length;
     const legsArr = items.map(l => ({
       match: l.match, sportLabel: l.sportLabel, market: l.market,
-      pick: l.pick, odds: l.odds, commence: l.commence || null, result: null
+      pick: l.pick, odds: l.odds, commence: realCommence(l.match) || l.commence || null, result: null
     }));
     const odds = parseFloat(legsArr.reduce((p, l) => p * l.odds, 1).toFixed(2));
     const id   = "combo-" + n + "-" + comboHash(comboKey({ legs: legsArr }));
@@ -499,7 +529,7 @@ async function fetchAndProcess() {
   // Új single nélkül is jöhet friss kombi, de a KORÁBBIVAL azonos láb-halmazú NEM
   // duplikálódik (a dedup a lábakat nézi, nem az azonosítót).
   const existingKeys = new Set(history.filter(t => t.type === "combo").map(comboKey));
-  const freshCombos = buildCombos(comboLegs).filter(c => !existingKeys.has(comboKey(c)));
+  const freshCombos = buildCombos(comboLegs, matchList).filter(c => !existingKeys.has(comboKey(c)));
   if (freshCombos.length) { history = [...freshCombos, ...history]; saveHistory(); }
   comboTips = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
 
@@ -609,11 +639,15 @@ async function regulationScore(game, cache) {
 // won / lost / push / half_won / half_lost, vagy null ha nem értelmezhető.
 function settleMarket(market, pick, homeTeam, awayTeam, homeScore, awayScore) {
   const mk = (market || "").toLowerCase();
+  // A pick csapatneve az AI-tól jön ("Molde"), a valós név az odds API-tól ("Molde FK") –
+  // ezért laza (normalizált) névegyezést használunk, nem szigorú ===-t.
+  const pickIsHome = () => nameSim(normTeam(pick), normTeam(homeTeam));
+  const pickIsAway = () => nameSim(normTeam(pick), normTeam(awayTeam));
   if (market === "1X2") {
     // Három kimenet: csapattippnél döntetlen = vereség (push nincs).
-    if (pick === homeTeam) return homeScore >  awayScore ? "won" : "lost";
-    if (pick === awayTeam) return awayScore >  homeScore ? "won" : "lost";
-    if (pick === "Draw")   return homeScore === awayScore ? "won" : "lost";
+    if (/^draw$|^döntetlen$|^x$/i.test((pick || "").trim())) return homeScore === awayScore ? "won" : "lost";
+    if (pickIsHome()) return homeScore >  awayScore ? "won" : "lost";
+    if (pickIsAway()) return awayScore >  homeScore ? "won" : "lost";
     return null;
   }
   if (mk.includes("over")) {
@@ -627,10 +661,11 @@ function settleMarket(market, pick, homeTeam, awayTeam, homeScore, awayScore) {
          : r === "half_won" ? "half_lost" : r === "half_lost" ? "half_won" : r;
   }
   if (mk.includes("hendikep") || mk.includes("handicap")) {
-    const lineMatch = (pick || "").match(/-?[\d.]+$/);
+    const lineMatch = (pick || "").match(/-?\+?[\d.]+$/);
     if (!lineMatch) return null;
-    const h      = parseFloat(lineMatch[0]);                      // pl. +0.75 / -1.5
-    const isHome = pick.includes(homeTeam);
+    const h      = parseFloat(lineMatch[0].replace("+", ""));      // pl. +0.75 / -1.5
+    const team   = (pick || "").replace(/[-+][\d.]+$/, "").trim();  // a csapatnév a hendikep előtt
+    const isHome = nameSim(normTeam(team), normTeam(homeTeam));
     const d      = isHome ? homeScore - awayScore : awayScore - homeScore;
     return settleQuarter(d, -h);
   }
@@ -670,15 +705,25 @@ async function checkResults() {
   }
 
   // A tippek "match" neve az AI-tól jön, a completed kulcsai az odds API-tól – ezek eltérhetnek
-  // (pl. "Tromso vs Vålerenga" vs "Tromsø IL vs Vålerenga Fotball"), ezért laza névpárosítás.
+  // (pl. "Tromso vs Vålerenga" vs "Tromsø IL vs Vålerenga Fotball"), sőt az AI a hazai/vendég
+  // sorrendet is felcserélheti ("Molde vs Aalesund" a valós "Aalesund vs Molde" helyett).
+  // Ezért: pontos egyezés → normalizált egyezés → FORDÍTOTT sorrendű egyezés.
+  // A kiértékelés mindig a valós (odds API-s) hazai/vendég csapatot használja, így a
+  // fordított párosítás sem torzítja az eredményt.
   const completedList = Object.entries(completed);
   const findByName = name => {
     if (completed[name]) return completed[name];                     // pontos egyezés
     const parts = String(name || "").split(/\s+vs\.?\s+/i);
     if (parts.length !== 2) return null;
     const nh = normTeam(parts[0]), na = normTeam(parts[1]);
-    for (const [key, g] of completedList) {                          // normalizált egyezés
+    for (const [, g] of completedList) {                             // normalizált egyezés
       if (nameSim(nh, normTeam(g.home_team)) && nameSim(na, normTeam(g.away_team))) return g;
+    }
+    for (const [, g] of completedList) {                             // fordított hazai/vendég
+      if (nameSim(nh, normTeam(g.away_team)) && nameSim(na, normTeam(g.home_team))) {
+        console.log(`    ⇄ Fordított névsorrend: "${name}" → ${g.home_team} vs ${g.away_team}`);
+        return g;
+      }
     }
     return null;
   };
