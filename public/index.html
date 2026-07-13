@@ -85,10 +85,27 @@
 
   <div id="tg-status" class="tg-status" style="display:none"></div>
 
+  <!-- Admin belépés (jelszó-ablak) -->
+  <div id="admin-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center">
+    <div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:12px;padding:20px;width:min(340px,90vw)">
+      <div style="font-weight:700;color:#00e676;margin-bottom:10px">🔐 Admin belépés</div>
+      <input id="admin-pwd-input" type="password" placeholder="Admin jelszó" autocomplete="current-password"
+             onkeydown="if(event.key==='Enter')adminLogin()"
+             style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #1e3a2f;background:#07111d;color:#e0e0e0;font-size:14px;margin-bottom:8px">
+      <div id="admin-err" style="color:#ef9a9a;font-size:12px;margin-bottom:8px;display:none"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-send" style="flex:1" onclick="adminLogin()">Belépés</button>
+        <button class="btn-del" style="flex:1" onclick="closeAdminModal()">Mégse</button>
+      </div>
+    </div>
+  </div>
+
   <div class="tabs">
     <button class="tab active" onclick="switchTab('tips')">📊 Mai tippek</button>
     <button class="tab" onclick="switchTab('history')">📁 Előzmények</button>
     <a href="/analyzer.html" style="text-decoration:none;padding:7px 18px;background:#0d1b2a;color:#80cbc4;border:1px solid #1e3a2f;border-radius:8px;font-weight:700;font-size:14px">⚡ Elemző</a>
+    <button id="admin-login-btn" class="tab" style="margin-left:auto" onclick="openAdminModal()">🔐 Admin</button>
+    <button id="admin-logout-btn" class="tab" style="margin-left:auto;display:none" onclick="adminLogout()">🚪 Kilépés</button>
   </div>
 
   <!-- Kinyitható leírás -->
@@ -180,7 +197,7 @@ let aiTips = [], comboTips = [], history = [];
 let msRemaining = 0;
 let dayCounter = 0;
 
-// Admin mód beállítása URL param alapján
+// Admin mód: URL param (visszafelé kompatibilis) VAGY beviteli mezős belépés
 (function(){
   var p = new URLSearchParams(window.location.search).get('admin');
   if (p) {
@@ -191,14 +208,76 @@ let dayCounter = 0;
 })();
 function isAdmin() { return localStorage.getItem('vbt_admin') === '1'; }
 function getAdminPwd() { return localStorage.getItem('vbt_admin_pwd') || ''; }
+
+function openAdminModal() {
+  document.getElementById('admin-err').style.display = 'none';
+  document.getElementById('admin-pwd-input').value = '';
+  const m = document.getElementById('admin-modal');
+  m.style.display = 'flex';
+  setTimeout(()=>document.getElementById('admin-pwd-input').focus(), 50);
+}
+function closeAdminModal() { document.getElementById('admin-modal').style.display = 'none'; }
+
+async function adminLogin() {
+  const pwd = document.getElementById('admin-pwd-input').value;
+  const err = document.getElementById('admin-err');
+  if (!pwd) { err.textContent = 'Add meg a jelszót!'; err.style.display='block'; return; }
+  try {
+    const r = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'x-admin-password-b64': b64pwd(pwd), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pwd })
+    });
+    if (r.status === 403) { err.textContent = 'Hibás jelszó.'; err.style.display='block'; return; }
+    if (!r.ok) { err.textContent = 'Hiba a belépéskor (HTTP '+r.status+').'; err.style.display='block'; return; }
+    localStorage.setItem('vbt_admin', '1');
+    localStorage.setItem('vbt_admin_pwd', pwd);
+    closeAdminModal();
+    applyAdminUI();
+    await loadTips();
+    await loadHistory();
+    showStatus('🔓 Admin belépés sikeres');
+  } catch(e) {
+    err.textContent = 'Hálózati hiba: ' + e.message; err.style.display='block';
+  }
+}
+
+function adminLogout() {
+  localStorage.removeItem('vbt_admin');
+  localStorage.removeItem('vbt_admin_pwd');
+  applyAdminUI();
+  loadTips(); loadHistory();
+  showStatus('🚪 Kiléptél az admin módból');
+}
+
+// Admin UI ki/be kapcsolása (gombok láthatósága)
+function applyAdminUI() {
+  const admin = isAdmin();
+  const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+  show('btn-refresh', admin);
+  show('btn-send-tips', admin);
+  show('admin-login-btn', !admin);
+  show('admin-logout-btn', admin);
+  const tools = document.getElementById('admin-tools');
+  if (tools) tools.style.display = admin ? 'flex' : 'none';
+}
+
+// A jelszót base64-ben küldjük, mert a HTTP header nem visel el ékezetes/UTF-8 karaktert.
+function b64pwd(p) {
+  try { return btoa(String.fromCharCode(...new TextEncoder().encode(p||''))); } catch(e) { return ''; }
+}
 function adminHeaders(json) {
-  const h = { "x-admin-password": getAdminPwd() };
+  const h = { "x-admin-password-b64": b64pwd(getAdminPwd()) };
   if (json) h["Content-Type"] = "application/json";
   return h;
 }
 async function handleAdminResp(r, okMsg) {
   if (r.status === 403) {
-    showStatus("⛔ Nincs admin jogosultság. Nyisd meg az oldalt így: ?admin=JELSZÓ", "#ef9a9a");
+    showStatus("⛔ Nincs admin jogosultság – lépj be újra.", "#ef9a9a");
+    localStorage.removeItem('vbt_admin');
+    localStorage.removeItem('vbt_admin_pwd');
+    applyAdminUI();
+    openAdminModal();
     return false;
   }
   if (okMsg) showStatus(okMsg);
@@ -664,11 +743,7 @@ loadTips();
 // Így az esetleg elhalt betöltés magától helyreáll, nem kell kézi oldalfrissítés.
 setInterval(() => { if (document.visibilityState === "visible") loadTips(); }, 60000);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") loadTips(); });
-if (isAdmin()) {
-  document.getElementById('btn-refresh').style.display = '';
-  document.getElementById('btn-send-tips').style.display = '';
-  document.getElementById('admin-tools').style.display = 'flex';
-}
+applyAdminUI();
 </script>
 </body>
 </html>
