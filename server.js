@@ -678,9 +678,12 @@ function settleMarket(market, pick, homeTeam, awayTeam, homeScore, awayScore) {
 // ── Eredményjelölés ───────────────────────────────────────
 async function checkResults() {
   const pendingSingles = history.filter(t => t.type === "ai"    && (t.result === "pending" || !t.manual));
-  const pendingCombos  = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
-  if (!pendingSingles.length && !pendingCombos.length) return;
-  console.log(`Eredmények ellenőrzése (${pendingSingles.length} single, ${pendingCombos.length} kombi)...`);
+  // Kombik: a nyitottak ÉS azok, amelyek már lezártak, de van még kitöltetlen lábuk
+  // (korai vesztes esetén a hátralévő lábakat a későbbi futások töltik ki).
+  const combosToCheck = history.filter(t => t.type === "combo" &&
+    (!t.result || t.result === "pending" || (t.legs || []).some(l => !l.result)));
+  if (!pendingSingles.length && !combosToCheck.length) return;
+  console.log(`Eredmények ellenőrzése (${pendingSingles.length} single, ${combosToCheck.length} kombi)...`);
   let changed = false;
   const fdCache = {};
 
@@ -744,19 +747,48 @@ async function checkResults() {
     changed = true;
   }
 
-  // 3. Kombik – MINDEN láb önállóan a meccs eredménye alapján (laza névpárosítással, lásd fent)
-  for (const combo of pendingCombos) {
+  // 3. Kombik – MINDEN láb önállóan a meccs eredménye alapján (laza névpárosítással, lásd fent).
+  // KORAI VESZTES: ha akár EGY láb már vesztett, a kombi matematikailag nem nyerhet → azonnal
+  // "lost" (bekerül a statisztikába), a hátralévő lábakat pedig a későbbi futások töltik ki.
+  for (const combo of combosToCheck) {
     const legGames = combo.legs.map(leg => findByName(leg.match));
     const legRes = combo.legs.map((leg, i) => {
       const g = legGames[i];
-      return g ? settleMarket(leg.market, leg.pick, g.home_team, g.away_team, g.homeScore, g.awayScore) : null;
+      const fresh = g ? settleMarket(leg.market, leg.pick, g.home_team, g.away_team, g.homeScore, g.awayScore) : null;
+      return fresh || leg.result || null;                 // korábban már megállapított láb-eredmény megmarad
     });
-    if (legRes.some(r => !r)) {
+    const legs      = combo.legs.map((l, i) => ({ ...l, result: legRes[i] }));
+    const legsFilled = JSON.stringify(legs) !== JSON.stringify(combo.legs);
+    const anyLost   = legRes.some(r => r === "lost");
+    const allKnown  = legRes.every(r => !!r);
+
+    if (anyLost) {
+      // A kombi bukott – akkor is, ha más lábak még nyitottak.
+      const patch = { result: "lost", comboPayout: 0, legs, settledAt: combo.settledAt || nowHu() };
+      if (combo.result !== "lost" || legsFilled) {
+        history   = history.map(t => t.id === combo.id ? { ...t, ...patch } : t);
+        comboTips = comboTips.map(t => t.id === combo.id ? { ...t, ...patch } : t);
+        changed = true;
+        const open = legs.filter(l => !l.result).length;
+        if (combo.result !== "lost")
+          console.log(`  KOMBI (${combo.legN} lábas) → lost (vesztes láb${open ? `, ${open} láb még nyitott` : ""})`);
+      }
+      continue;
+    }
+
+    if (!allKnown) {
       const open = combo.legs.filter((l, i) => !legRes[i])
         .map((l, i) => `${l.match}${legGames[combo.legs.indexOf(l)] ? " (piac nem értékelhető: " + l.market + "/" + l.pick + ")" : " (meccs még nincs lezárva)"}`);
+      if (legsFilled) {   // részeredmények mentése (megjelenítéshez)
+        history   = history.map(t => t.id === combo.id ? { ...t, legs } : t);
+        comboTips = comboTips.map(t => t.id === combo.id ? { ...t, legs } : t);
+        changed = true;
+      }
       console.log(`  KOMBI (${combo.legN} lábas) – még nyitott: ${open.join("; ")}`);
       continue;
     }
+
+    // Minden láb ismert és egyik sem vesztett → tényleges kifizetés
     const mults = legRes.map((r, i) => {
       const o = parseFloat(combo.legs[i].odds) || 0;
       switch (r) {
@@ -764,17 +796,18 @@ async function checkResults() {
         case "half_won":  return (1 + o) / 2;
         case "push":      return 1;
         case "half_lost": return 0.5;
-        default:          return 0;       // lost
+        default:          return 0;
       }
     });
     const payout = mults.reduce((a, b) => a * b, 1);
     const result = payout > 1.0001 ? "won" : payout < 0.9999 ? "lost" : "push";
-    const legs   = combo.legs.map((l, i) => ({ ...l, result: legRes[i] }));   // lábak eredménye a megjelenítéshez
     const patch  = { result, comboPayout: parseFloat(payout.toFixed(2)), legs, settledAt: nowHu() };
-    history   = history.map(t => t.id === combo.id ? { ...t, ...patch } : t);
-    comboTips = comboTips.map(t => t.id === combo.id ? { ...t, ...patch } : t);
-    changed = true;
-    console.log(`  KOMBI (${combo.legN} lábas) → ${result} (x${patch.comboPayout})`);
+    if (combo.result !== result || combo.comboPayout !== patch.comboPayout || legsFilled) {
+      history   = history.map(t => t.id === combo.id ? { ...t, ...patch } : t);
+      comboTips = comboTips.map(t => t.id === combo.id ? { ...t, ...patch } : t);
+      changed = true;
+      console.log(`  KOMBI (${combo.legN} lábas) → ${result} (x${patch.comboPayout})`);
+    }
   }
 
   if (changed) { saveHistory(); console.log("Eredmények mentve ✓"); }
