@@ -776,12 +776,19 @@ setInterval(async () => {
 
 // ── Admin hitelesítés ─────────────────────────────────────
 // Jelszó jöhet: x-admin-password header, body.password, vagy ?password= query.
+// Jelszó jöhet: x-admin-password header (ASCII), x-admin-password-b64 header (UTF-8 biztos,
+// base64), body.password, vagy ?password= query.
+function extractPwd(req) {
+  const b64 = req.get("x-admin-password-b64");
+  if (b64) { try { return Buffer.from(b64, "base64").toString("utf8"); } catch {} }
+  return req.get("x-admin-password") || req.body?.password || req.query?.password || "";
+}
 function requireAdmin(req, res) {
   if (!ADMIN_PWD) {
     // Ha nincs jelszó beállítva, nyitva marad – de erről induláskor figyelmeztetünk.
     return true;
   }
-  const pwd = req.get("x-admin-password") || req.body?.password || req.query?.password;
+  const pwd = extractPwd(req);
   if (pwd !== ADMIN_PWD) {
     res.status(403).json({ error: "Hozzáférés megtagadva — hibás vagy hiányzó admin jelszó." });
     return false;
@@ -793,7 +800,7 @@ function requireAdmin(req, res) {
 // Admin (helyes jelszóval) MINDEN tippet lát (jóváhagyásra várókat is); a felhasználók
 // csak a jóváhagyottakat. A jelszó jöhet x-admin-password headerben vagy ?password= query-ben.
 function isAdminReq(req) {
-  const pwd = req.get("x-admin-password") || req.query?.password;
+  const pwd = extractPwd(req);
   return !!ADMIN_PWD && pwd === ADMIN_PWD;
 }
 app.get("/api/tips", (req, res) => {
@@ -865,6 +872,14 @@ app.delete("/api/history/:id", (req, res) => {
   if (removed) saveHistory();
   console.log(`Tipp törölve (${id}): ${removed} db`);
   res.json({ ok: true, removed });
+});
+
+// Admin jelszó ellenőrzése (beviteli mezős belépéshez)
+app.post("/api/admin/login", (req, res) => {
+  const pwd = extractPwd(req);
+  if (!ADMIN_PWD) return res.json({ ok: true, note: "Nincs ADMIN_PASSWORD beállítva – nyitott mód." });
+  if (pwd !== ADMIN_PWD) return res.status(403).json({ ok: false, error: "Hibás jelszó." });
+  res.json({ ok: true });
 });
 
 // Tipp jóváhagyása (ettől lesz publikus)
