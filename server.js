@@ -669,7 +669,20 @@ async function checkResults() {
     } catch (e) { console.error(`Scores hiba (${sportKey}):`, e.message); }
   }
 
-  const findGame = tip => completed[tip.match] || Object.values(completed).find(g => g.id === tip.matchId);
+  // A tippek "match" neve az AI-tól jön, a completed kulcsai az odds API-tól – ezek eltérhetnek
+  // (pl. "Tromso vs Vålerenga" vs "Tromsø IL vs Vålerenga Fotball"), ezért laza névpárosítás.
+  const completedList = Object.entries(completed);
+  const findByName = name => {
+    if (completed[name]) return completed[name];                     // pontos egyezés
+    const parts = String(name || "").split(/\s+vs\.?\s+/i);
+    if (parts.length !== 2) return null;
+    const nh = normTeam(parts[0]), na = normTeam(parts[1]);
+    for (const [key, g] of completedList) {                          // normalizált egyezés
+      if (nameSim(nh, normTeam(g.home_team)) && nameSim(na, normTeam(g.away_team))) return g;
+    }
+    return null;
+  };
+  const findGame = tip => findByName(tip.match) || Object.values(completed).find(g => g.id === tip.matchId);
 
   // 2. Single tippek kiértékelése
   for (const tip of pendingSingles) {
@@ -686,13 +699,19 @@ async function checkResults() {
     changed = true;
   }
 
-  // 3. Kombik – MINDEN láb önállóan a meccs eredménye alapján
+  // 3. Kombik – MINDEN láb önállóan a meccs eredménye alapján (laza névpárosítással, lásd fent)
   for (const combo of pendingCombos) {
-    const legRes = combo.legs.map(leg => {
-      const g = completed[leg.match];
+    const legGames = combo.legs.map(leg => findByName(leg.match));
+    const legRes = combo.legs.map((leg, i) => {
+      const g = legGames[i];
       return g ? settleMarket(leg.market, leg.pick, g.home_team, g.away_team, g.homeScore, g.awayScore) : null;
     });
-    if (legRes.some(r => !r)) continue;   // van még nyitott / nem értékelhető láb
+    if (legRes.some(r => !r)) {
+      const open = combo.legs.filter((l, i) => !legRes[i])
+        .map((l, i) => `${l.match}${legGames[combo.legs.indexOf(l)] ? " (piac nem értékelhető: " + l.market + "/" + l.pick + ")" : " (meccs még nincs lezárva)"}`);
+      console.log(`  KOMBI (${combo.legN} lábas) – még nyitott: ${open.join("; ")}`);
+      continue;
+    }
     const mults = legRes.map((r, i) => {
       const o = parseFloat(combo.legs[i].odds) || 0;
       switch (r) {
