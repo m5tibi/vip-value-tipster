@@ -96,7 +96,20 @@
              onkeydown="if(event.key==='Enter')authSubmit()"
              style="width:100%;box-sizing:border-box;padding:11px;border-radius:8px;border:1px solid #1e3a2f;background:#07111d;color:#e0e0e0;font-size:14px;margin-bottom:8px">
       <div id="auth-err" style="color:#ef9a9a;font-size:12px;margin-bottom:10px;display:none"></div>
+      <div id="auth-consent" style="display:none;margin-bottom:12px">
+        <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:#90a4ae;margin-bottom:7px;cursor:pointer">
+          <input type="checkbox" id="cb-over18" style="margin-top:2px;flex-shrink:0">
+          <span>Elmúltam <b>18 éves</b>.</span>
+        </label>
+        <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:#90a4ae;cursor:pointer">
+          <input type="checkbox" id="cb-terms" style="margin-top:2px;flex-shrink:0">
+          <span>Elfogadom az <a href="/aszf.html" target="_blank" style="color:#00e676">ÁSZF</a>-et, és megismertem az <a href="/adatvedelem.html" target="_blank" style="color:#00e676">Adatkezelési tájékoztatót</a>.</span>
+        </label>
+      </div>
       <button class="btn-send" style="width:100%;padding:11px;font-size:14px" onclick="authSubmit()" id="auth-submit">Belépés</button>
+      <div id="auth-forgot" style="text-align:center;margin-top:10px">
+        <a href="#" onclick="event.preventDefault();forgotPassword()" style="color:#546e7a;font-size:12px;text-decoration:none">Elfelejtetted a jelszavad?</a>
+      </div>
       <div style="text-align:center;margin-top:12px;font-size:12px;color:#78909c">
         <span id="auth-switch-text">Még nincs fiókod?</span>
         <a href="#" onclick="event.preventDefault();authSwitch()" id="auth-switch-link" style="color:#00e676;font-weight:700;text-decoration:none">Regisztrálj ingyen</a>
@@ -105,6 +118,12 @@
         <a href="#" onclick="event.preventDefault();closeAuthModal()" style="color:#546e7a;font-size:12px;text-decoration:none">Mégse</a>
       </div>
     </div>
+  </div>
+
+  <!-- E-mail megerősítő emlékeztető -->
+  <div id="verify-banner" style="display:none;background:#1a1a0d;border:1px solid #7a6a1f;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#ffe082">
+    📧 Erősítsd meg az e-mail címed! Elküldtük a megerősítő linket.
+    <a href="#" onclick="event.preventDefault();resendVerification()" style="color:#00e676;font-weight:700;text-decoration:none;margin-left:6px">Újraküldés</a>
   </div>
 
   <div class="tabs">
@@ -200,6 +219,17 @@
     </div>
     <div id="history-list"><div class="empty">Még nincsenek rögzített tippek.</div></div>
   </div>
+
+  <footer style="margin-top:28px;padding-top:16px;border-top:1px solid #1e3a2f;text-align:center;color:#546e7a;font-size:12px;line-height:1.8">
+    <div style="margin-bottom:6px">
+      <a href="/aszf.html" style="color:#80cbc4;text-decoration:none">ÁSZF</a> ·
+      <a href="/adatvedelem.html" style="color:#80cbc4;text-decoration:none">Adatkezelési tájékoztató</a>
+    </div>
+    <div style="background:#1a1214;border:1px solid #5d4037;border-radius:8px;padding:10px 14px;margin-top:8px;color:#a1887f">
+      <b style="color:#ffcc80">18+</b> · A tippek <b>nem garantálnak nyereséget</b>, tájékoztató jellegűek — a fogadás pénzügyi veszteséggel járhat.<br>
+      A szerencsejáték függőséget okozhat. Segítség: <b style="color:#ffcc80">116-123</b> (ingyenes, éjjel-nappal)
+    </div>
+  </footer>
 </div>
 
 <script>
@@ -252,6 +282,8 @@ function applyAuthModal() {
   document.getElementById('auth-pwd').placeholder = reg ? 'Jelszó (min. 8 karakter)' : 'Jelszó';
   document.getElementById('auth-switch-text').textContent = reg ? 'Van már fiókod?' : 'Még nincs fiókod?';
   document.getElementById('auth-switch-link').textContent = reg ? 'Lépj be' : 'Regisztrálj ingyen';
+  document.getElementById('auth-consent').style.display = reg ? '' : 'none';   // ÁSZF csak regisztrációnál
+  document.getElementById('auth-forgot').style.display  = reg ? 'none' : '';
 }
 
 async function authSubmit() {
@@ -259,12 +291,22 @@ async function authSubmit() {
   const pwd   = document.getElementById('auth-pwd').value;
   const err   = document.getElementById('auth-err');
   const showErr = m => { err.textContent = m; err.style.display = 'block'; };
+  err.style.display = 'none';
   if (!email || !pwd) return showErr('Add meg az e-mail címet és a jelszót!');
-  const url = authMode === 'register' ? '/api/auth/register' : '/api/auth/login';
+
+  const reg = authMode === 'register';
+  const body = { email, password: pwd };
+  if (reg) {
+    const over18 = document.getElementById('cb-over18').checked;
+    const terms  = document.getElementById('cb-terms').checked;
+    if (!over18) return showErr('A szolgáltatás csak 18 éven felülieknek érhető el.');
+    if (!terms)  return showErr('A regisztrációhoz el kell fogadnod az ÁSZF-et.');
+    body.over18 = true; body.acceptTerms = true;
+  }
   try {
-    const r = await fetch(url, {
+    const r = await fetch(reg ? '/api/auth/register' : '/api/auth/login', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password: pwd })
+      body: JSON.stringify(body)
     });
     const d = await r.json().catch(()=>({}));
     if (!r.ok) return showErr(d.error || ('Hiba (HTTP ' + r.status + ')'));
@@ -272,8 +314,31 @@ async function authSubmit() {
     await refreshMe();
     await loadTips();
     await loadHistory();
-    showStatus(authMode === 'register' ? '🎉 Sikeres regisztráció – jó szórakozást!' : '👋 Üdv újra!');
+    showStatus(reg ? '🎉 Sikeres regisztráció – nézd meg a postafiókod!' : '👋 Üdv újra!');
   } catch(e) { showErr('Hálózati hiba: ' + e.message); }
+}
+
+async function forgotPassword() {
+  const email = document.getElementById('auth-email').value.trim();
+  const err   = document.getElementById('auth-err');
+  if (!email) { err.textContent = 'Írd be az e-mail címed, és kattints újra.'; err.style.display='block'; return; }
+  try {
+    await fetch('/api/auth/forgot', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    closeAuthModal();
+    showStatus('📧 Ha van ilyen fiók, elküldtük a jelszó-visszaállító linket.');
+  } catch(e) {
+    err.textContent = 'Hálózati hiba: ' + e.message; err.style.display='block';
+  }
+}
+
+async function resendVerification() {
+  try {
+    await fetch('/api/auth/resend-verification', { method: 'POST' });
+    showStatus('📧 Megerősítő e-mail újraküldve.');
+  } catch(e) { showStatus('⚠️ Nem sikerült elküldeni.', '#ef9a9a'); }
 }
 
 async function userLogout() {
@@ -311,6 +376,9 @@ function applyAdminUI() {
   }
   const tools = document.getElementById('admin-tools');
   if (tools) tools.style.display = admin ? 'flex' : 'none';
+  // Megerősítő sáv: csak belépett, még meg nem erősített e-mailnél
+  const vb = document.getElementById('verify-banner');
+  if (vb) vb.style.display = (ME.user && ME.user.emailVerified === false) ? '' : 'none';
 }
 
 async function handleAdminResp(r, okMsg) {
