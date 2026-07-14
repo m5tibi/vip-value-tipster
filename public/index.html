@@ -6,16 +6,24 @@
 <title>AI Foci Tippek</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #07111d; color: #e0f7fa; font-family: sans-serif; padding: 18px 14px; }
+  body { background: #07111d; color: #e0f7fa; font-family: sans-serif; padding: 18px 14px; overflow-x: hidden; }
+  * { box-sizing: border-box; }
   .wrap { max-width: 720px; margin: 0 auto; }
   .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
   .title { font-size: 20px; font-weight: 700; color: #00e676; }
   .sub { font-size: 11px; color: #546e7a; }
   .cd { font-size: 12px; color: #546e7a; background: #0d1b2a; border: 1px solid #1e3a2f; border-radius: 8px; padding: 4px 10px; }
   .cd b { color: #ffe082; }
-  .tabs { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
   .tab { background: #0d1b2a; color: #80cbc4; border: 1px solid #1e3a2f; border-radius: 8px; padding: 7px 18px; font-weight: 700; font-size: 14px; cursor: pointer; }
   .tab.active { background: #00e676; color: #07111d; border-color: #00e676; }
+  /* A belépett e-mail cím ne feszítse szét a fejlécet mobilon */
+  #user-email { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (max-width: 520px) {
+    .tabs { gap: 6px; }
+    .tab { padding: 7px 12px; font-size: 13px; }
+    #user-email { display: none !important; }   /* mobilon elrejtjük – a Kilépés gomb úgyis jelzi, hogy be vagy lépve */
+  }
   .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
   .last-update { font-size: 12px; color: #546e7a; }
   .btn-refresh { background: #00e676; color: #07111d; border: none; border-radius: 10px; padding: 9px 20px; font-weight: 700; font-size: 14px; cursor: pointer; }
