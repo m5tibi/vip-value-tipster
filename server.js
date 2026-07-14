@@ -2,9 +2,15 @@ const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
 const path    = require("path");
+const cookieParser = require("cookie-parser");
+
+const usersDb = require("./users");
+const auth    = require("./auth");
 
 const app = express();
 app.use(express.json());
+app.use(cookieParser());
+app.use(auth.attachUser);                    // minden kérésre beteszi a req.user-t
 app.use(express.static(path.join(__dirname, "public")));
 app.use('/api/odds', require('./routes/odds'));
 
@@ -874,23 +880,81 @@ function requireAdmin(req, res) {
   return true;
 }
 
+// ── Auth végpontok ────────────────────────────────────────
+app.post("/api/auth/register", async (req, res) => {
+  const { email, password } = req.body || {};
+  const r = await usersDb.create(email, password);
+  if (!r.ok) return res.status(400).json({ error: r.error });
+  auth.setSession(res, r.user.id);
+  console.log(`Új regisztráció: ${r.user.email} (összes: ${usersDb.count()})`);
+  res.json({ ok: true, user: usersDb.publicView(r.user), hasAccess: auth.hasAccess(r.user) });
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  const { email, password } = req.body || {};
+  const u = await usersDb.verify(email, password);
+  if (!u) return res.status(401).json({ error: "Hibás e-mail cím vagy jelszó." });
+  auth.setSession(res, u.id);
+  res.json({ ok: true, user: usersDb.publicView(u), hasAccess: auth.hasAccess(u) });
+});
+
+app.post("/api/auth/logout", (req, res) => {
+  auth.clearSession(res);
+  res.json({ ok: true });
+});
+
+// Ki vagyok? (a frontend ezzel dönti el, mit mutasson)
+app.get("/api/auth/me", (req, res) => {
+  res.json({
+    user: usersDb.publicView(req.user),
+    hasAccess: auth.hasAccess(req.user),
+    paidMode: auth.PAID_MODE,
+    isAdmin: !!req.user?.isAdmin || isAdminReq(req),
+  });
+});
+
+app.post("/api/auth/password", auth.requireLogin, async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  const ok = await usersDb.verify(req.user.email, currentPassword);
+  if (!ok) return res.status(401).json({ error: "A jelenlegi jelszó hibás." });
+  const r = await usersDb.setPassword(req.user.id, newPassword);
+  if (!r.ok) return res.status(400).json({ error: r.error });
+  res.json({ ok: true });
+});
+
 // ── API végpontok ─────────────────────────────────────────
-// Admin (helyes jelszóval) MINDEN tippet lát (jóváhagyásra várókat is); a felhasználók
-// csak a jóváhagyottakat. A jelszó jöhet x-admin-password headerben vagy ?password= query-ben.
+// Admin (helyes jelszóval VAGY admin fiókkal) MINDEN tippet lát (jóváhagyásra várókat is).
 function isAdminReq(req) {
+  if (req.user?.isAdmin) return true;
   const pwd = extractPwd(req);
   return !!ADMIN_PWD && pwd === ADMIN_PWD;
 }
+
+// ÉLŐ TIPPEK – ez a termék: belépés (és fizetős módban aktív előfizetés) kell hozzá.
 app.get("/api/tips", (req, res) => {
   const admin = isAdminReq(req);
+  if (!admin && !auth.hasAccess(req.user)) {
+    return res.status(req.user ? 402 : 401).json({
+      error: req.user ? "Aktív előfizetés szükséges." : "Belépés szükséges a tippek megtekintéséhez.",
+      needLogin: !req.user, needSubscription: !!req.user,
+      aiTips: [], comboTips: [],
+    });
+  }
   res.json({
     aiTips:    admin ? aiTips    : aiTips.filter(isApproved),
     comboTips: admin ? comboTips : comboTips.filter(isApproved),
     admin
   });
 });
+
+// ELŐZMÉNY – a LEZÁRT tippek publikusak (ez a track record, a bizalom alapja).
+// A még függő (élő) tippeket csak a jogosultak látják, különben kiszivárogna a termék.
 app.get("/api/history", (req, res) => {
-  res.json(isAdminReq(req) ? history : history.filter(isApproved));
+  if (isAdminReq(req)) return res.json(history);
+  const approved = history.filter(isApproved);
+  if (auth.hasAccess(req.user)) return res.json(approved);
+  const settledOnly = approved.filter(t => t.result && t.result !== "pending");
+  res.json(settledOnly);
 });
 
 app.get("/api/status", (req, res) => {
@@ -1059,6 +1123,25 @@ app.delete("/api/analyzer-history", (req, res) => {
 
 // ── Indítás ───────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
+// ── Admin fiók bootstrap ──────────────────────────────────
+// Ha be van állítva ADMIN_EMAIL + ADMIN_PASSWORD, létrehozzuk/frissítjük az admin fiókot,
+// hogy e-mail+jelszóval is be tudj lépni (nem csak a régi ?admin= módszerrel).
+(async () => {
+  const email = process.env.ADMIN_EMAIL;
+  if (!email || !ADMIN_PWD) return;
+  const existing = usersDb.findByEmail(email);
+  if (existing) {
+    if (!existing.isAdmin) usersDb.update(existing.id, { isAdmin: true });
+  } else {
+    const r = await usersDb.create(email, ADMIN_PWD, { isAdmin: true, skipPolicy: true });
+    if (r.ok) console.log(`✓ Admin fiók létrehozva: ${email}`);
+    else console.warn(`⚠️  Admin fiók létrehozása sikertelen: ${r.error}`);
+    if (ADMIN_PWD.length < 12) console.warn("⚠️  Az ADMIN_PASSWORD rövid – éles üzemben érdemes hosszabbra cserélni.");
+  }
+})();
+
+console.log(`Regisztrált felhasználók: ${usersDb.count()} · Fizetős mód: ${auth.PAID_MODE ? "BE" : "KI (ingyenes szakasz)"}`);
+
 app.listen(PORT, () => console.log(`AI Foci Tippek fut: http://localhost:${PORT}`));
 
 if (!ADMIN_PWD) {
