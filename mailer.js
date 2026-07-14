@@ -1,20 +1,27 @@
 // ── E-mail küldés ─────────────────────────────────────────
-// Szolgáltató-független SMTP (Brevo, Resend, Postmark, Mailgun… mind ad SMTP hozzáférést).
-// Ha nincs beállítva SMTP, a rendszer NEM omlik össze: csak logolja, hogy mit küldene.
-// Így az app e-mail szolgáltató nélkül is működik (a linket a logból ki tudod másolni).
+// Három mód, ebben a sorrendben:
+//  1) RESEND_API_KEY → Resend HTTP API (AJÁNLOTT: a PaaS-ok néha blokkolják az SMTP portokat,
+//     a HTTPS-t soha; kevesebb beállítás, megbízhatóbb).
+//  2) SMTP_HOST/USER/PASS → bármely SMTP szolgáltató (Resend, Brevo, Postmark…).
+//  3) Semmi → a rendszer NEM omlik össze: a levelet csak a logba írja (a linket onnan kimásolhatod).
 
 const nodemailer = require("nodemailer");
 
+const RESEND_KEY = process.env.RESEND_API_KEY;
 const HOST = process.env.SMTP_HOST;
 const PORT = Number(process.env.SMTP_PORT || 587);
 const USER = process.env.SMTP_USER;
 const PASS = process.env.SMTP_PASS;
 const FROM = process.env.MAIL_FROM || "AI Foci Tippek <noreply@example.com>";
 
-const configured = !!(HOST && USER && PASS);
+const useResendApi = !!RESEND_KEY;
+const useSmtp      = !useResendApi && !!(HOST && USER && PASS);
+const configured   = useResendApi || useSmtp;
 
 let transporter = null;
-if (configured) {
+if (useResendApi) {
+  console.log("✓ E-mail küldés bekötve (Resend HTTP API)");
+} else if (useSmtp) {
   transporter = nodemailer.createTransport({
     host: HOST,
     port: PORT,
@@ -22,10 +29,10 @@ if (configured) {
     auth: { user: USER, pass: PASS },
   });
   transporter.verify()
-    .then(() => console.log(`✓ E-mail küldés bekötve (${HOST}:${PORT})`))
+    .then(() => console.log(`✓ E-mail küldés bekötve (SMTP ${HOST}:${PORT})`))
     .catch(e => console.warn(`⚠️  SMTP ellenőrzés sikertelen: ${e.message}`));
 } else {
-  console.log("ℹ️  SMTP nincs beállítva – a rendszer-e-mailek csak a logba íródnak (SMTP_HOST/USER/PASS).");
+  console.log("ℹ️  E-mail küldés nincs beállítva – a levelek csak a logba íródnak (állítsd be a RESEND_API_KEY-t).");
 }
 
 async function send({ to, subject, html, text }) {
@@ -34,7 +41,20 @@ async function send({ to, subject, html, text }) {
     return { ok: true, simulated: true };
   }
   try {
-    await transporter.sendMail({ from: FROM, to, subject, html, text });
+    if (useResendApi) {
+      const r = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: FROM, to: [to], subject, html, text }),
+      });
+      if (!r.ok) {
+        const body = await r.text();
+        console.error(`📧 Resend hiba (${to}): HTTP ${r.status} – ${body.slice(0, 200)}`);
+        return { ok: false, error: `HTTP ${r.status}` };
+      }
+    } else {
+      await transporter.sendMail({ from: FROM, to, subject, html, text });
+    }
     console.log(`📧 E-mail elküldve: ${to} – ${subject}`);
     return { ok: true };
   } catch (e) {
