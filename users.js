@@ -63,6 +63,7 @@ async function create(email, password, { isAdmin = false, skipPolicy = false } =
     email: e,
     passwordHash: await bcrypt.hash(password, 10),
     isAdmin,
+    emailVerified: !!isAdmin,     // az admin fiók eleve megerősítettnek számít
     plan: "free",                 // "free" | "pro"
     // Stripe mezők – most üresek, a fizetőssé tételkor töltődnek
     stripeCustomerId: null,
@@ -110,6 +111,7 @@ function publicView(u) {
   if (!u) return null;
   return {
     id: u.id, email: u.email, isAdmin: !!u.isAdmin, plan: u.plan,
+    emailVerified: u.emailVerified !== false,   // régi fiókok visszafelé kompatibilisen megerősítettek
     subscriptionStatus: u.subscriptionStatus, currentPeriodEnd: u.currentPeriodEnd,
     createdAt: u.createdAt,
   };
