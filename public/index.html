@@ -85,17 +85,24 @@
 
   <div id="tg-status" class="tg-status" style="display:none"></div>
 
-  <!-- Admin belépés (jelszó-ablak) -->
-  <div id="admin-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center">
-    <div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:12px;padding:20px;width:min(340px,90vw)">
-      <div style="font-weight:700;color:#00e676;margin-bottom:10px">🔐 Admin belépés</div>
-      <input id="admin-pwd-input" type="password" placeholder="Admin jelszó" autocomplete="current-password"
-             onkeydown="if(event.key==='Enter')adminLogin()"
-             style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #1e3a2f;background:#07111d;color:#e0e0e0;font-size:14px;margin-bottom:8px">
-      <div id="admin-err" style="color:#ef9a9a;font-size:12px;margin-bottom:8px;display:none"></div>
-      <div style="display:flex;gap:8px">
-        <button class="btn-send" style="flex:1" onclick="adminLogin()">Belépés</button>
-        <button class="btn-del" style="flex:1" onclick="closeAdminModal()">Mégse</button>
+  <!-- Belépés / Regisztráció -->
+  <div id="auth-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;align-items:center;justify-content:center;padding:16px">
+    <div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:12px;padding:22px;width:min(380px,100%)">
+      <div id="auth-title" style="font-weight:700;color:#00e676;font-size:17px;margin-bottom:4px">Belépés</div>
+      <div id="auth-sub" style="color:#78909c;font-size:12px;margin-bottom:14px">Lépj be a napi tippek megtekintéséhez.</div>
+      <input id="auth-email" type="email" placeholder="E-mail cím" autocomplete="email"
+             style="width:100%;box-sizing:border-box;padding:11px;border-radius:8px;border:1px solid #1e3a2f;background:#07111d;color:#e0e0e0;font-size:14px;margin-bottom:8px">
+      <input id="auth-pwd" type="password" placeholder="Jelszó" autocomplete="current-password"
+             onkeydown="if(event.key==='Enter')authSubmit()"
+             style="width:100%;box-sizing:border-box;padding:11px;border-radius:8px;border:1px solid #1e3a2f;background:#07111d;color:#e0e0e0;font-size:14px;margin-bottom:8px">
+      <div id="auth-err" style="color:#ef9a9a;font-size:12px;margin-bottom:10px;display:none"></div>
+      <button class="btn-send" style="width:100%;padding:11px;font-size:14px" onclick="authSubmit()" id="auth-submit">Belépés</button>
+      <div style="text-align:center;margin-top:12px;font-size:12px;color:#78909c">
+        <span id="auth-switch-text">Még nincs fiókod?</span>
+        <a href="#" onclick="event.preventDefault();authSwitch()" id="auth-switch-link" style="color:#00e676;font-weight:700;text-decoration:none">Regisztrálj ingyen</a>
+      </div>
+      <div style="text-align:center;margin-top:10px">
+        <a href="#" onclick="event.preventDefault();closeAuthModal()" style="color:#546e7a;font-size:12px;text-decoration:none">Mégse</a>
       </div>
     </div>
   </div>
@@ -104,8 +111,11 @@
     <button class="tab active" onclick="switchTab('tips')">📊 Mai tippek</button>
     <button class="tab" onclick="switchTab('history')">📁 Előzmények</button>
     <a href="/analyzer.html" style="text-decoration:none;padding:7px 18px;background:#0d1b2a;color:#80cbc4;border:1px solid #1e3a2f;border-radius:8px;font-weight:700;font-size:14px">⚡ Elemző</a>
-    <button id="admin-login-btn" class="tab" style="margin-left:auto" onclick="openAdminModal()">🔐 Admin</button>
-    <button id="admin-logout-btn" class="tab" style="margin-left:auto;display:none" onclick="adminLogout()">🚪 Kilépés</button>
+    <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+      <span id="user-email" style="display:none;color:#78909c;font-size:12px"></span>
+      <button id="btn-login"  class="tab" onclick="openAuthModal('login')">🔑 Belépés</button>
+      <button id="btn-logout" class="tab" style="display:none" onclick="userLogout()">🚪 Kilépés</button>
+    </span>
   </div>
 
   <!-- Kinyitható leírás -->
@@ -197,7 +207,11 @@ let aiTips = [], comboTips = [], history = [];
 let msRemaining = 0;
 let dayCounter = 0;
 
-// Admin mód: URL param (visszafelé kompatibilis) VAGY beviteli mezős belépés
+// ── Felhasználó / jogosultság állapot ──
+let ME = { user: null, hasAccess: false, paidMode: false, isAdmin: false };
+let authMode = 'login';   // 'login' | 'register'
+
+// Visszafelé kompatibilis admin-jelszó (régi ?admin=... mód; a session mellett megmarad)
 (function(){
   var p = new URLSearchParams(window.location.search).get('admin');
   if (p) {
@@ -206,63 +220,8 @@ let dayCounter = 0;
     window.history.replaceState({}, '', '/');
   }
 })();
-function isAdmin() { return localStorage.getItem('vbt_admin') === '1'; }
+function isAdmin() { return !!ME.isAdmin || localStorage.getItem('vbt_admin') === '1'; }
 function getAdminPwd() { return localStorage.getItem('vbt_admin_pwd') || ''; }
-
-function openAdminModal() {
-  document.getElementById('admin-err').style.display = 'none';
-  document.getElementById('admin-pwd-input').value = '';
-  const m = document.getElementById('admin-modal');
-  m.style.display = 'flex';
-  setTimeout(()=>document.getElementById('admin-pwd-input').focus(), 50);
-}
-function closeAdminModal() { document.getElementById('admin-modal').style.display = 'none'; }
-
-async function adminLogin() {
-  const pwd = document.getElementById('admin-pwd-input').value;
-  const err = document.getElementById('admin-err');
-  if (!pwd) { err.textContent = 'Add meg a jelszót!'; err.style.display='block'; return; }
-  try {
-    const r = await fetch('/api/admin/login', {
-      method: 'POST',
-      headers: { 'x-admin-password-b64': b64pwd(pwd), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pwd })
-    });
-    if (r.status === 403) { err.textContent = 'Hibás jelszó.'; err.style.display='block'; return; }
-    if (!r.ok) { err.textContent = 'Hiba a belépéskor (HTTP '+r.status+').'; err.style.display='block'; return; }
-    localStorage.setItem('vbt_admin', '1');
-    localStorage.setItem('vbt_admin_pwd', pwd);
-    closeAdminModal();
-    applyAdminUI();
-    await loadTips();
-    await loadHistory();
-    showStatus('🔓 Admin belépés sikeres');
-  } catch(e) {
-    err.textContent = 'Hálózati hiba: ' + e.message; err.style.display='block';
-  }
-}
-
-function adminLogout() {
-  localStorage.removeItem('vbt_admin');
-  localStorage.removeItem('vbt_admin_pwd');
-  applyAdminUI();
-  loadTips(); loadHistory();
-  showStatus('🚪 Kiléptél az admin módból');
-}
-
-// Admin UI ki/be kapcsolása (gombok láthatósága)
-function applyAdminUI() {
-  const admin = isAdmin();
-  const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
-  show('btn-refresh', admin);
-  show('btn-send-tips', admin);
-  show('admin-login-btn', !admin);
-  show('admin-logout-btn', admin);
-  const tools = document.getElementById('admin-tools');
-  if (tools) tools.style.display = admin ? 'flex' : 'none';
-}
-
-// A jelszót base64-ben küldjük, mert a HTTP header nem visel el ékezetes/UTF-8 karaktert.
 function b64pwd(p) {
   try { return btoa(String.fromCharCode(...new TextEncoder().encode(p||''))); } catch(e) { return ''; }
 }
@@ -271,13 +230,96 @@ function adminHeaders(json) {
   if (json) h["Content-Type"] = "application/json";
   return h;
 }
+
+// ── Belépés / regisztráció ──
+function openAuthModal(mode) {
+  authMode = mode || 'login';
+  applyAuthModal();
+  document.getElementById('auth-err').style.display = 'none';
+  document.getElementById('auth-modal').style.display = 'flex';
+  setTimeout(()=>document.getElementById('auth-email').focus(), 50);
+}
+function closeAuthModal() { document.getElementById('auth-modal').style.display = 'none'; }
+function authSwitch() { authMode = (authMode === 'login') ? 'register' : 'login'; applyAuthModal(); }
+function applyAuthModal() {
+  const reg = authMode === 'register';
+  document.getElementById('auth-title').textContent = reg ? 'Regisztráció' : 'Belépés';
+  document.getElementById('auth-sub').textContent   = reg
+    ? 'Hozz létre ingyenes fiókot, és nézd meg a napi tippeket.'
+    : 'Lépj be a napi tippek megtekintéséhez.';
+  document.getElementById('auth-submit').textContent = reg ? 'Ingyenes regisztráció' : 'Belépés';
+  document.getElementById('auth-pwd').setAttribute('autocomplete', reg ? 'new-password' : 'current-password');
+  document.getElementById('auth-pwd').placeholder = reg ? 'Jelszó (min. 8 karakter)' : 'Jelszó';
+  document.getElementById('auth-switch-text').textContent = reg ? 'Van már fiókod?' : 'Még nincs fiókod?';
+  document.getElementById('auth-switch-link').textContent = reg ? 'Lépj be' : 'Regisztrálj ingyen';
+}
+
+async function authSubmit() {
+  const email = document.getElementById('auth-email').value.trim();
+  const pwd   = document.getElementById('auth-pwd').value;
+  const err   = document.getElementById('auth-err');
+  const showErr = m => { err.textContent = m; err.style.display = 'block'; };
+  if (!email || !pwd) return showErr('Add meg az e-mail címet és a jelszót!');
+  const url = authMode === 'register' ? '/api/auth/register' : '/api/auth/login';
+  try {
+    const r = await fetch(url, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pwd })
+    });
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) return showErr(d.error || ('Hiba (HTTP ' + r.status + ')'));
+    closeAuthModal();
+    await refreshMe();
+    await loadTips();
+    await loadHistory();
+    showStatus(authMode === 'register' ? '🎉 Sikeres regisztráció – jó szórakozást!' : '👋 Üdv újra!');
+  } catch(e) { showErr('Hálózati hiba: ' + e.message); }
+}
+
+async function userLogout() {
+  try { await fetch('/api/auth/logout', { method: 'POST' }); } catch(e) {}
+  localStorage.removeItem('vbt_admin');
+  localStorage.removeItem('vbt_admin_pwd');
+  await refreshMe();
+  await loadTips();
+  await loadHistory();
+  showStatus('🚪 Kijelentkeztél');
+}
+
+// Ki vagyok? – ez vezérli az egész felület láthatóságát
+async function refreshMe() {
+  try {
+    const r = await fetch('/api/auth/me', { cache: 'no-store' });
+    ME = await r.json();
+  } catch(e) { ME = { user:null, hasAccess:false, paidMode:false, isAdmin:false }; }
+  applyAdminUI();
+}
+
+// Admin + felhasználói UI láthatóság
+function applyAdminUI() {
+  const admin  = isAdmin();
+  const loggedIn = !!ME.user || admin;
+  const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+  show('btn-refresh', admin);
+  show('btn-send-tips', admin);
+  show('btn-login',  !loggedIn);
+  show('btn-logout', loggedIn);
+  const em = document.getElementById('user-email');
+  if (em) {
+    em.style.display = ME.user ? '' : 'none';
+    em.textContent = ME.user ? (ME.user.email + (ME.user.isAdmin ? ' (admin)' : '')) : '';
+  }
+  const tools = document.getElementById('admin-tools');
+  if (tools) tools.style.display = admin ? 'flex' : 'none';
+}
+
 async function handleAdminResp(r, okMsg) {
   if (r.status === 403) {
     showStatus("⛔ Nincs admin jogosultság – lépj be újra.", "#ef9a9a");
     localStorage.removeItem('vbt_admin');
     localStorage.removeItem('vbt_admin_pwd');
     applyAdminUI();
-    openAdminModal();
+    openAuthModal('login');
     return false;
   }
   if (okMsg) showStatus(okMsg);
@@ -650,9 +692,37 @@ async function refresh() {
 let tipsEverLoaded = false;
 let tipsRetryDelay = 3000;
 let tipsErrLogged  = false;
+// Zárolt nézet: nincs belépve (vagy nincs előfizetés) → felhívás a tippek helyett
+function renderLocked(needSubscription) {
+  const wrap = document.getElementById("combo-wrap");
+  if (wrap) wrap.style.display = "none";
+  const lu = document.getElementById("last-update");
+  if (lu) lu.textContent = "";
+  document.getElementById("ai-list").innerHTML = needSubscription
+    ? `<div style="background:#0d1b2a;border:1px solid #5d4037;border-radius:12px;padding:24px;text-align:center">
+         <div style="font-size:32px;margin-bottom:8px">🔒</div>
+         <div style="font-weight:700;color:#ffcc80;font-size:16px;margin-bottom:6px">Aktív előfizetés szükséges</div>
+         <div style="color:#78909c;font-size:13px;margin-bottom:14px">A napi tippek megtekintéséhez előfizetés kell.<br>Az eddigi eredmények az <b>Előzmények</b> fülön szabadon megtekinthetők.</div>
+       </div>`
+    : `<div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:12px;padding:24px;text-align:center">
+         <div style="font-size:32px;margin-bottom:8px">🔒</div>
+         <div style="font-weight:700;color:#00e676;font-size:16px;margin-bottom:6px">A napi tippek megtekintéséhez lépj be</div>
+         <div style="color:#78909c;font-size:13px;margin-bottom:14px">A regisztráció <b style="color:#a5d6a7">ingyenes</b>, és azonnal látod az aznapi tippeket.<br>Az eddigi eredményeinket az <b>Előzmények</b> fülön előzetesen is megnézheted.</div>
+         <button class="btn-send" style="padding:11px 22px;font-size:14px" onclick="openAuthModal('register')">✨ Ingyenes regisztráció</button>
+         <div style="margin-top:10px;font-size:12px;color:#546e7a">Van már fiókod? <a href="#" onclick="event.preventDefault();openAuthModal('login')" style="color:#00e676;font-weight:700;text-decoration:none">Lépj be</a></div>
+       </div>`;
+}
+
 async function loadTips() {
   try {
     const r = await fetch("/api/tips", { cache: "no-store", headers: isAdmin()?adminHeaders():{} });
+    // Nincs belépve / nincs előfizetés → nem hiba: felhívást mutatunk a tippek helyett
+    if (r.status === 401 || r.status === 402) {
+      aiTips = []; comboTips = [];
+      tipsEverLoaded = true;
+      renderLocked(r.status === 402);
+      return;
+    }
     if (!r.ok) throw new Error("HTTP "+r.status);
     const d = await r.json();
     aiTips    = Array.isArray(d.aiTips)?d.aiTips:[];
@@ -737,13 +807,15 @@ async function sendTips() {
 
 async function loadStatus() {}
 
-loadStatus();
-loadTips();
+// Indulás: előbb megnézzük, ki van belépve, aztán töltünk
+(async () => {
+  await refreshMe();
+  await loadTips();
+  await loadHistory();
+})();
 // Önjavító frissítés: percenként, és amikor a fül újra aktív lesz (pl. deploy után).
-// Így az esetleg elhalt betöltés magától helyreáll, nem kell kézi oldalfrissítés.
 setInterval(() => { if (document.visibilityState === "visible") loadTips(); }, 60000);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") loadTips(); });
-applyAdminUI();
 </script>
 </body>
 </html>
