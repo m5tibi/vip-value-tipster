@@ -92,8 +92,37 @@ function requireAccess(req, res, next) {
   next();
 }
 
+// ── Célhoz kötött tokenek (e-mail megerősítés, jelszó-visszaállítás) ──
+// Aláírt, lejáró token – nem kell adatbázisban tárolni.
+// A jelszó-hash beépítése miatt a reset link AUTOMATIKUSAN érvénytelenné válik,
+// amint a jelszó megváltozik (egyszer használatos).
+function makePurposeToken(purpose, userId, ttlMs, extra = "") {
+  const exp  = Date.now() + ttlMs;
+  const data = `${purpose}.${userId}.${exp}`;
+  const sig  = crypto.createHmac("sha256", SECRET).update(data + "." + extra).digest("base64url");
+  return `${Buffer.from(data).toString("base64url")}.${sig}`;
+}
+
+function readPurposeToken(purpose, token, extraFor) {
+  try {
+    if (!token || typeof token !== "string") return null;
+    const [b64, sig] = token.split(".");
+    if (!b64 || !sig) return null;
+    const data = Buffer.from(b64, "base64url").toString("utf8");
+    const [p, userId, exp] = data.split(".");
+    if (p !== purpose) return null;
+    if (Date.now() > Number(exp)) return null;
+    const extra = typeof extraFor === "function" ? (extraFor(userId) || "") : "";
+    const expected = crypto.createHmac("sha256", SECRET).update(data + "." + extra).digest("base64url");
+    if (sig.length !== expected.length) return null;
+    if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+    return userId;
+  } catch { return null; }
+}
+
 module.exports = {
   COOKIE, PAID_MODE,
   setSession, clearSession, attachUser,
   hasAccess, requireLogin, requireAccess,
+  makePurposeToken, readPurposeToken,
 };
