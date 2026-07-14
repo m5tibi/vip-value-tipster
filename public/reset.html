@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Új jelszó beállítása – AI Foci Tippek</title>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px;
+         background:#07111d; color:#cfd8dc; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  .card { background:#0d1b2a; border:1px solid #1e3a2f; border-radius:12px; padding:26px; width:min(400px,100%); }
+  h1 { color:#00e676; font-size:19px; margin:0 0 4px; }
+  .sub { color:#78909c; font-size:13px; margin-bottom:16px; }
+  input { width:100%; padding:11px; border-radius:8px; border:1px solid #1e3a2f; background:#07111d;
+          color:#e0e0e0; font-size:14px; margin-bottom:9px; }
+  button { width:100%; padding:12px; border:none; border-radius:8px; background:#00e676; color:#07111d;
+           font-weight:700; font-size:14px; cursor:pointer; }
+  button:disabled { opacity:.6; cursor:default; }
+  .err { color:#ef9a9a; font-size:12px; margin-bottom:10px; display:none; }
+  .ok  { color:#69f0ae; font-size:14px; line-height:1.6; }
+  a { color:#00e676; text-decoration:none; font-weight:700; }
+  .foot { text-align:center; margin-top:14px; font-size:12px; color:#546e7a; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div id="form-view">
+    <h1>Új jelszó beállítása</h1>
+    <div class="sub">Add meg az új jelszavad (legalább 8 karakter).</div>
+    <input id="pwd1" type="password" placeholder="Új jelszó" autocomplete="new-password">
+    <input id="pwd2" type="password" placeholder="Új jelszó még egyszer" autocomplete="new-password"
+           onkeydown="if(event.key==='Enter')submitReset()">
+    <div id="err" class="err"></div>
+    <button id="btn" onclick="submitReset()">Jelszó mentése</button>
+    <div class="foot"><a href="/">← Vissza a főoldalra</a></div>
+  </div>
+  <div id="done-view" style="display:none;text-align:center">
+    <div style="font-size:40px;margin-bottom:8px">✅</div>
+    <h1>Jelszó megváltoztatva</h1>
+    <div class="ok">Be is léptettünk – jó szórakozást!</div>
+    <div style="margin-top:18px"><a href="/" style="display:inline-block;background:#00e676;color:#07111d;padding:11px 22px;border-radius:8px">Tovább a tippekhez</a></div>
+  </div>
+</div>
+<script>
+const token = new URLSearchParams(location.search).get('token') || '';
+const err = document.getElementById('err');
+const showErr = m => { err.textContent = m; err.style.display = 'block'; };
+
+if (!token) showErr('Hiányzó vagy hibás link. Kérj új jelszó-visszaállító e-mailt.');
+
+async function submitReset() {
+  const p1 = document.getElementById('pwd1').value;
+  const p2 = document.getElementById('pwd2').value;
+  err.style.display = 'none';
+  if (p1.length < 8)  return showErr('A jelszó legalább 8 karakter legyen.');
+  if (p1 !== p2)      return showErr('A két jelszó nem egyezik.');
+  if (!token)         return showErr('Hiányzó link. Kérj új jelszó-visszaállító e-mailt.');
+  const btn = document.getElementById('btn');
+  btn.disabled = true; btn.textContent = 'Mentés...';
+  try {
+    const r = await fetch('/api/auth/reset', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, newPassword: p1 })
+    });
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { btn.disabled = false; btn.textContent = 'Jelszó mentése'; return showErr(d.error || 'Hiba történt.'); }
+    document.getElementById('form-view').style.display = 'none';
+    document.getElementById('done-view').style.display = '';
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'Jelszó mentése';
+    showErr('Hálózati hiba: ' + e.message);
+  }
+}
+</script>
+</body>
+</html>
