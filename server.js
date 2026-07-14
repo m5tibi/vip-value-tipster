@@ -869,6 +869,9 @@ function extractPwd(req) {
   return req.get("x-admin-password") || req.body?.password || req.query?.password || "";
 }
 function requireAdmin(req, res) {
+  // 1) Belépett admin fiók (e-mail + jelszó, session cookie) – ez az elsődleges mód
+  if (req.user?.isAdmin) return true;
+  // 2) Régi, jelszavas mód (visszafelé kompatibilitás: ?admin=... / header)
   if (!ADMIN_PWD) {
     // Ha nincs jelszó beállítva, nyitva marad – de erről induláskor figyelmeztetünk.
     return true;
