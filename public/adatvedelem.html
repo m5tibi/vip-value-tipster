@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adatkezelési tájékoztató – AI Foci Tippek</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; padding:24px 16px; background:#07111d; color:#cfd8dc; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; line-height:1.7; }
+  .wrap { max-width:820px; margin:0 auto; }
+  a { color:#00e676; }
+  h1 { color:#00e676; font-size:24px; margin-bottom:4px; }
+  h2 { color:#80cbc4; font-size:17px; margin-top:28px; margin-bottom:8px; border-bottom:1px solid #1e3a2f; padding-bottom:6px; }
+  .meta { color:#546e7a; font-size:13px; margin-bottom:20px; }
+  .box { background:#0d1b2a; border:1px solid #1e3a2f; border-radius:10px; padding:14px 16px; margin:16px 0; }
+  .todo { background:#1a1a0d; border:1px solid #7a6a1f; color:#ffe082; }
+  table { width:100%; border-collapse:collapse; margin:12px 0; font-size:13px; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid #1e3a2f; vertical-align:top; }
+  th { color:#80cbc4; font-weight:700; }
+  ul { padding-left:20px; }
+  li { margin-bottom:6px; }
+  .back { display:inline-block; margin-bottom:18px; padding:7px 16px; background:#0d1b2a; border:1px solid #1e3a2f; border-radius:8px; text-decoration:none; font-weight:700; font-size:14px; }
+  footer { margin-top:36px; padding-top:16px; border-top:1px solid #1e3a2f; color:#546e7a; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a href="/" class="back">← Vissza a főoldalra</a>
+
+  <h1>Adatkezelési tájékoztató</h1>
+  <div class="meta">Hatályos: 2026. július 14-től · GDPR (EU) 2016/679 · AI Foci Tippek</div>
+
+  <div class="box todo">
+
+  <h2>1. Az adatkezelő</h2>
+  <ul>
+    <li><b>Név:</b> <i>Varga Tibor e.v.</i></li>
+    <li><b>Székhely:</b> <i>2724, Újlengyel, Kossuth Lajos utca 115.</i></li>
+    <li><b>E-mail:</b> <i>vargat77@gmail.com</i></li>
+  </ul>
+  <p>Adatvédelmi tisztviselő kijelölése nem kötelező, ezért nem került kijelölésre.</p>
+
+  <h2>2. Milyen adatokat kezelünk, milyen célból és jogalapon?</h2>
+  <table>
+    <tr><th>Adat</th><th>Cél</th><th>Jogalap</th><th>Megőrzés</th></tr>
+    <tr>
+      <td>E-mail cím</td>
+      <td>Fiók létrehozása, azonosítás, belépés, szolgáltatással kapcsolatos értesítések</td>
+      <td>Szerződés teljesítése<br>(GDPR 6. cikk (1) b))</td>
+      <td>A fiók törléséig</td>
+    </tr>
+    <tr>
+      <td>Jelszó (titkosított formában, bcrypt)</td>
+      <td>Biztonságos belépés. A jelszót <b>eredeti formájában nem ismerjük és nem tároljuk</b>.</td>
+      <td>Szerződés teljesítése</td>
+      <td>A fiók törléséig</td>
+    </tr>
+    <tr>
+      <td>Regisztráció és belépés időpontja</td>
+      <td>Biztonság, visszaélések megelőzése</td>
+      <td>Jogos érdek<br>(GDPR 6. cikk (1) f))</td>
+      <td>A fiók törléséig</td>
+    </tr>
+    <tr>
+      <td>Naplóadatok (IP-cím, böngésző típusa – a tárhelyszolgáltatónál)</td>
+      <td>Üzemeltetés, hibakeresés, támadások elhárítása</td>
+      <td>Jogos érdek</td>
+      <td>A tárhelyszolgáltató gyakorlata szerint (jellemzően 30 nap)</td>
+    </tr>
+    <tr>
+      <td>Számlázási adatok (név, cím) – <i>csak fizetős előfizetés esetén</i></td>
+      <td>Számla kiállítása</td>
+      <td>Jogi kötelezettség<br>(GDPR 6. cikk (1) c))</td>
+      <td><b>8 év</b> (számviteli törvény)</td>
+    </tr>
+  </table>
+  <p><b>Bankkártyaadatokat nem látunk és nem tárolunk</b> – a fizetést (a fizetős szakasz indulásakor) a Stripe kezeli.</p>
+
+  <h2>3. Sütik (cookie-k)</h2>
+  <p>A Weboldal <b>kizárólag működéshez feltétlenül szükséges sütit</b> használ:</p>
+  <table>
+    <tr><th>Süti</th><th>Cél</th><th>Élettartam</th></tr>
+    <tr><td><code>aft_session</code></td><td>Belépési munkamenet fenntartása (hogy belépve maradj)</td><td>30 nap</td></tr>
+  </table>
+  <p>Nem használunk marketing- vagy analitikai sütit, nyomkövetést, sem hirdetési célú profilalkotást. Emiatt <b>süti-hozzájáruló ablak (cookie banner) nem szükséges</b> – a működéshez elengedhetetlen sütik ez alól mentesülnek. (Ha a jövőben analitikát vezetnénk be, erről előzetesen tájékoztatunk, és hozzájárulást kérünk.)</p>
+
+  <h2>4. Adatfeldolgozók (kinek adjuk át az adatokat?)</h2>
+  <table>
+    <tr><th>Szolgáltató</th><th>Mit végez</th><th>Milyen adatot lát</th></tr>
+    <tr>
+      <td><b>Render Services, Inc.</b> (USA)</td>
+      <td>Tárhely, szerverüzemeltetés</td>
+      <td>Minden tárolt adat, naplók</td>
+    </tr>
+    <tr>
+      <td><b>[E-mail szolgáltató]</b> <i>Resend</i></td>
+      <td>Rendszer-e-mailek küldése (megerősítés, jelszó-visszaállítás)</td>
+      <td>E-mail cím</td>
+    </tr>
+    <tr>
+      <td><b>Stripe Payments Europe, Ltd.</b> (Írország) – <i>csak fizetős szakaszban</i></td>
+      <td>Fizetés feldolgozása</td>
+      <td>E-mail cím, fizetési adatok</td>
+    </tr>
+    <tr>
+      <td><b>KBOSS.hu Kft. (szamlazz.hu)</b> – <i>csak fizetős szakaszban</i></td>
+      <td>Számlázás</td>
+      <td>Számlázási név, cím, e-mail</td>
+    </tr>
+  </table>
+  <p><b>Az USA-ba történő adattovábbítás</b> (Render) az EU-USA Adatvédelmi Keret (Data Privacy Framework), illetve az Európai Bizottság általános szerződési feltételei (SCC) alapján történik.</p>
+  <p>A tippek elkészítéséhez mesterséges intelligenciát (Anthropic Claude) és sportadat-szolgáltatókat használunk. <b>Ezekhez a szolgáltatásokhoz személyes adatot nem továbbítunk</b> – csak nyilvános mérkőzés- és szorzóadatokat.</p>
+
+  <h2>5. Milyen jogaid vannak?</h2>
+  <ul>
+    <li><b>Hozzáférés:</b> tájékoztatást kérhetsz arról, milyen adatot kezelünk rólad.</li>
+    <li><b>Helyesbítés:</b> kérheted a pontatlan adatok javítását.</li>
+    <li><b>Törlés („elfeledtetéshez való jog”):</b> kérheted a fiókod és adataid törlését. (A számlázási adatokat a számviteli törvény miatt 8 évig meg kell őriznünk.)</li>
+    <li><b>Korlátozás:</b> kérheted az adatkezelés korlátozását.</li>
+    <li><b>Tiltakozás:</b> tiltakozhatsz a jogos érdeken alapuló adatkezelés ellen.</li>
+    <li><b>Adathordozhatóság:</b> kérheted adataid géppel olvasható formában.</li>
+  </ul>
+  <p>Kérelmeidet a <i>[kapcsolati e-mail]</i> címen jelezheted; <b>legkésőbb 30 napon belül</b> válaszolunk.</p>
+
+  <h2>6. Panasz, jogorvoslat</h2>
+  <p>Ha úgy érzed, jogsérelem ért, panaszt tehetsz a felügyeleti hatóságnál:</p>
+  <div class="box">
+    <b>Nemzeti Adatvédelmi és Információszabadság Hatóság (NAIH)</b><br>
+    1055 Budapest, Falk Miksa utca 9-11. · Postacím: 1363 Budapest, Pf. 9.<br>
+    Telefon: +36 (1) 391-1400 · E-mail: ugyfelszolgalat@naih.hu · <a href="https://naih.hu" target="_blank" rel="noopener">naih.hu</a>
+  </div>
+  <p>Jogaidat bíróság előtt is érvényesítheted (a lakóhelyed szerinti törvényszéken).</p>
+
+  <h2>7. Adatbiztonság</h2>
+  <ul>
+    <li>A jelszavakat <b>bcrypt</b> algoritmussal, egyirányúan titkosítva tároljuk.</li>
+    <li>A kapcsolat <b>HTTPS</b> titkosítással védett.</li>
+    <li>A munkamenet-süti <code>httpOnly</code> beállítású, így JavaScriptből nem olvasható.</li>
+    <li>Az adatokhoz kizárólag az adatkezelő fér hozzá.</li>
+  </ul>
+
+  <h2>8. Kiskorúak</h2>
+  <p>A szolgáltatás <b>18 éven aluliak számára nem elérhető</b>. Tudatosan nem gyűjtünk kiskorúaktól adatot. Ha ilyenről tudomást szerzünk, az adatokat haladéktalanul töröljük.</p>
+
+  <h2>9. A tájékoztató módosítása</h2>
+  <p>A tájékoztatót szükség esetén módosíthatjuk; a változásról a Weboldalon tájékoztatunk. A mindenkori hatályos verzió itt érhető el.</p>
+
+  <footer>
+    AI Foci Tippek · <a href="/aszf.html">ÁSZF</a> · <a href="/">Főoldal</a><br>
+    18+ · A szerencsejáték függőséget okozhat. Segítség: 116-123
+  </footer>
+</div>
+</body>
+</html>
