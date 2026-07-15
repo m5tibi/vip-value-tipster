@@ -12,7 +12,7 @@ const HOST = process.env.SMTP_HOST;
 const PORT = Number(process.env.SMTP_PORT || 587);
 const USER = process.env.SMTP_USER;
 const PASS = process.env.SMTP_PASS;
-const FROM = process.env.MAIL_FROM || "AI Foci Tippek <noreply@example.com>";
+const FROM = process.env.MAIL_FROM || "90perc.hu <noreply@90perc.hu>";
 
 const useResendApi = !!RESEND_KEY;
 const useSmtp      = !useResendApi && !!(HOST && USER && PASS);
@@ -67,12 +67,12 @@ async function send({ to, subject, html, text }) {
 const shell = (title, body) => `
 <div style="background:#07111d;padding:24px;font-family:-apple-system,Segoe UI,Roboto,sans-serif">
   <div style="max-width:520px;margin:0 auto;background:#0d1b2a;border:1px solid #1e3a2f;border-radius:12px;padding:24px;color:#cfd8dc">
-    <div style="color:#00e676;font-weight:700;font-size:19px;margin-bottom:14px">⚽ AI Foci Tippek</div>
+    <div style="color:#00e676;font-weight:700;font-size:19px;margin-bottom:14px">⚽ 90perc.hu</div>
     <div style="font-weight:700;font-size:16px;margin-bottom:10px;color:#e0e0e0">${title}</div>
     ${body}
     <div style="margin-top:24px;padding-top:14px;border-top:1px solid #1e3a2f;color:#546e7a;font-size:11px;line-height:1.6">
       18+ · A szerencsejáték függőséget okozhat. Segítség: 116-123<br>
-      Ezt az e-mailt azért kaptad, mert fiókot hoztál létre az AI Foci Tippek oldalon.
+      Ezt az e-mailt azért kaptad, mert fiókot hoztál létre a 90perc.hu oldalon.
     </div>
   </div>
 </div>`;
@@ -83,7 +83,7 @@ const button = (url, label) =>
 async function sendVerification(to, url) {
   return send({
     to,
-    subject: "Erősítsd meg az e-mail címed – AI Foci Tippek",
+    subject: "Erősítsd meg az e-mail címed – 90perc.hu",
     text: `Üdv!\n\nErősítsd meg az e-mail címed az alábbi linkre kattintva:\n${url}\n\nA link 24 óráig érvényes.\nHa nem te regisztráltál, hagyd figyelmen kívül ezt a levelet.`,
     html: shell("Erősítsd meg az e-mail címed", `
       <p style="line-height:1.7;margin:0 0 6px">Köszönjük a regisztrációt! Kattints az alábbi gombra az e-mail címed megerősítéséhez.</p>
@@ -99,7 +99,7 @@ async function sendVerification(to, url) {
 async function sendPasswordReset(to, url) {
   return send({
     to,
-    subject: "Jelszó visszaállítása – AI Foci Tippek",
+    subject: "Jelszó visszaállítása – 90perc.hu",
     text: `Jelszó visszaállítása\n\nKattints ide az új jelszó beállításához:\n${url}\n\nA link 1 óráig érvényes.\nHa nem te kérted, hagyd figyelmen kívül ezt a levelet – a jelszavad változatlan marad.`,
     html: shell("Jelszó visszaállítása", `
       <p style="line-height:1.7;margin:0 0 6px">Kérted a jelszavad visszaállítását. Kattints az alábbi gombra új jelszó beállításához.</p>
