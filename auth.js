@@ -6,7 +6,7 @@
 const crypto = require("crypto");
 const users  = require("./users");
 
-const COOKIE     = "aft_session";
+const COOKIE     = "90perc_session";
 const MAX_AGE_MS = 30 * 24 * 3600 * 1000;         // 30 nap
 
 // A SESSION_SECRET-et a Renderen állítsd be! Ha hiányzik, generálunk egyet,
