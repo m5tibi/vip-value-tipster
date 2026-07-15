@@ -1117,7 +1117,7 @@ app.post("/api/tips/send", async (req, res) => {
   if (!singlesToSend.length && !combosToSend.length) {
     return res.json({ ok: true, sent: 0, message: "Nincs kiküldendő (jóváhagyott, még el nem küldött) tipp." });
   }
-  let msg = `🏆 <b>AI Foci Tippek – ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</b>\n\n`;
+  let msg = `🏆 <b>90perc.hu – ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</b>\n\n`;
   if (singlesToSend.length) {
     msg += `🤖 <b>TIPPEK</b>\n<i>Web keresés, forma és statisztika alapján</i>\n\n`;
     singlesToSend.forEach(t => {
@@ -1152,7 +1152,7 @@ app.post("/api/check-results", async (req, res) => {
 
 app.post("/api/stats/send", async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  await sendTelegram(buildStatsMsg("AI Foci Tippek – Statisztika"));
+  await sendTelegram(buildStatsMsg("90perc.hu – Statisztika"));
   res.json({ ok: true });
 });
 
@@ -1215,7 +1215,7 @@ const PORT = process.env.PORT || 3000;
 
 console.log(`Regisztrált felhasználók: ${usersDb.count()} · Fizetős mód: ${auth.PAID_MODE ? "BE" : "KI (ingyenes szakasz)"}`);
 
-app.listen(PORT, () => console.log(`AI Foci Tippek fut: http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`90perc.hu fut: http://localhost:${PORT}`));
 
 if (!ADMIN_PWD) {
   console.warn("⚠️  FIGYELEM: ADMIN_PASSWORD nincs beállítva – az admin végpontok (törlés, eredményjelölés, stat-küldés, frissítés) VÉDTELENEK! Állítsd be a Render Environment Variables között.");
