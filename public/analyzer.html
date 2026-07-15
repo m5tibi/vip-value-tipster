@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VIP Fogadás Elemző</title>
+  <title>90perc.hu – Meccs Elemző</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{background:#0c0e14;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;min-height:100vh}
@@ -260,51 +260,64 @@ function analyze(){
   if(!q){alert('Kérlek írj be egy meccset (fogadási opció megadása nem kötelező)!');return;}
   S.loading=true;S.result=null;R();
 
-  // Főoldali tippek lekérése kontextushoz
+  // Háttér-kontextus: főoldali tippek lekérése (NEM jelenik meg az elemzésben)
   fetch('/api/tips').then(function(r){return r.json();}).catch(function(){return {valueTips:[],aiTips:[]};})
   .then(function(td){
     var allTips=(td.aiTips||[]);
-    var tipsCtx='';
+    var hiddenCtx='';
     if(allTips.length){
-      tipsCtx='\n\nAz AI Foci Tippek főoldalán ma az alábbi tippek szerepelnek (NE mondj ezeknek ellent, hacsak nem egyértelmű hiba):\n';
+      hiddenCtx='\n\n[BELSŐ HÁTTÉR-KONTEXTUS — NEM JELENIK MEG AZ ELEMZÉSBEN, NE HIVATKOZZ RÁ]\n'+
+        'Az alábbi tippek más forrásból már ki lettek dolgozva erre a napra. Az elemzésedben SOHA ne utalj arra, hogy "más tipp", "főoldal", "rendszer" vagy bármilyen külső forrás ezeket ajánlja. Ezeket csak saját konzisztencia-ellenőrzésre használd — ha az elemzésed más következtetésre jut, azt a te saját adatelemzésed alapján tedd, hivatkozás nélkül.\n';
       for(var i=0;i<allTips.length;i++){
         var t=allTips[i];
-        tipsCtx+='- '+t.match+': '+t.market+' → '+t.pick+' @ '+t.odds+'\n';
+        hiddenCtx+='- '+t.match+': '+t.market+' → '+t.pick+' @ '+t.odds+'\n';
       }
+      hiddenCtx+='[/BELSŐ HÁTTÉR-KONTEXTUS]\n';
     }
 
     var prompt=
-      'Te egy profi labdarúgás-fogadási elemző vagy.\n\n'+
+      'Te egy profi labdarúgás-fogadási elemző vagy, aki fizetős előfizetők számára készít elemzéseket.\n\n'+
+      'STÍLUS ÉS NYELVEZET:\n'+
+      '- Kizárólag helyes, igényes magyar nyelven írj. Kerüld a hibás tükörfordításokat és a sportnyelvi zsargont (pl. ne írd: "félszívóban", "nyomás alatt lép pályára" helyett írj "fáradtan érkezik", "a kapus a bal kapufánál" stb.).\n'+
+      '- Légy tömör és konkrét. Kerüld az általánosságokat — csak számokkal alátámasztott állításokat tégy.\n'+
+      '- Soha ne utalj arra, hogy más forrásból, más rendszertől vagy más elemzéstől kaptál információt. Az elemzés a saját kutatásod eredménye.\n\n'+
       'FONTOS: Ha nem tudsz labdarúgó meccset azonosítani a kérésből, vagy ha a kérés nem focival kapcsolatos, NE kezdj elemzésbe! Helyette írd pontosan ezt:\n'+
-      'NEM ÉRTEM: [rövid magyarázat, és javaslat a helyes formátumra, pl.: "Csapat1 - Csapat2" vagy "Csapat1 - Csapat2; fogadási opció"]\n\n'+
+      'NEM ÉRTEM: [rövid magyarázat, és javaslat a helyes formátumra, pl.: "Csapat1 - Csapat2" vagy "Csapat1 - Csapat2; Over 2.5"]\n\n'+
       'A felhasználó kérése:\n"'+q+'"\n'+
-      tipsCtx+'\n\n'+
+      hiddenCtx+'\n\n'+
       'Használj web keresést a valós, aktuális adatokhoz (forma, sérülések, H2H). Két eset lehetséges:\n\n'+
       '=== (A) HA A KÉRÉS KONKRÉT FOGADÁSI OPCIÓT IS TARTALMAZ ===\n'+
-      '(pl. "Over 2.5", "hazai győzelem", "mindkét csapat szerez gólt"), akkor AZT az opciót értékeld, PONTOSAN ebben a struktúrában:\n\n'+
-      'MECCS KONTEXTUS:\n[Torna, forduló, tét — 1-2 mondat]\n\n'+
-      'HAZAI CSAPAT FORMA:\n[Utolsó 5 meccs konkrét eredményekkel, gólátlag]\n\n'+
-      'VENDÉG CSAPAT FORMA:\n[Utolsó 5 meccs konkrét eredményekkel, gólátlag]\n\n'+
-      'H2H ELŐZMÉNYEK:\n[Utolsó 3-5 találkozó eredménye, gólátlag]\n\n'+
-      'SÉRÜLÉSEK / HIÁNYZÓK:\n[Mindkét csapat fontos hiányzói]\n\n'+
-      'FOGADÁSI OPCIÓ ÉRTÉKELÉSE:\n[A konkrét opció részletes elemzése — 4-5 mondat]\n\n'+
-      'Egy üres sor után add meg a verdiktet pontosan így:\n'+
-      'VERDIKT: AJANLOTT\n'+
-      'vagy: VERDIKT: BIZONYTALAN\n'+
-      'vagy: VERDIKT: NEM AJANLOTT\n\n'+
+      '(pl. "Over 2.5", "hazai győzelem", "mindkét csapat szerez gólt"), akkor AZT az opciót értékeld mélyen, PONTOSAN ebben a struktúrában:\n\n'+
+      'MECCS KONTEXTUS:\n[Torna, forduló, tét — 1-2 tömör mondat]\n\n'+
+      'HAZAI CSAPAT FORMA:\n[Utolsó 5 meccs konkrét eredményekkel és dátummal, gólátlag kiszámítva]\n\n'+
+      'VENDÉG CSAPAT FORMA:\n[Utolsó 5 meccs konkrét eredményekkel és dátummal, gólátlag kiszámítva]\n\n'+
+      'H2H ELŐZMÉNYEK:\n[Utolsó 3-5 egymás elleni találkozó eredménye, gólátlag, trendek]\n\n'+
+      'SÉRÜLÉSEK / HIÁNYZÓK:\n[Mindkét csapat kulcsjátékosainak sérülési és eltiltási státusza]\n\n'+
+      'FOGADÁSI OPCIÓ ÉRTÉKELÉSE:\n[Az adott piac részletes elemzése: mi szól mellette, mi szól ellene, konkrét számokkal — 5-6 mondat]\n\n'+
+      'Egy üres sor után add meg a verdiktet és indokold meg egy mondatban:\n'+
+      'VERDIKT: AJANLOTT — [egy mondat az ok]\n'+
+      'vagy: VERDIKT: BIZONYTALAN — [egy mondat az ok]\n'+
+      'vagy: VERDIKT: NEM AJANLOTT — [egy mondat az ok]\n\n'+
       '=== (B) HA A KÉRÉS CSAK EGY MECCSET TARTALMAZ, FOGADÁSI OPCIÓ NÉLKÜL ===\n'+
-      '(pl. "Brazília - Norvégia"), akkor készíts általános elemzést, majd ajánlj tippeket, PONTOSAN ebben a struktúrában:\n\n'+
-      'MECCS KONTEXTUS:\n[Torna, forduló, tét — 1-2 mondat]\n\n'+
-      'HAZAI CSAPAT FORMA:\n[Utolsó 5 meccs konkrét eredményekkel, gólátlag]\n\n'+
-      'VENDÉG CSAPAT FORMA:\n[Utolsó 5 meccs konkrét eredményekkel, gólátlag]\n\n'+
-      'H2H ELŐZMÉNYEK:\n[Utolsó 3-5 találkozó eredménye, gólátlag]\n\n'+
-      'SÉRÜLÉSEK / HIÁNYZÓK:\n[Mindkét csapat fontos hiányzói]\n\n'+
+      '(pl. "Brazília - Norvégia"), akkor készíts teljes elemzést és adj több konkrét tipp-javaslatot, PONTOSAN ebben a struktúrában:\n\n'+
+      'MECCS KONTEXTUS:\n[Torna, forduló, tét — 1-2 tömör mondat]\n\n'+
+      'HAZAI CSAPAT FORMA:\n[Utolsó 5 meccs konkrét eredményekkel és dátummal, gólátlag kiszámítva]\n\n'+
+      'VENDÉG CSAPAT FORMA:\n[Utolsó 5 meccs konkrét eredményekkel és dátummal, gólátlag kiszámítva]\n\n'+
+      'H2H ELŐZMÉNYEK:\n[Utolsó 3-5 egymás elleni találkozó eredménye, gólátlag, trendek]\n\n'+
+      'SÉRÜLÉSEK / HIÁNYZÓK:\n[Mindkét csapat kulcsjátékosainak sérülési és eltiltási státusza]\n\n'+
       'TIPP JAVASLATOK:\n'+
-      '[3-5 konkrét fogadási javaslat, MEGBÍZHATÓSÁG SZERINT CSÖKKENŐ sorrendben — a legmegbízhatóbb elöl. Minden javaslat új sorban, pontosan ilyen formában:]\n'+
-      '1. [konkrét tipp, pl. Over 2.5 gól] — Megbízhatóság: MAGAS — [1-2 mondatos indoklás valós adatokkal]\n'+
-      '2. [tipp] — Megbízhatóság: KÖZEPES — [indoklás]\n'+
-      '3. [tipp] — Megbízhatóság: ALACSONY — [indoklás]\n\n'+
-      'Szabályok: ne használj csillag (*) formázást, adj valódi számokat. Magyar nyelven, szakszerűen.';
+      'Adj 4-5 konkrét fogadási javaslatot, MEGBÍZHATÓSÁG SZERINT CSÖKKENŐ sorrendben. Minden javaslat legyen különböző piacról (pl. gólszám, győztes, hendikep, BTTS). Pontosan ilyen formában:\n\n'+
+      '1. [Piac és konkrét tipp, pl. Over 2.5 gól] — Megbízhatóság: MAGAS\n'+
+      '   Indoklás: [2-3 mondat, konkrét számokkal, gólátlaggal, statisztikával alátámasztva]\n\n'+
+      '2. [Piac és konkrét tipp] — Megbízhatóság: MAGAS\n'+
+      '   Indoklás: [2-3 mondat]\n\n'+
+      '3. [Piac és konkrét tipp] — Megbízhatóság: KÖZEPES\n'+
+      '   Indoklás: [2-3 mondat]\n\n'+
+      '4. [Piac és konkrét tipp] — Megbízhatóság: KÖZEPES\n'+
+      '   Indoklás: [2-3 mondat]\n\n'+
+      '5. [Piac és konkrét tipp] — Megbízhatóság: ALACSONY\n'+
+      '   Indoklás: [2-3 mondat — magyarázd el, miért kockázatosabb]\n\n'+
+      'Szabályok: ne használj csillag (*) vagy hashtag (#) formázást. Adj valódi, ellenőrzött számokat. Kizárólag helyes, igényes magyar nyelvezet.';
 
     fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
@@ -347,7 +360,7 @@ function rHdr(){
     '<div class="dot" style="background:#4ade80"></div>'+
     '<span style="font-size:11px;color:#4ade80;font-weight:600">Claude</span></div>':'';
   return '<div class="hdr">'+
-    '<div><div class="htitle">VIP Fogadás Elemző</div><div class="hsub">AI meccs elemzés</div></div>'+
+    '<div><div class="htitle">90perc.hu Elemző</div><div class="hsub">AI meccs elemzés</div></div>'+
     '<div class="hright">'+badge+'<a class="back" href="/">← Főoldal</a></div>'+
     '</div>';
 }
