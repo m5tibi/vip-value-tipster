@@ -203,13 +203,13 @@ function nowHu() {
   return new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" });
 }
 
-// Csak foci AI tippek: a value tippeket és a nem-foci sportágakat kihagyjuk.
+// AI tippek: foci meccsek elemzése valós odds és web keresés alapján.
 function isFootballAi(t) {
   if (t.type === "value") return false;
   return /soccer|foci|⚽/i.test((t.sport || "") + " " + (t.sportLabel || ""));
 }
 
-// ── Statisztika számítás (csak foci, value nélkül) ────────
+// ── Statisztika számítás ──────────────────────────────────
 function calcStats() {
   const tips     = history.filter(isFootballAi);
   const won      = tips.filter(t => t.result === "won").length;
@@ -259,8 +259,7 @@ function buildStatsMsg(title) {
     `Nyert/Vesztett: <b>${cs.won}</b> / <b>${cs.lost}</b> (folyamatban: ${cs.pend})\n`+
     `Profit: <b>${cs.profitStr} egység</b> · ROI: <b>${cs.roiStr}</b>` : "";
   return `📈 <b>${title}</b>\n`+
-    `📅 ${new Date().toLocaleDateString("hu-HU")}\n`+
-    `<i>Csak foci tippek (value nélkül)</i>\n\n`+
+    `📅 ${new Date().toLocaleDateString("hu-HU")}\n\n`+
     `📊 <b>Összesítés</b>\n`+
     `Összes tipp: <b>${total}</b>\n`+
     `⏳ Folyamatban: <b>${pend}</b>\n`+
@@ -855,7 +854,7 @@ setInterval(async () => {
   }
   if (hour === 0 && minute === 5 && _lastStatsDay !== dayKey) {
     _lastStatsDay = dayKey;
-    await sendTelegram(buildStatsMsg("Napi statisztika"));
+    await sendTelegram(buildStatsMsg("90perc.hu – Napi statisztika"));
   }
 }, 60000);
 
@@ -1117,7 +1116,7 @@ app.post("/api/tips/send", async (req, res) => {
   if (!singlesToSend.length && !combosToSend.length) {
     return res.json({ ok: true, sent: 0, message: "Nincs kiküldendő (jóváhagyott, még el nem küldött) tipp." });
   }
-  let msg = `🏆 <b>90perc.hu – ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</b>\n\n`;
+  let msg = `🏆 <b>AI Foci Tippek – ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</b>\n\n`;
   if (singlesToSend.length) {
     msg += `🤖 <b>TIPPEK</b>\n<i>Web keresés, forma és statisztika alapján</i>\n\n`;
     singlesToSend.forEach(t => {
@@ -1152,7 +1151,7 @@ app.post("/api/check-results", async (req, res) => {
 
 app.post("/api/stats/send", async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  await sendTelegram(buildStatsMsg("90perc.hu – Statisztika"));
+  await sendTelegram(buildStatsMsg("AI Foci Tippek – Statisztika"));
   res.json({ ok: true });
 });
 
@@ -1215,7 +1214,7 @@ const PORT = process.env.PORT || 3000;
 
 console.log(`Regisztrált felhasználók: ${usersDb.count()} · Fizetős mód: ${auth.PAID_MODE ? "BE" : "KI (ingyenes szakasz)"}`);
 
-app.listen(PORT, () => console.log(`90perc.hu fut: http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`AI Foci Tippek fut: http://localhost:${PORT}`));
 
 if (!ADMIN_PWD) {
   console.warn("⚠️  FIGYELEM: ADMIN_PASSWORD nincs beállítva – az admin végpontok (törlés, eredményjelölés, stat-küldés, frissítés) VÉDTELENEK! Állítsd be a Render Environment Variables között.");
