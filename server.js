@@ -284,7 +284,7 @@ async function fetchAiTips(matchList, alreadyTipped = []) {
   ).join("\n");
 
   const skipNote = alreadyTipped.length
-    ? `\nEZEKRE A MECCSEKRE MÁR VAN SINGLE TIPP – NE adj rájuk újabb SINGLE tippet (de kombi lábnak felhasználhatod): ${alreadyTipped.join("; ")}\n`
+    ? `\nEZEKRE A MECCSEKRE MÁR VAN TIPP – NE szerepeljen sem SINGLE tippként, sem KOMBI LÁBKÉNT: ${alreadyTipped.join("; ")}\n`
     : "";
 
   const prompt = `Te egy profi labdarúgás-fogadási elemző vagy. Használj web keresést az aktuális formához, sérülésekhez és keretinformációkhoz az alábbi közelgő foci meccsekre (a következő ~36 óra).
@@ -535,7 +535,9 @@ async function fetchAndProcess() {
   // Új single nélkül is jöhet friss kombi, de a KORÁBBIVAL azonos láb-halmazú NEM
   // duplikálódik (a dedup a lábakat nézi, nem az azonosítót).
   const existingKeys = new Set(history.filter(t => t.type === "combo").map(comboKey));
-  const freshCombos = buildCombos(comboLegs, matchList).filter(c => !existingKeys.has(comboKey(c)));
+  // Backstop: ha egy kombi láb meccse már single tippként szerepel (ma, pending), kiszűrjük
+  const filteredComboLegs = comboLegs.filter(l => !tippedMatches.has(l.match));
+  const freshCombos = buildCombos(filteredComboLegs, matchList).filter(c => !existingKeys.has(comboKey(c)));
   if (freshCombos.length) { history = [...freshCombos, ...history]; saveHistory(); }
   comboTips = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
 
@@ -1044,6 +1046,31 @@ app.get("/api/status", (req, res) => {
     minsUntilNext     = (24 - hour) * 60 - minute + (isWE ? 10 : 15) * 60;
   }
   res.json({ aiTipsCount: aiTips.length, lastUpdate: history[0]?.addedAt || null, nextFetchMs: minsUntilNext * 60 * 1000, isWeekend, fetchHours });
+});
+
+
+app.get("/api/public-stats", (req, res) => {
+  const H = history.filter(t =>
+    t.type !== "combo" && isApproved(t) &&
+    (t.result && t.result !== "pending")
+  );
+  const won      = H.filter(t => t.result === "won").length;
+  const lost     = H.filter(t => t.result === "lost").length;
+  const halfWon  = H.filter(t => t.result === "half_won").length;
+  const halfLost = H.filter(t => t.result === "half_lost").length;
+  const push     = H.filter(t => t.result === "push").length;
+  const settled  = H.length;
+  const decN     = won + lost + halfWon + halfLost;
+  const winRate  = decN ? (((won + halfWon * 0.5) / decN) * 100).toFixed(1) : null;
+  const profit   = H.reduce((sum, t) => {
+    if (t.result === "won")       return sum + (parseFloat(t.odds) - 1);
+    if (t.result === "lost")      return sum - 1;
+    if (t.result === "half_won")  return sum + (parseFloat(t.odds) - 1) / 2;
+    if (t.result === "half_lost") return sum - 0.5;
+    return sum;
+  }, 0);
+  const roi = settled ? ((profit / settled) * 100).toFixed(1) : null;
+  res.json({ settled, won, lost, push: push + halfWon + halfLost, winRate, profit: parseFloat(profit.toFixed(2)), roi });
 });
 
 app.post("/api/refresh", async (req, res) => {
