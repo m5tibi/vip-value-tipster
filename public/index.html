@@ -363,20 +363,20 @@
 <div class="stats-bar">
   <div class="stats-inner">
     <div>
-      <div class="stat-num">67<span style="font-size:24px">%</span></div>
+      <div class="stat-num" id="stat-wr">–</div>
       <div class="stat-label">Nyerési arány (single tippek)</div>
     </div>
     <div>
-      <div class="stat-num gold">+8.4</div>
-      <div class="stat-label">Egységnyi profit (ROI alapon)</div>
+      <div class="stat-num gold" id="stat-profit">–</div>
+      <div class="stat-label">Egységnyi profit</div>
+    </div>
+    <div>
+      <div class="stat-num" id="stat-roi">–</div>
+      <div class="stat-label">ROI</div>
     </div>
     <div>
       <div class="stat-num">36</div>
       <div class="stat-label">Liga figyelve folyamatosan</div>
-    </div>
-    <div>
-      <div class="stat-num">100<span style="font-size:24px">%</span></div>
-      <div class="stat-label">Átlátható, ellenőrizhető előzmény</div>
     </div>
   </div>
 </div>
@@ -617,6 +617,33 @@ function toggleFaq(btn) {
     btn.nextElementSibling.classList.add('open');
   }
 }
+</script>
+
+<script>
+(function() {
+  fetch('/api/public-stats')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var wrEl     = document.getElementById('stat-wr');
+      var profitEl = document.getElementById('stat-profit');
+      var roiEl    = document.getElementById('stat-roi');
+      if (!wrEl) return;
+      if (d.winRate != null) {
+        wrEl.innerHTML = d.winRate + '<span style="font-size:24px">%</span>';
+      }
+      if (d.profit != null) {
+        var sign = d.profit >= 0 ? '+' : '';
+        profitEl.textContent = sign + d.profit.toFixed(1);
+        profitEl.style.color = d.profit >= 0 ? '#f59e0b' : '#ef4444';
+      }
+      if (d.roi != null) {
+        var sign = d.roi >= 0 ? '+' : '';
+        roiEl.innerHTML = sign + d.roi + '<span style="font-size:24px">%</span>';
+        roiEl.style.color = d.roi >= 0 ? '#00e676' : '#ef4444';
+      }
+    })
+    .catch(function() {});
+})();
 </script>
 </body>
 </html>
