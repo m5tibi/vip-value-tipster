@@ -318,17 +318,36 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6", max_tokens: 5000,
+        model: "claude-sonnet-4-6", max_tokens: 8000,
         tools: [{ type: "web_search_20250305", name: "web_search" }],
         messages: [{ role: "user", content: prompt }]
       })
     });
     const data = await r.json();
+    if (data.error) { console.error("AI API hiba:", JSON.stringify(data.error)); return { singles: [], comboLegs: [] }; }
     const text = (data.content?.filter(b => b.type === "text").map(b => b.text) || []).join("\n");
-    const found = text.match(/\{[\s\S]*\}/);
-    if (!found) { console.log("AI: nem sikerült JSON-t kinyerni\n" + text.slice(0, 300)); return { singles: [], comboLegs: [] }; }
+    if (!text.trim()) { console.log("AI: üres szöveges válasz. stop_reason:", data.stop_reason); return { singles: [], comboLegs: [] }; }
+
+    // JSON kinyerés: 1) ```json...``` blokk, 2) nyers {} blokk
+    let jsonStr = null;
+    const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeBlock) {
+      jsonStr = codeBlock[1].trim();
+    } else {
+      // Legelső { és legutolsó } közötti rész
+      const first = text.indexOf("{");
+      const last  = text.lastIndexOf("}");
+      if (first !== -1 && last > first) jsonStr = text.slice(first, last + 1);
+    }
+    if (!jsonStr) {
+      console.log("AI: nem sikerült JSON-t kinyerni. Válasz eleje:\n" + text.slice(0, 500));
+      return { singles: [], comboLegs: [] };
+    }
     let obj;
-    try { obj = JSON.parse(found[0]); } catch { console.log("AI: JSON parse hiba"); return { singles: [], comboLegs: [] }; }
+    try { obj = JSON.parse(jsonStr); } catch(e) {
+      console.log("AI: JSON parse hiba –", e.message, "\nPróbált JSON eleje:\n" + jsonStr.slice(0, 400));
+      return { singles: [], comboLegs: [] };
+    }
     // A valós kezdési idő a meccslistából (odds API), nem az AI adatából
     const realCommence = name => {
       const exact = matchList.find(m => m.match === name);
