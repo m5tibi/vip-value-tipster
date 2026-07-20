@@ -456,14 +456,19 @@ function needsPush(market) {
 
 function actionBtns(t) {
   if (!isAdmin()) return "";
-  if (t.result && t.result!=="pending") return "";
-  const pb = needsPush(t.market)
-    ? `<button class="btn-push" onclick="setResult('${t.id}','half_won')">½✅</button>
-       <button class="btn-push" onclick="setResult('${t.id}','push')">↩️</button>
-       <button class="btn-push" onclick="setResult('${t.id}','half_lost')">½❌</button>`
-    : "";
-  return `<button class="btn-won" onclick="setResult('${t.id}','won')">✅ Nyert</button>
-          <button class="btn-lost" onclick="setResult('${t.id}','lost')">❌ Vesztett</button>${pb}`;
+  const pb = `<button class="btn-push" onclick="setResult('${t.id}','half_won')">½✅</button>
+     <button class="btn-push" onclick="setResult('${t.id}','push')">↩️</button>
+     <button class="btn-push" onclick="setResult('${t.id}','half_lost')">½❌</button>`;
+  const allBtns = `<button class="btn-won" onclick="setResult('${t.id}','won')">✅</button>
+     <button class="btn-lost" onclick="setResult('${t.id}','lost')">❌</button>${pb}`;
+  if (!t.result || t.result === "pending") {
+    // Még nem értékelt: teljes szöveges gombok
+    const pbFull = needsPush(t.market) ? pb : "";
+    return `<button class="btn-won" onclick="setResult('${t.id}','won')">✅ Nyert</button>
+            <button class="btn-lost" onclick="setResult('${t.id}','lost')">❌ Vesztett</button>${pbFull}`;
+  }
+  // Már ki van értékelve: kompakt javítás gombok
+  return `<span style="font-size:10px;color:#546e7a;margin-right:4px">Javítás:</span>${allBtns}`;
 }
 
 function parseCommence(c) {
