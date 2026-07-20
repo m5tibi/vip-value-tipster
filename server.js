@@ -1118,11 +1118,16 @@ app.post("/api/refresh", async (req, res) => {
 app.patch("/api/history/:id", (req, res) => {
   if (!requireAdmin(req, res)) return;
   const { result } = req.body;
+  const validResults = ["won","lost","push","half_won","half_lost","pending"];
+  if (!validResults.includes(result)) return res.status(400).json({ error: "Érvénytelen eredmény" });
   const patch = { result, manual: true };       // kézi jelölést az auto-újraértékelés nem írja felül
-  history    = history.map(t => t.id === req.params.id ? { ...t, ...patch } : t);
-  latestTips = latestTips.map(t => t.id === req.params.id ? { ...t, ...patch } : t);
-  aiTips     = aiTips.map(t => t.id === req.params.id ? { ...t, ...patch } : t);
+  const upd = t => t.id === req.params.id ? { ...t, ...patch } : t;
+  history    = history.map(upd);
+  latestTips = latestTips.map(upd);
+  aiTips     = aiTips.map(upd);
+  comboTips  = comboTips.map(upd);
   saveHistory();
+  console.log(`Kézi eredmény javítás: ${req.params.id} → ${result}`);
   res.json({ ok: true });
 });
 
