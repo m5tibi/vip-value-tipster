@@ -1285,7 +1285,7 @@ console.log(`Regisztrált felhasználók: ${usersDb.count()} · Fizetős mód: $
 
 app.get("/api/admin/users", (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const list = auth.all().map(u => ({
+  const list = usersDb.all().map(u => ({
     id: u.id,
     email: u.email,
     plan: u.plan || "free",
@@ -1300,15 +1300,14 @@ app.get("/api/admin/users", (req, res) => {
 app.patch("/api/admin/users/:id", (req, res) => {
   if (!requireAdmin(req, res)) return;
   const { plan, paidUntil } = req.body;
-  auth.update(req.params.id, { plan, paidUntil });
+  usersDb.update(req.params.id, { plan, paidUntil });
   console.log(`Felhasználó frissítve: ${req.params.id} → plan:${plan}`);
   res.json({ ok: true });
 });
 
 app.delete("/api/admin/users/:id", (req, res) => {
   if (!requireAdmin(req, res)) return;
-  // Soft delete: deaktiváljuk a fiókot
-  auth.update(req.params.id, { disabled: true, plan: "free" });
+  usersDb.update(req.params.id, { disabled: true, plan: "free" });
   console.log(`Felhasználó deaktiválva: ${req.params.id}`);
   res.json({ ok: true });
 });
