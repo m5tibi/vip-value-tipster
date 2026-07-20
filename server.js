@@ -616,7 +616,15 @@ function fdScore90(m) {
   const pick = o => o && (o.home != null || o.homeTeam != null)
     ? { home: +(o.home ?? o.homeTeam), away: +(o.away ?? o.awayTeam) } : null;
   const s = m.score || {};
-  return pick(s.regularTime) || pick(s.fullTime);
+  const duration = s.duration || "REGULAR";
+  const reg = pick(s.regularTime);
+  if (reg) return reg;                                       // regularTime mindig helyes
+  if (duration === "EXTRA_TIME" || duration === "PENALTY_SHOOTOUT") {
+    // Hosszabbítás/büntetők esetén fullTime ≠ 90 perc → NE használjuk visszaesésként
+    console.log(`    ⚠️  KO-meccs (${duration}), de nincs regularTime adat – kiértékelés halasztva: ${m.homeTeam?.shortName || ""} vs ${m.awayTeam?.shortName || ""}`);
+    return null;
+  }
+  return pick(s.fullTime);                                   // REGULAR meccsnél fullTime = 90 perc
 }
 async function fdMatchesForDate(dateStr, cache) {
   if (!FOOTBALLDATA_TOKEN) return null;
@@ -656,7 +664,13 @@ async function regulationScore(game, cache) {
     const m = fdMatchFixture(game, fx);
     if (m && m.status === "FINISHED") {
       const sc = fdScore90(m);
-      if (sc && sc.home != null) return { home: sc.home, away: sc.away, status: m.score?.duration || "FINISHED" };
+      const dur = m.score?.duration || "REGULAR";
+      if (sc && sc.home != null) {
+        if (dur === "EXTRA_TIME" || dur === "PENALTY_SHOOTOUT") {
+          console.log(`    ℹ️  KO-meccs (${dur}): 90 perces eredmény = ${sc.home}-${sc.away} (nem a végeredmény!)`);
+        }
+        return { home: sc.home, away: sc.away, status: dur };
+      }
     }
   }
   return null;
@@ -1069,9 +1083,11 @@ app.get("/api/status", (req, res) => {
 
 
 app.get("/api/public-stats", (req, res) => {
+  const isFociSrv = t => /soccer|foci|⚽/i.test((t.sport || "") + " " + (t.sportLabel || ""));
   const H = history.filter(t =>
-    t.type !== "combo" && isApproved(t) &&
-    (t.result && t.result !== "pending")
+    t.type !== "combo" && t.type !== "value" &&
+    isApproved(t) && isFociSrv(t) &&
+    ["won","lost","push","half_won","half_lost"].includes(t.result)
   );
   const won      = H.filter(t => t.result === "won").length;
   const lost     = H.filter(t => t.result === "lost").length;
@@ -1082,14 +1098,15 @@ app.get("/api/public-stats", (req, res) => {
   const decN     = won + lost + halfWon + halfLost;
   const winRate  = decN ? (((won + halfWon * 0.5) / decN) * 100).toFixed(1) : null;
   const profit   = H.reduce((sum, t) => {
-    if (t.result === "won")       return sum + (parseFloat(t.odds) - 1);
+    const o = parseFloat(t.odds) || 1;
+    if (t.result === "won")       return sum + (o - 1);
     if (t.result === "lost")      return sum - 1;
-    if (t.result === "half_won")  return sum + (parseFloat(t.odds) - 1) / 2;
+    if (t.result === "half_won")  return sum + (o - 1) / 2;
     if (t.result === "half_lost") return sum - 0.5;
-    return sum;
+    return sum;  // push
   }, 0);
   const roi = settled ? ((profit / settled) * 100).toFixed(1) : null;
-  res.json({ settled, won, lost, push: push + halfWon + halfLost, winRate, profit: parseFloat(profit.toFixed(2)), roi });
+  res.json({ settled, won, lost, push, halfWon, halfLost, winRate, profit: parseFloat(profit.toFixed(2)), roi });
 });
 
 app.post("/api/refresh", async (req, res) => {
