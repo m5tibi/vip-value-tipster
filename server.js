@@ -1282,6 +1282,37 @@ const PORT = process.env.PORT || 3000;
 
 console.log(`Regisztrált felhasználók: ${usersDb.count()} · Fizetős mód: ${auth.PAID_MODE ? "BE" : "KI (ingyenes szakasz)"}`);
 
+
+app.get("/api/admin/users", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const list = auth.all().map(u => ({
+    id: u.id,
+    email: u.email,
+    plan: u.plan || "free",
+    emailVerified: u.emailVerified !== false,
+    isAdmin: !!u.isAdmin,
+    createdAt: u.createdAt || null,
+    paidUntil: u.paidUntil || null
+  }));
+  res.json(list);
+});
+
+app.patch("/api/admin/users/:id", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const { plan, paidUntil } = req.body;
+  auth.update(req.params.id, { plan, paidUntil });
+  console.log(`Felhasználó frissítve: ${req.params.id} → plan:${plan}`);
+  res.json({ ok: true });
+});
+
+app.delete("/api/admin/users/:id", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  // Soft delete: deaktiváljuk a fiókot
+  auth.update(req.params.id, { disabled: true, plan: "free" });
+  console.log(`Felhasználó deaktiválva: ${req.params.id}`);
+  res.json({ ok: true });
+});
+
 app.listen(PORT, () => console.log(`90perc.hu fut: http://localhost:${PORT}`));
 
 if (!ADMIN_PWD) {
