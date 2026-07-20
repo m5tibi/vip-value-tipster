@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Track Record – 90perc.hu</title>
+<meta name="description" content="A 90perc.hu minden tippjének nyilvános, manipulálhatatlan előzménye. Valós win%, ROI és profit adatok."/>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@600;700&display=swap"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#060e1b;--surf:#0c1a2e;--border:#1a2f4a;
+    --green:#00e676;--red:#ef4444;--gold:#f59e0b;
+    --text:#dce8f5;--muted:#5d7a96;--radius:12px;
+  }
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;line-height:1.6;min-height:100vh}
+
+  /* NAV */
+  nav{position:sticky;top:0;z-index:50;background:rgba(6,14,27,.94);backdrop-filter:blur(12px);
+      border-bottom:1px solid var(--border);padding:12px 20px;
+      display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .nav-logo{display:flex;align-items:center}
+  .nav-logo img{height:32px;width:auto}
+  .nav-links{display:flex;gap:12px;align-items:center}
+  .nav-links a{color:var(--muted);text-decoration:none;font-size:13px;font-weight:500;transition:color .15s}
+  .nav-links a:hover{color:var(--green)}
+  .nav-cta{background:var(--green);color:#060e1b;font-weight:700;font-size:13px;
+            padding:7px 16px;border-radius:8px;text-decoration:none;white-space:nowrap}
+
+  /* HERO STATS */
+  .hero{padding:48px 20px 32px;text-align:center;position:relative;overflow:hidden}
+  .hero::before{content:'';position:absolute;inset:0;
+    background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(0,230,118,.06),transparent 70%);
+    pointer-events:none}
+  .hero-eyebrow{display:inline-flex;align-items:center;gap:7px;
+    background:rgba(0,230,118,.08);border:1px solid rgba(0,230,118,.2);
+    border-radius:100px;padding:4px 14px;font-size:11px;font-weight:700;
+    color:var(--green);letter-spacing:.5px;margin-bottom:20px}
+  .hero-eyebrow .dot{width:6px;height:6px;background:var(--green);border-radius:50%;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .hero h1{font-family:'Oswald',sans-serif;font-size:clamp(28px,6vw,48px);color:#fff;
+            line-height:1.1;margin-bottom:8px}
+  .hero h1 em{color:var(--green);font-style:normal}
+  .hero-sub{font-size:14px;color:var(--muted);max-width:480px;margin:0 auto}
+
+  /* STATS SCOREBOARD */
+  .scoreboard{max-width:860px;margin:32px auto 0;padding:0 20px;
+              display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+  .score-card{background:var(--surf);border:1px solid var(--border);border-radius:var(--radius);
+              padding:20px 16px;text-align:center}
+  .score-num{font-family:'Oswald',sans-serif;font-size:40px;line-height:1;color:#fff;margin-bottom:4px}
+  .score-num.green{color:var(--green)}
+  .score-num.gold{color:var(--gold)}
+  .score-num.red{color:var(--red)}
+  .score-label{font-size:11px;color:var(--muted);letter-spacing:.3px}
+  .score-sub{font-size:10px;color:var(--border);margin-top:2px}
+
+  /* PROFIT CHART */
+  .chart-wrap{max-width:860px;margin:32px auto 0;padding:0 20px}
+  .chart-box{background:var(--surf);border:1px solid var(--border);border-radius:var(--radius);
+             padding:20px;position:relative}
+  .chart-title{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:1px;
+               text-transform:uppercase;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+  .chart-title span{color:var(--green);font-family:'Oswald',sans-serif;font-size:16px;letter-spacing:0}
+  #profit-chart{width:100%;height:140px;display:block}
+
+  /* FILTER + TABLE */
+  .table-wrap{max-width:860px;margin:24px auto 0;padding:0 20px 60px}
+  .filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .filter-btn{background:var(--surf);border:1px solid var(--border);border-radius:8px;
+              padding:6px 16px;font-size:12px;font-weight:600;color:var(--muted);
+              cursor:pointer;transition:all .15s}
+  .filter-btn.active{border-color:var(--green);color:var(--green);background:rgba(0,230,118,.08)}
+  .filter-btn:hover{border-color:var(--green);color:var(--green)}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{text-align:left;padding:8px 10px;font-size:10px;font-weight:700;
+           color:var(--muted);letter-spacing:1px;text-transform:uppercase;
+           border-bottom:2px solid var(--border)}
+  tbody tr{border-bottom:1px solid rgba(26,47,74,.6);transition:background .1s}
+  tbody tr:hover{background:rgba(12,26,46,.6)}
+  td{padding:10px 10px;vertical-align:middle}
+  .td-date{color:var(--muted);font-size:11px;white-space:nowrap}
+  .td-match{color:#fff;font-weight:600;font-size:13px}
+  .td-pick{color:var(--text);font-size:12px}
+  .td-odds{font-family:'Oswald',sans-serif;font-size:16px;color:var(--gold)}
+  .badge{display:inline-flex;align-items:center;gap:4px;border-radius:5px;
+         padding:2px 9px;font-size:11px;font-weight:700;white-space:nowrap}
+  .badge.won{background:rgba(0,230,118,.12);color:var(--green)}
+  .badge.lost{background:rgba(239,68,68,.12);color:var(--red)}
+  .badge.half_won{background:rgba(0,230,118,.07);color:#69f0ae}
+  .badge.half_lost{background:rgba(239,68,68,.07);color:#f87171}
+  .badge.push{background:rgba(93,122,150,.15);color:var(--muted)}
+  .badge.pending{background:rgba(245,158,11,.1);color:var(--gold)}
+  .td-pl{font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;text-align:right}
+  .td-pl.pos{color:var(--green)}
+  .td-pl.neg{color:var(--red)}
+  .td-pl.zero{color:var(--muted)}
+
+  .empty{text-align:center;padding:48px 20px;color:var(--muted);font-size:14px}
+  .loading{text-align:center;padding:48px;color:var(--muted)}
+
+  /* CTA */
+  .cta-box{max-width:860px;margin:0 auto;padding:0 20px 60px}
+  .cta-inner{background:linear-gradient(135deg,#071a10,#060e1b);
+             border:1px solid rgba(0,230,118,.15);border-radius:var(--radius);
+             padding:36px 24px;text-align:center}
+  .cta-inner h2{font-family:'Oswald',sans-serif;font-size:28px;color:#fff;margin-bottom:10px}
+  .cta-inner h2 em{color:var(--green);font-style:normal}
+  .cta-inner p{font-size:14px;color:var(--muted);margin-bottom:24px}
+  .cta-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .btn-primary{background:var(--green);color:#060e1b;font-weight:700;font-size:14px;
+               padding:12px 24px;border-radius:9px;text-decoration:none;
+               box-shadow:0 0 20px rgba(0,230,118,.2)}
+  .btn-tg{display:inline-flex;align-items:center;gap:7px;background:#229ED9;color:#fff;
+          font-weight:700;font-size:14px;padding:12px 24px;border-radius:9px;text-decoration:none}
+
+  /* FOOTER */
+  footer{border-top:1px solid var(--border);padding:20px;text-align:center;
+         font-size:11px;color:var(--muted)}
+  footer a{color:var(--muted);text-decoration:none}
+  footer a:hover{color:var(--green)}
+
+  @media(max-width:600px){
+    .scoreboard{grid-template-columns:repeat(2,1fr)}
+    table{font-size:12px}
+    td{padding:8px 6px}
+    .td-match{font-size:12px}
+    thead th:nth-child(1),td:nth-child(1){display:none}
+  }
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="/"><img src="/logo-horizontal.png" alt="90perc.hu"/></a>
+  <div class="nav-links">
+    <a href="/tippek.html">Tippek</a>
+    <a href="/analyzer.html">Elemző</a>
+    <a href="https://t.me/+rMoqrue6DBFlZmVk" target="_blank" rel="noopener" style="color:#229ED9">Telegram</a>
+    <a class="nav-cta" href="/tippek.html">Belépés</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="hero-eyebrow"><span class="dot"></span>Élő adatok · Automatikusan frissítve</div>
+  <h1>Minden tipp.<br/><em>Nyilvánosan.</em></h1>
+  <p class="hero-sub">Nem törölhetünk, nem módosíthatunk. Amit kinn van, az marad – az eredménnyel együtt.</p>
+</div>
+
+<div class="scoreboard" id="scoreboard">
+  <div class="score-card"><div class="score-num" id="s-settled">–</div><div class="score-label">Lezárt tipp</div></div>
+  <div class="score-card"><div class="score-num green" id="s-wr">–</div><div class="score-label">Nyerési arány</div><div class="score-sub">döntetlen és fél-eredmény nélkül</div></div>
+  <div class="score-card"><div class="score-num gold" id="s-profit">–</div><div class="score-label">Profit (egység)</div><div class="score-sub">1 egység = 1 téted</div></div>
+  <div class="score-card"><div class="score-num" id="s-roi">–</div><div class="score-label">ROI</div><div class="score-sub">return on investment</div></div>
+</div>
+
+<div class="chart-wrap">
+  <div class="chart-box">
+    <div class="chart-title">
+      Kumulatív profit alakulása
+      <span id="chart-current">–</span>
+    </div>
+    <canvas id="profit-chart"></canvas>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="setFilter('all',this)">Összes</button>
+    <button class="filter-btn" onclick="setFilter('won',this)">✅ Nyert</button>
+    <button class="filter-btn" onclick="setFilter('half_won',this)">½✅ Fél nyert</button>
+    <button class="filter-btn" onclick="setFilter('push',this)">↩️ Visszajár</button>
+    <button class="filter-btn" onclick="setFilter('half_lost',this)">½❌ Fél veszett</button>
+    <button class="filter-btn" onclick="setFilter('lost',this)">❌ Veszett</button>
+  </div>
+  <div id="tips-table"><div class="loading">Adatok betöltése...</div></div>
+</div>
+
+<div class="cta-box">
+  <div class="cta-inner">
+    <h2>Meggyőzött a track record?<br/><em>Csatlakozz ingyen.</em></h2>
+    <p>Regisztrálj és azonnal hozzáférsz a napi tippekhez – fizetési kötelezettség nélkül.</p>
+    <div class="cta-btns">
+      <a class="btn-primary" href="/tippek.html">Regisztrálok ingyen →</a>
+      <a class="btn-tg" href="https://t.me/+rMoqrue6DBFlZmVk" target="_blank" rel="noopener">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248l-2.018 9.51c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.881.71z"/></svg>
+        Telegram csatorna
+      </a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p>© 2026 90perc.hu ·
+    <a href="/">Főoldal</a> ·
+    <a href="/tippek.html">Tippek</a> ·
+    <a href="/analyzer.html">Elemző</a> ·
+    <a href="/aszf.html">ÁSZF</a> ·
+    Az adatok automatikusan, manipuláció nélkül kerülnek rögzítésre. 18+
+  </p>
+</footer>
+
+<script>
+let allTips = [];
+let currentFilter = 'all';
+
+const RESULT_LABELS = {
+  won:'✅ Nyert', lost:'❌ Veszett', push:'↩️ Visszajár',
+  half_won:'½✅ Fél nyert', half_lost:'½❌ Fél veszett', pending:'⏳ Folyamatban'
+};
+const RESULT_CLASS = {
+  won:'won', lost:'lost', push:'push',
+  half_won:'half_won', half_lost:'half_lost', pending:'pending'
+};
+
+function tipProfit(t) {
+  const o = parseFloat(t.odds) || 1;
+  if (t.result === 'won')       return +(o - 1).toFixed(2);
+  if (t.result === 'lost')      return -1;
+  if (t.result === 'half_won')  return +((o - 1) / 2).toFixed(2);
+  if (t.result === 'half_lost') return -0.5;
+  return 0;
+}
+
+function formatDate(d) {
+  if (!d) return '–';
+  const dt = new Date(d);
+  return dt.toLocaleDateString('hu-HU', { month:'short', day:'numeric' });
+}
+
+function renderTable(tips) {
+  const el = document.getElementById('tips-table');
+  const filtered = currentFilter === 'all' ? tips : tips.filter(t => t.result === currentFilter);
+  const settled  = filtered.filter(t => t.result && t.result !== 'pending');
+  if (!filtered.length) { el.innerHTML = '<div class="empty">Nincs találat ebben a szűrőben.</div>'; return; }
+
+  const rows = filtered.map(t => {
+    const pl = tipProfit(t);
+    const plClass = pl > 0 ? 'pos' : pl < 0 ? 'neg' : 'zero';
+    const plText  = t.result === 'pending' ? '–' : (pl >= 0 ? '+' : '') + pl.toFixed(2);
+    const rc = RESULT_CLASS[t.result] || 'pending';
+    return `<tr>
+      <td class="td-date">${formatDate(t.addedAt || t.commence)}</td>
+      <td class="td-match">${t.match || '–'}</td>
+      <td class="td-pick"><span style="color:var(--muted);font-size:11px">${t.market || ''}</span><br/>${t.pick || ''}</td>
+      <td class="td-odds">${parseFloat(t.odds).toFixed(2)}</td>
+      <td><span class="badge ${rc}">${RESULT_LABELS[t.result] || '–'}</span></td>
+      <td class="td-pl ${plClass}">${plText}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `<table>
+    <thead><tr>
+      <th>Dátum</th><th>Meccs</th><th>Tipp</th><th>Odds</th><th>Eredmény</th><th style="text-align:right">P/L</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <p style="font-size:11px;color:var(--muted);margin-top:12px;text-align:right">
+    ${settled.length} lezárt tipp ebben a nézetben
+  </p>`;
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTable(allTips);
+}
+
+function drawChart(tips) {
+  const canvas = document.getElementById('profit-chart');
+  const ctx    = canvas.getContext('2d');
+  const dpr    = window.devicePixelRatio || 1;
+  const W      = canvas.offsetWidth;
+  const H      = canvas.offsetHeight;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  ctx.scale(dpr, dpr);
+
+  const settled = tips.filter(t => t.result && t.result !== 'pending')
+                      .sort((a,b) => (a.addedAt||'').localeCompare(b.addedAt||''));
+  if (!settled.length) return;
+
+  // Cumulative profit points
+  let cum = 0;
+  const points = [{ x:0, y:0 }];
+  settled.forEach((t, i) => {
+    cum += tipProfit(t);
+    points.push({ x: (i + 1) / settled.length, y: cum });
+  });
+
+  const maxY = Math.max(...points.map(p => p.y), 1);
+  const minY = Math.min(...points.map(p => p.y), -1);
+  const range = maxY - minY || 1;
+  const PAD   = { t:10, r:10, b:20, l:40 };
+  const cW = W - PAD.l - PAD.r;
+  const cH = H - PAD.t - PAD.b;
+
+  const cx = x => PAD.l + x * cW;
+  const cy = y => PAD.t + cH - ((y - minY) / range) * cH;
+
+  // Zero line
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(93,122,150,.3)';
+  ctx.lineWidth   = 1;
+  ctx.setLineDash([4,4]);
+  ctx.moveTo(PAD.l, cy(0));
+  ctx.lineTo(W - PAD.r, cy(0));
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Y axis label
+  ctx.fillStyle = '#5d7a96';
+  ctx.font = '10px Inter,sans-serif';
+  ctx.textAlign = 'right';
+  [minY, 0, maxY].forEach(v => {
+    ctx.fillText((v >= 0 ? '+' : '') + v.toFixed(1), PAD.l - 4, cy(v) + 3);
+  });
+
+  // Fill under/over line
+  const isPositive = cum >= 0;
+  const fillColor  = isPositive ? 'rgba(0,230,118,.08)' : 'rgba(239,68,68,.08)';
+  ctx.beginPath();
+  ctx.moveTo(cx(points[0].x), cy(0));
+  points.forEach(p => ctx.lineTo(cx(p.x), cy(p.y)));
+  ctx.lineTo(cx(points[points.length-1].x), cy(0));
+  ctx.closePath();
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.strokeStyle = isPositive ? '#00e676' : '#ef4444';
+  ctx.lineWidth   = 2;
+  ctx.lineJoin    = 'round';
+  points.forEach((p,i) => i ? ctx.lineTo(cx(p.x), cy(p.y)) : ctx.moveTo(cx(p.x), cy(p.y)));
+  ctx.stroke();
+
+  // Last point dot
+  const last = points[points.length - 1];
+  ctx.beginPath();
+  ctx.arc(cx(last.x), cy(last.y), 4, 0, Math.PI * 2);
+  ctx.fillStyle = isPositive ? '#00e676' : '#ef4444';
+  ctx.fill();
+
+  document.getElementById('chart-current').textContent =
+    (cum >= 0 ? '+' : '') + cum.toFixed(2) + ' egység';
+  document.getElementById('chart-current').style.color = isPositive ? '#00e676' : '#ef4444';
+}
+
+async function loadData() {
+  try {
+    const [statsRes, histRes] = await Promise.all([
+      fetch('/api/public-stats'),
+      fetch('/api/history')
+    ]);
+    const stats = await statsRes.json();
+    const hist  = await histRes.json();
+
+    // Stats scoreboard
+    const sEl = id => document.getElementById(id);
+    if (stats.settled != null) sEl('s-settled').textContent = stats.settled;
+    if (stats.winRate != null) sEl('s-wr').textContent = stats.winRate + '%';
+    if (stats.profit  != null) {
+      const p = stats.profit;
+      sEl('s-profit').textContent = (p >= 0 ? '+' : '') + p.toFixed(2);
+      sEl('s-profit').className = 'score-num ' + (p >= 0 ? 'gold' : 'red');
+    }
+    if (stats.roi != null) {
+      const r = parseFloat(stats.roi);
+      sEl('s-roi').textContent = (r >= 0 ? '+' : '') + r + '%';
+      sEl('s-roi').className = 'score-num ' + (r >= 0 ? 'green' : 'red');
+    }
+
+    // Only soccer, only settled (public endpoint már szűrt)
+    allTips = (Array.isArray(hist) ? hist : [])
+      .filter(t => t.type !== 'combo')
+      .sort((a,b) => (b.addedAt||b.commence||'').localeCompare(a.addedAt||a.commence||''));
+
+    drawChart(allTips.slice().reverse());
+    renderTable(allTips);
+  } catch(e) {
+    document.getElementById('tips-table').innerHTML =
+      '<div class="empty">Adatok betöltése sikertelen. Próbáld újra később.</div>';
+  }
+}
+
+window.addEventListener('load', loadData);
+window.addEventListener('resize', () => {
+  if (allTips.length) drawChart(allTips.slice().reverse());
+});
+</script>
+</body>
+</html>
