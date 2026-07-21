@@ -9,6 +9,62 @@ const auth    = require("./auth");
 const mailer  = require("./mailer");
 
 const app = express();
+
+// ── Stripe ───────────────────────────────────────────────────
+const STRIPE_SECRET  = process.env.STRIPE_SECRET_KEY;
+const STRIPE_WEBHOOK = process.env.STRIPE_WEBHOOK_SECRET;
+const STRIPE_PRICE   = process.env.STRIPE_PRICE_ID;
+const BASE_URL       = process.env.BASE_URL || "https://90perc.hu";
+const stripe = STRIPE_SECRET ? require("stripe")(STRIPE_SECRET) : null;
+
+// Stripe webhook – express.raw BEFORE global json middleware!
+app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  if (!stripe) return res.status(500).json({ error: "Stripe nincs konfigurálva" });
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, req.headers["stripe-signature"], STRIPE_WEBHOOK);
+  } catch (err) {
+    console.error("Stripe webhook aláírás hiba:", err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  const updateUser = (customerId, email, patch) => {
+    const u = (email && usersDb.findByEmail(email)) || usersDb.findByStripeCustomer(customerId);
+    if (u) { usersDb.update(u.id, patch); return u; }
+    return null;
+  };
+
+  if (event.type === "checkout.session.completed") {
+    const s = event.data.object;
+    const paidUntil = new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString();
+    const u = updateUser(s.customer, s.customer_details?.email || s.customer_email, {
+      plan: "pro", stripeCustomerId: s.customer, paidUntil
+    });
+    if (u) console.log(`Stripe ✓ előfizetés aktiválva: ${u.email}`);
+    else console.warn(`Stripe: felhasználó nem található – ${s.customer_details?.email}`);
+  }
+
+  if (event.type === "invoice.payment_succeeded") {
+    const inv = event.data.object;
+    if (inv.billing_reason === "subscription_cycle") {
+      const periodEnd = inv.lines?.data?.[0]?.period?.end;
+      const paidUntil = periodEnd
+        ? new Date(periodEnd * 1000).toISOString()
+        : new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString();
+      const u = updateUser(inv.customer, null, { paidUntil });
+      if (u) console.log(`Stripe ✓ megújítva: ${u.email}, lejár: ${paidUntil}`);
+    }
+  }
+
+  if (event.type === "customer.subscription.deleted") {
+    const sub = event.data.object;
+    const u = updateUser(sub.customer, null, { plan: "free", paidUntil: null });
+    if (u) console.log(`Stripe: lemondva – ${u.email}`);
+  }
+
+  res.json({ received: true });
+});
+
 app.use(express.json());
 app.use(cookieParser());
 app.use(auth.attachUser);                    // minden kérésre beteszi a req.user-t
@@ -1310,6 +1366,61 @@ app.delete("/api/admin/users/:id", (req, res) => {
   usersDb.update(req.params.id, { disabled: true, plan: "free" });
   console.log(`Felhasználó deaktiválva: ${req.params.id}`);
   res.json({ ok: true });
+});
+
+
+// ── Stripe: Checkout Session létrehozása ─────────────────────
+app.post("/api/stripe/checkout", async (req, res) => {
+  if (!stripe)       return res.status(500).json({ error: "Stripe nincs konfigurálva" });
+  if (!STRIPE_PRICE) return res.status(500).json({ error: "STRIPE_PRICE_ID nincs beállítva" });
+  const r = auth.requireLogin(req, res); if (!r) return;
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      payment_method_types: ["card"],
+      customer_email: r.user.email,
+      line_items: [{ price: STRIPE_PRICE, quantity: 1 }],
+      success_url: `${BASE_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url:  `${BASE_URL}/elofizetes.html`,
+      metadata:    { userId: r.user.id },
+      locale:      "hu",
+      allow_promotion_codes: true,
+    });
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error("Stripe checkout hiba:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Stripe: Ügyfélportál (előfizetés kezelése / lemondás) ─────
+app.post("/api/stripe/portal", async (req, res) => {
+  if (!stripe) return res.status(500).json({ error: "Stripe nincs konfigurálva" });
+  const r = auth.requireLogin(req, res); if (!r) return;
+  const user = usersDb.findById(r.user.id);
+  if (!user?.stripeCustomerId) return res.status(400).json({ error: "Nincs aktív előfizetés" });
+  try {
+    const portal = await stripe.billingPortal.sessions.create({
+      customer:   user.stripeCustomerId,
+      return_url: `${BASE_URL}/tippek.html`,
+    });
+    res.json({ url: portal.url });
+  } catch (err) {
+    console.error("Stripe portal hiba:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Stripe: Előfizetés státusz ────────────────────────────────
+app.get("/api/stripe/status", (req, res) => {
+  const r = auth.requireLogin(req, res); if (!r) return;
+  const user = usersDb.findById(r.user.id);
+  res.json({
+    plan:            user?.plan || "free",
+    paidUntil:       user?.paidUntil || null,
+    hasStripe:       !!user?.stripeCustomerId,
+    stripeConfigured: !!stripe && !!STRIPE_PRICE,
+  });
 });
 
 app.listen(PORT, () => console.log(`90perc.hu fut: http://localhost:${PORT}`));
