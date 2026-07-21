@@ -14,7 +14,7 @@ const app = express();
 const STRIPE_SECRET  = process.env.STRIPE_SECRET_KEY;
 const STRIPE_WEBHOOK = process.env.STRIPE_WEBHOOK_SECRET;
 const STRIPE_PRICE   = process.env.STRIPE_PRICE_ID;
-const BASE_URL       = process.env.BASE_URL || "https://90perc.hu";
+const BASE_URL       = (process.env.BASE_URL || "https://90perc.hu").replace(/\/$/, "");
 const stripe = STRIPE_SECRET ? require("stripe")(STRIPE_SECRET) : null;
 
 // Stripe webhook – express.raw BEFORE global json middleware!
@@ -975,7 +975,6 @@ function requireAdmin(req, res) {
 }
 
 // ── Auth végpontok ────────────────────────────────────────
-const BASE_URL = (process.env.BASE_URL || "").replace(/\/$/, "");
 const baseUrl = req => BASE_URL || `${req.protocol}://${req.get("host")}`;
 
 async function sendVerifyEmail(req, user) {
