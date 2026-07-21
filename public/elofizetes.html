@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Előfizetés – 90perc.hu</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@600;700&display=swap"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:#060e1b;color:#dce8f5;font-family:'Inter',system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column}
+  nav{background:rgba(6,14,27,.95);border-bottom:1px solid #1a2f4a;padding:12px 20px;
+      display:flex;justify-content:space-between;align-items:center}
+  .nav-logo img{height:32px}
+  .nav-back{color:#5d7a96;text-decoration:none;font-size:13px}
+  .nav-back:hover{color:#00e676}
+
+  main{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 20px}
+  .pricing-wrap{max-width:480px;width:100%}
+
+  .eyebrow{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+           color:#00e676;text-align:center;margin-bottom:12px}
+  h1{font-family:'Oswald',sans-serif;font-size:clamp(30px,6vw,44px);color:#fff;
+     text-align:center;line-height:1.1;margin-bottom:8px}
+  h1 em{color:#00e676;font-style:normal}
+  .sub{text-align:center;color:#5d7a96;font-size:14px;margin-bottom:36px}
+
+  .plan-card{background:#0c1a2e;border:2px solid #00e676;border-radius:16px;padding:32px;
+             box-shadow:0 0 40px rgba(0,230,118,.1)}
+  .plan-name{font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+             color:#00e676;margin-bottom:16px}
+  .plan-price{display:flex;align-items:baseline;gap:6px;margin-bottom:6px}
+  .plan-price .amount{font-family:'Oswald',sans-serif;font-size:52px;color:#fff;line-height:1}
+  .plan-price .currency{font-size:20px;color:#5d7a96}
+  .plan-price .period{font-size:14px;color:#5d7a96}
+  .plan-sub{font-size:12px;color:#5d7a96;margin-bottom:28px}
+
+  .features{list-style:none;display:flex;flex-direction:column;gap:10px;margin-bottom:28px}
+  .features li{display:flex;align-items:flex-start;gap:10px;font-size:14px;color:#dce8f5}
+  .features li::before{content:'✓';color:#00e676;font-weight:700;flex-shrink:0;margin-top:1px}
+
+  .btn-checkout{width:100%;background:#00e676;color:#060e1b;font-weight:700;font-size:16px;
+                padding:16px;border-radius:10px;border:none;cursor:pointer;
+                box-shadow:0 0 24px rgba(0,230,118,.25);transition:transform .15s,box-shadow .15s}
+  .btn-checkout:hover{transform:translateY(-2px);box-shadow:0 0 36px rgba(0,230,118,.4)}
+  .btn-checkout:disabled{opacity:.6;cursor:not-allowed;transform:none}
+
+  .secure{display:flex;align-items:center;justify-content:center;gap:6px;
+          margin-top:14px;font-size:11px;color:#5d7a96}
+
+  .divider{border:none;border-top:1px solid #1a2f4a;margin:28px 0}
+
+  .manage-btn{width:100%;background:transparent;color:#5d7a96;font-size:13px;font-weight:600;
+              padding:10px;border-radius:8px;border:1px solid #1a2f4a;cursor:pointer;
+              transition:all .15s;display:none}
+  .manage-btn:hover{border-color:#5d7a96;color:#dce8f5}
+
+  .status-box{background:#071a10;border:1px solid rgba(0,230,118,.2);border-radius:10px;
+              padding:14px 18px;margin-bottom:20px;font-size:13px;display:none}
+  .status-box.active{display:block}
+  .status-box b{color:#00e676}
+
+  #msg{margin-top:12px;font-size:13px;text-align:center;min-height:18px}
+  #msg.err{color:#ef4444}
+  #msg.ok{color:#00e676}
+
+  footer{padding:20px;text-align:center;font-size:11px;color:#5d7a96;border-top:1px solid #1a2f4a}
+  footer a{color:#5d7a96;text-decoration:none}
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="/"><img src="/logo-horizontal.png" alt="90perc.hu"/></a>
+  <a class="nav-back" href="/tippek.html">← Vissza</a>
+</nav>
+
+<main>
+  <div class="pricing-wrap">
+    <div class="eyebrow">Prémium hozzáférés</div>
+    <h1>Egyetlen csomag.<br/><em>Minden benne van.</em></h1>
+    <p class="sub">Nincs próbaidőszak, nincs rejtett díj – bármikor lemondható.</p>
+
+    <!-- Aktív előfizetés állapot -->
+    <div class="status-box" id="status-box">
+      ✅ Aktív előfizetésed van – lejár: <b id="paid-until">–</b>
+    </div>
+
+    <div class="plan-card">
+      <div class="plan-name">Pro csomag</div>
+      <div class="plan-price">
+        <span class="amount">14 990</span>
+        <span class="currency">Ft</span>
+        <span class="period">/ hó</span>
+      </div>
+      <p class="plan-sub">Automatikusan megújul – bármikor lemondható</p>
+
+      <ul class="features">
+        <li>Napi AI tippek – azonnal jóváhagyás után</li>
+        <li>Pending tippek megtekintése (jóváhagyás előtt)</li>
+        <li>Korlátlan meccs elemző használat</li>
+        <li>Telegram értesítő minden új tippnél</li>
+        <li>Teljes előzmény és statisztika</li>
+        <li>Prioritás ügyfélszolgálat</li>
+      </ul>
+
+      <button class="btn-checkout" id="checkout-btn" onclick="startCheckout()">
+        Előfizetek most →
+      </button>
+
+      <div id="msg"></div>
+
+      <div class="secure">
+        🔒 Biztonságos fizetés – Stripe · Visa, Mastercard, Apple Pay
+      </div>
+
+      <hr class="divider"/>
+
+      <button class="manage-btn" id="manage-btn" onclick="openPortal()">
+        Előfizetés kezelése / lemondás
+      </button>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <p>© 2026 90perc.hu · <a href="/aszf.html">ÁSZF</a> · <a href="/adatvedelem.html">Adatvédelem</a><br/>
+  A fizetést a Stripe Inc. kezeli. A 90perc.hu nem tárol bankkártya adatokat.</p>
+</footer>
+
+<script>
+async function loadStatus() {
+  try {
+    const r = await fetch('/api/stripe/status');
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.plan === 'pro' && d.paidUntil) {
+      document.getElementById('status-box').classList.add('active');
+      document.getElementById('paid-until').textContent =
+        new Date(d.paidUntil).toLocaleDateString('hu-HU', { year:'numeric', month:'long', day:'numeric' });
+      document.getElementById('checkout-btn').style.display = 'none';
+      document.getElementById('manage-btn').style.display   = 'block';
+    }
+  } catch(e) {}
+}
+
+async function startCheckout() {
+  const btn = document.getElementById('checkout-btn');
+  const msg = document.getElementById('msg');
+  btn.disabled = true;
+  btn.textContent = 'Átirányítás...';
+  msg.textContent = '';
+  msg.className   = '';
+  try {
+    const r = await fetch('/api/stripe/checkout', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' } });
+    const d = await r.json();
+    if (d.url) { window.location.href = d.url; return; }
+    if (d.error === 'Unauthenticated') {
+      msg.textContent = 'Kérjük, először jelentkezz be!';
+      msg.className = 'err';
+      setTimeout(() => window.location.href = '/tippek.html', 1500);
+    } else {
+      msg.textContent = d.error || 'Hiba történt, próbáld újra.';
+      msg.className = 'err';
+    }
+  } catch(e) {
+    msg.textContent = 'Kapcsolódási hiba. Próbáld újra.';
+    msg.className   = 'err';
+  }
+  btn.disabled    = false;
+  btn.textContent = 'Előfizetek most →';
+}
+
+async function openPortal() {
+  const btn = document.getElementById('manage-btn');
+  btn.disabled = true;
+  btn.textContent = 'Átirányítás...';
+  try {
+    const r = await fetch('/api/stripe/portal', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' } });
+    const d = await r.json();
+    if (d.url) window.location.href = d.url;
+  } catch(e) {
+    btn.textContent = 'Hiba – próbáld újra';
+  }
+  btn.disabled = false;
+}
+
+loadStatus();
+</script>
+</body>
+</html>
