@@ -1355,8 +1355,9 @@ app.get("/api/admin/users", (req, res) => {
 app.patch("/api/admin/users/:id", (req, res) => {
   if (!requireAdmin(req, res)) return;
   const { plan, paidUntil } = req.body;
-  usersDb.update(req.params.id, { plan, paidUntil });
-  console.log(`Felhasználó frissítve: ${req.params.id} → plan:${plan}`);
+  const validPlan = ["free","pro"].includes(plan) ? plan : "free";
+  usersDb.update(req.params.id, { plan: validPlan, paidUntil });
+  console.log(`Felhasználó frissítve: ${req.params.id} → plan:${validPlan}`);
   res.json({ ok: true });
 });
 
