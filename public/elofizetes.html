@@ -99,10 +99,9 @@
 
       <ul class="features">
         <li>Napi AI tippek – azonnal jóváhagyás után</li>
-        <li>Pending tippek megtekintése (jóváhagyás előtt)</li>
-        <li>Korlátlan meccs elemző használat</li>
         <li>Telegram értesítő minden új tippnél</li>
         <li>Teljes előzmény és statisztika</li>
+        <li>Meccs elemző hozzáférés</li>
         <li>Prioritás ügyfélszolgálat</li>
       </ul>
 
@@ -167,7 +166,7 @@ async function startCheckout() {
       msg.className = 'err';
     }
   } catch(e) {
-    msg.textContent = 'Kapcsolódási hiba. Próbáld újra.';
+    msg.textContent = 'Hiba: ' + e.message;
     msg.className   = 'err';
   }
   btn.disabled    = false;
