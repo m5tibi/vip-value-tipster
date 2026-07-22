@@ -1507,6 +1507,7 @@ Ne használj csillagot (*) vagy hashtaget (#). Csak HTML bold (<b>) formázást.
 async function handleBotUpdate(update) {
   const msg    = update.message || update.edited_message;
   if (!msg?.text) return;
+  if (msg.chat.type !== "private") return;  // csak privát chat, ne csatorna/csoport
   const chatId = msg.chat.id;
   const text   = msg.text.trim();
   const userId = msg.from?.id;
