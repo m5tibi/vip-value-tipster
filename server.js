@@ -1628,6 +1628,9 @@ async function handleBotUpdate(update) {
 }
 
 // ── Telegram bot webhook endpoint ─────────────────────────────
+// Telegram GET-tel is ellenőrzi a webhookot
+app.get("/api/telegram/bot", (req, res) => res.sendStatus(200));
+
 app.post("/api/telegram/bot", express.json(), async (req, res) => {
   res.sendStatus(200); // Telegram-nak azonnal válaszolunk
   try { await handleBotUpdate(req.body); } catch(e) { console.error("Bot hiba:", e.message); }
@@ -1650,7 +1653,14 @@ app.post("/api/telegram/link", auth.requireLogin, (req, res) => {
   res.json({ ok: true });
 });
 
-app.listen(PORT, () => console.log(`90perc.hu fut: http://localhost:${PORT}`));
+app.listen(PORT, () => {
+  console.log(`90perc.hu fut: http://localhost:${PORT}`);
+  if (TG_BOT_TOKEN) {
+    console.log("✓ Telegram bot aktív – webhook: /api/telegram/bot");
+  } else {
+    console.log("⚠️  TG_BOT_TOKEN nincs beállítva – bot inaktív");
+  }
+});
 
 if (!ADMIN_PWD) {
   console.warn("⚠️  FIGYELEM: ADMIN_PASSWORD nincs beállítva – az admin végpontok (törlés, eredményjelölés, stat-küldés, frissítés) VÉDTELENEK! Állítsd be a Render Environment Variables között.");
