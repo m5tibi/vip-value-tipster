@@ -418,6 +418,7 @@ function applyAdminUI() {
   show('btn-send-tips', admin);
   show('btn-login',  !loggedIn);
   show('btn-logout', loggedIn);
+  show('btn-tg-link', loggedIn);
   const em = document.getElementById('user-email');
   if (em) {
     em.style.display = ME.user ? '' : 'none';
