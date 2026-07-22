@@ -932,12 +932,36 @@ function scheduleNextFetch() {
   setTimeout(() => { fetchAndProcess(); scheduleNextFetch(); }, minsUntilNext * 60 * 1000);
 }
 
+
+// ── Lejárt előfizetések ellenőrzése ──────────────────────────
+function checkExpiredSubscriptions() {
+  const now = new Date();
+  const expired = usersDb.all().filter(u =>
+    u.plan === "pro" &&
+    u.paidUntil &&
+    new Date(u.paidUntil) < now &&
+    !u.isAdmin
+  );
+  if (!expired.length) return;
+  expired.forEach(u => {
+    usersDb.update(u.id, { plan: "free" });
+    console.log(`Előfizetés lejárt, visszaminősítve: ${u.email} (lejárt: ${u.paidUntil})`);
+  });
+  console.log(`Lejárt előfizetések: ${expired.length} felhasználó visszaminősítve.`);
+}
+
+// Indításkor azonnal lefut (startup után fogja az esetleg lejártakat kezelni)
+checkExpiredSubscriptions();
+
 // ── Napnyitó: 00:03 automatikus eredmény-ellenőrzés, 00:05 napi statisztika Telegramra
 //    (magyar idő). Tipptartalom NEM megy ki automatikusan – az csak jóváhagyás után, kézzel. ──
 let _lastCheckDay = "", _lastStatsDay = "";
 setInterval(async () => {
   const { hour, minute } = getHungarianTime();
   const dayKey = todayHU();                       // naponta egyszer, dupla lefutás ellen
+  if (hour === 0 && minute === 1 && _lastCheckDay !== dayKey) {
+    checkExpiredSubscriptions();
+  }
   if (hour === 0 && minute === 3 && _lastCheckDay !== dayKey) {
     _lastCheckDay = dayKey;
     console.log("Napnyitó automatikus eredmény-ellenőrzés...");
