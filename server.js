@@ -1444,6 +1444,212 @@ app.get("/api/stripe/status", auth.requireLogin, (req, res) => {
   });
 });
 
+
+// ══════════════════════════════════════════════════════════════
+// ── TELEGRAM BOT (kétirányú) ──────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+
+const TG_BOT_API = `https://api.telegram.org/bot${TG_BOT_TOKEN}`;
+
+async function tgSend(chatId, text, extra = {}) {
+  if (!TG_BOT_TOKEN) return;
+  await fetch(`${TG_BOT_API}/sendMessage`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", ...extra })
+  }).catch(e => console.error("tgSend hiba:", e.message));
+}
+
+async function tgTyping(chatId) {
+  if (!TG_BOT_TOKEN) return;
+  await fetch(`${TG_BOT_API}/sendChatAction`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, action: "typing" })
+  }).catch(() => {});
+}
+
+// ── Meccs elemzés szerver oldalon (bot számára) ───────────────
+async function analyzeForBot(query) {
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "anthropic-beta": "web-search-2025-03-05" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6", max_tokens: 4000,
+      tools: [{ type: "web_search_20250305", name: "web_search" }],
+      messages: [{ role: "user", content:
+        `Te egy profi labdarúgás-fogadási elemző vagy. Kizárólag helyes, igényes magyar nyelven írj. Kerüld a zsargont.
+
+A kérés: "${query}"
+
+Ha nem focimeccs, válaszolj: "NEM ÉRTEM: [magyarázat]"
+
+Készíts rövid, tömör elemzést Telegram-ra optimalizálva (max 800 karakter). Struktúra:
+
+⚽ <b>[Meccs neve]</b>
+
+<b>Forma:</b> [1-2 mondat, számokkal]
+<b>H2H:</b> [1 mondat]
+<b>Sérülések:</b> [1 mondat]
+
+<b>Top tippek:</b>
+1. [Tipp] @ [odds] – [Megbízhatóság: MAGAS/KÖZEPES]
+2. [Tipp] @ [odds] – [Megbízhatóság: MAGAS/KÖZEPES]
+
+Ne használj csillagot (*) vagy hashtaget (#). Csak HTML bold (<b>) formázást.`
+      }]
+    })
+  });
+  const data = await r.json();
+  const text = (data.content?.filter(b => b.type === "text").map(b => b.text) || []).join("\n").trim();
+  return text || "Az elemzés sikertelen. Próbáld újra.";
+}
+
+// ── Bot parancsok kezelése ────────────────────────────────────
+async function handleBotUpdate(update) {
+  const msg    = update.message || update.edited_message;
+  if (!msg?.text) return;
+  const chatId = msg.chat.id;
+  const text   = msg.text.trim();
+  const userId = msg.from?.id;
+
+  // /start
+  if (text === "/start" || text.startsWith("/start ")) {
+    await tgSend(chatId,
+      `⚽ <b>Üdv a 90perc.hu botban!</b>\n\n` +
+      `<b>Parancsok:</b>\n` +
+      `/tippek – Mai jóváhagyott tippek\n` +
+      `/elemzes [meccs] – AI meccs elemzés (Pro)\n` +
+      `/fiok – Fiókod összekapcsolása\n` +
+      `/help – Súgó\n\n` +
+      `A weboldalon: <a href="https://90perc.hu">90perc.hu</a>`
+    );
+    return;
+  }
+
+  // /help
+  if (text === "/help") {
+    await tgSend(chatId,
+      `<b>90perc.hu Bot – Súgó</b>\n\n` +
+      `/tippek – Megmutatja a mai jóváhagyott tippeket\n` +
+      `/elemzes [meccs] – AI elemzés egy meccsre (Pro előfizetők)\n` +
+      `  Példa: <code>/elemzes Bayern - Dortmund</code>\n` +
+      `/fiok – Telegram fiókod összekapcsolása a 90perc.hu fiókkal\n\n` +
+      `<a href="https://90perc.hu/elofizetes.html">Pro előfizetés</a>`
+    );
+    return;
+  }
+
+  // /tippek
+  if (text === "/tippek") {
+    const approved = history.filter(t =>
+      isApproved(t) && t.result === "pending" && t.type !== "combo"
+    );
+    if (!approved.length) {
+      await tgSend(chatId, "⚽ Ma még nincsenek jóváhagyott tippek. Nézz vissza később!");
+      return;
+    }
+    const lines = approved.slice(0, 5).map(t =>
+      `• <b>${t.match}</b>\n  ${t.market}: <b>${t.pick}</b> @ ${t.odds}`
+    ).join("\n\n");
+    await tgSend(chatId,
+      `⚽ <b>Mai tippek (${approved.length} db)</b>\n\n${lines}\n\n` +
+      `<a href="https://90perc.hu/tippek.html">Összes tipp →</a>`
+    );
+    return;
+  }
+
+  // /fiok
+  if (text === "/fiok") {
+    const linked = usersDb.all().find(u => u.telegramChatId === String(chatId));
+    if (linked) {
+      const plan = linked.plan === "pro" ? "✅ Pro" : "🔓 Ingyenes";
+      await tgSend(chatId,
+        `<b>Kapcsolt fiók:</b> ${linked.email}\n<b>Csomag:</b> ${plan}\n\n` +
+        `Ha le szeretnéd választani: <a href="https://90perc.hu">90perc.hu</a>`
+      );
+    } else {
+      await tgSend(chatId,
+        `<b>Fiók összekapcsolása</b>\n\n` +
+        `1. Menj a 90perc.hu oldalra és jelentkezz be\n` +
+        `2. Kattints a Telegram összekapcsolása gombra\n` +
+        `3. Add meg ezt az azonosítót: <code>${chatId}</code>\n\n` +
+        `<a href="https://90perc.hu/tippek.html">Megyek az oldalra →</a>`
+      );
+    }
+    return;
+  }
+
+  // /elemzes
+  if (text.startsWith("/elemzes")) {
+    const query = text.replace("/elemzes", "").trim();
+    if (!query) {
+      await tgSend(chatId, "❓ Add meg a meccs nevét!\nPélda: <code>/elemzes Bayern - Dortmund</code>");
+      return;
+    }
+    // Pro ellenőrzés
+    const linked = usersDb.all().find(u => u.telegramChatId === String(chatId));
+    if (!linked || linked.plan !== "pro") {
+      await tgSend(chatId,
+        `🔒 <b>Pro előfizetés szükséges</b>\n\n` +
+        `Az AI meccs elemzés csak Pro előfizetőknek elérhető.\n` +
+        `<a href="https://90perc.hu/elofizetes.html">Előfizetek – 14 990 Ft/hó →</a>`
+      );
+      return;
+    }
+    // Rate limit: max 5 elemzés/nap
+    const today = todayHU();
+    const rateKey = `tgAnalysis_${linked.id}_${today}`;
+    linked._tgDailyCount = linked._tgDailyCount || {};
+    const count = linked._tgDailyCount[today] || 0;
+    if (count >= 5) {
+      await tgSend(chatId, "⏳ Napi elemzési limit elérve (5/nap). Holnap folytathatod.");
+      return;
+    }
+    linked._tgDailyCount[today] = count + 1;
+    usersDb.update(linked.id, { _tgDailyCount: linked._tgDailyCount });
+
+    await tgSend(chatId, `🔍 Elemzem: <b>${query}</b>...\nEz 20-40 másodpercig tarthat.`);
+    await tgTyping(chatId);
+    try {
+      const result = await analyzeForBot(query);
+      // Telegram max 4096 karakter
+      const chunks = result.match(/.{1,4000}/gs) || [result];
+      for (const chunk of chunks) await tgSend(chatId, chunk);
+    } catch(e) {
+      console.error("Bot elemzés hiba:", e.message);
+      await tgSend(chatId, "❌ Elemzési hiba. Próbáld újra.");
+    }
+    return;
+  }
+
+  // Ismeretlen parancs
+  if (text.startsWith("/")) {
+    await tgSend(chatId, "❓ Ismeretlen parancs. Írd: /help");
+  }
+}
+
+// ── Telegram bot webhook endpoint ─────────────────────────────
+app.post("/api/telegram/bot", express.json(), async (req, res) => {
+  res.sendStatus(200); // Telegram-nak azonnal válaszolunk
+  try { await handleBotUpdate(req.body); } catch(e) { console.error("Bot hiba:", e.message); }
+});
+
+// ── Telegram fiók összekapcsolása a weboldalról ───────────────
+app.post("/api/telegram/link", auth.requireLogin, (req, res) => {
+  const { chatId } = req.body;
+  if (!chatId) return res.status(400).json({ error: "chatId szükséges" });
+  // Ellenőrzés: nincs-e más fiókhoz kötve
+  const existing = usersDb.all().find(u => u.telegramChatId === String(chatId) && u.id !== req.user.id);
+  if (existing) return res.status(400).json({ error: "Ez a Telegram fiók már össze van kapcsolva." });
+  usersDb.update(req.user.id, { telegramChatId: String(chatId) });
+  console.log(`Telegram összekapcsolva: ${req.user.email} ↔ chatId ${chatId}`);
+  tgSend(chatId,
+    `✅ <b>Sikeresen összekapcsolva!</b>\n\n` +
+    `A 90perc.hu fiókod (${req.user.email}) össze van kötve ezzel a Telegram fiókkal.\n` +
+    `Írd: /help a parancsok listájához.`
+  );
+  res.json({ ok: true });
+});
+
 app.listen(PORT, () => console.log(`90perc.hu fut: http://localhost:${PORT}`));
 
 if (!ADMIN_PWD) {
