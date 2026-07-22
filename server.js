@@ -1369,19 +1369,18 @@ app.delete("/api/admin/users/:id", (req, res) => {
 
 
 // ── Stripe: Checkout Session létrehozása ─────────────────────
-app.post("/api/stripe/checkout", async (req, res) => {
+app.post("/api/stripe/checkout", auth.requireLogin, async (req, res) => {
   if (!stripe)       return res.status(500).json({ error: "Stripe nincs konfigurálva" });
   if (!STRIPE_PRICE) return res.status(500).json({ error: "STRIPE_PRICE_ID nincs beállítva" });
-  const r = auth.requireLogin(req, res); if (!r) return;
   try {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
-      customer_email: r.user.email,
+      customer_email: req.user.email,
       line_items: [{ price: STRIPE_PRICE, quantity: 1 }],
       success_url: `${BASE_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url:  `${BASE_URL}/elofizetes.html`,
-      metadata:    { userId: r.user.id },
+      metadata:    { userId: req.user.id },
       locale:      "hu",
       allow_promotion_codes: true,
     });
@@ -1393,10 +1392,9 @@ app.post("/api/stripe/checkout", async (req, res) => {
 });
 
 // ── Stripe: Ügyfélportál (előfizetés kezelése / lemondás) ─────
-app.post("/api/stripe/portal", async (req, res) => {
+app.post("/api/stripe/portal", auth.requireLogin, async (req, res) => {
   if (!stripe) return res.status(500).json({ error: "Stripe nincs konfigurálva" });
-  const r = auth.requireLogin(req, res); if (!r) return;
-  const user = usersDb.findById(r.user.id);
+  const user = usersDb.findById(req.user.id);
   if (!user?.stripeCustomerId) return res.status(400).json({ error: "Nincs aktív előfizetés" });
   try {
     const portal = await stripe.billingPortal.sessions.create({
@@ -1411,9 +1409,8 @@ app.post("/api/stripe/portal", async (req, res) => {
 });
 
 // ── Stripe: Előfizetés státusz ────────────────────────────────
-app.get("/api/stripe/status", (req, res) => {
-  const r = auth.requireLogin(req, res); if (!r) return;
-  const user = usersDb.findById(r.user.id);
+app.get("/api/stripe/status", auth.requireLogin, (req, res) => {
+  const user = usersDb.findById(req.user.id);
   res.json({
     plan:            user?.plan || "free",
     paidUntil:       user?.paidUntil || null,
