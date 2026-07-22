@@ -1559,11 +1559,14 @@ async function handleBotUpdate(update) {
 
   // /fiok
   if (text === "/fiok") {
-    const linked = usersDb.all().find(u => u.telegramChatId === String(chatId));
-    if (linked) {
-      const plan = linked.plan === "pro" ? "✅ Pro" : "🔓 Ingyenes";
+    const allLinked = usersDb.all().filter(u => u.telegramChatId === String(chatId));
+    if (allLinked.length) {
+      const lines = allLinked.map(u => {
+        const plan = u.isAdmin ? "👑 Admin" : u.plan === "pro" ? "✅ Pro" : "🔓 Ingyenes";
+        return `• ${u.email} – ${plan}`;
+      }).join("\n");
       await tgSend(chatId,
-        `<b>Kapcsolt fiók:</b> ${linked.email}\n<b>Csomag:</b> ${plan}\n\n` +
+        `<b>Kapcsolt fiókok:</b>\n${lines}\n\n` +
         `Ha le szeretnéd választani: <a href="https://90perc.hu">90perc.hu</a>`
       );
     } else {
@@ -1585,9 +1588,11 @@ async function handleBotUpdate(update) {
       await tgSend(chatId, "❓ Add meg a meccs nevét!\nPélda: <code>/elemzes Bayern - Dortmund</code>");
       return;
     }
-    // Pro ellenőrzés
-    const linked = usersDb.all().find(u => u.telegramChatId === String(chatId));
-    if (!linked || linked.plan !== "pro") {
+    // Pro ellenőrzés – ha több fiók van ugyanazzal a chat ID-vel, preferáljuk a pro/admin fiókot
+    const allLinked = usersDb.all().filter(u => u.telegramChatId === String(chatId));
+    const linked = allLinked.find(u => u.isAdmin || u.plan === "pro") || allLinked[0];
+    const hasProAccess = linked && (linked.isAdmin || linked.plan === "pro");
+    if (!hasProAccess) {
       await tgSend(chatId,
         `🔒 <b>Pro előfizetés szükséges</b>\n\n` +
         `Az AI meccs elemzés csak Pro előfizetőknek elérhető.\n` +
@@ -1595,17 +1600,18 @@ async function handleBotUpdate(update) {
       );
       return;
     }
-    // Rate limit: max 5 elemzés/nap
-    const today = todayHU();
-    const rateKey = `tgAnalysis_${linked.id}_${today}`;
-    linked._tgDailyCount = linked._tgDailyCount || {};
-    const count = linked._tgDailyCount[today] || 0;
-    if (count >= 5) {
-      await tgSend(chatId, "⏳ Napi elemzési limit elérve (5/nap). Holnap folytathatod.");
-      return;
+    // Rate limit: max 5 elemzés/nap (admin korlátlan)
+    if (!linked.isAdmin) {
+      const today = todayHU();
+      linked._tgDailyCount = linked._tgDailyCount || {};
+      const count = linked._tgDailyCount[today] || 0;
+      if (count >= 5) {
+        await tgSend(chatId, "⏳ Napi elemzési limit elérve (5/nap). Holnap folytathatod.");
+        return;
+      }
+      linked._tgDailyCount[today] = count + 1;
+      usersDb.update(linked.id, { _tgDailyCount: linked._tgDailyCount });
     }
-    linked._tgDailyCount[today] = count + 1;
-    usersDb.update(linked.id, { _tgDailyCount: linked._tgDailyCount });
 
     await tgSend(chatId, `🔍 Elemzem: <b>${query}</b>...\nEz 20-40 másodpercig tarthat.`);
     await tgTyping(chatId);
