@@ -178,7 +178,6 @@
       <span id="user-email" style="display:none;color:#78909c;font-size:12px"></span>
       <button id="btn-login"  class="tab" onclick="openAuthModal('login')">🔑 Belépés</button>
       <button id="btn-logout" class="tab" style="display:none" onclick="userLogout()">🚪 Kilépés</button>
-      <button id="btn-tg-link" class="tab" style="display:none;background:#0d2233;color:#229ED9;border:1px solid #1a3a55" onclick="linkTelegram()">🔗 Telegram</button>
     </span>
   </div>
 
@@ -418,7 +417,6 @@ function applyAdminUI() {
   show('btn-send-tips', admin);
   show('btn-login',  !loggedIn);
   show('btn-logout', loggedIn);
-  show('btn-tg-link', loggedIn);
   const em = document.getElementById('user-email');
   if (em) {
     em.style.display = ME.user ? '' : 'none';
@@ -1038,30 +1036,6 @@ async function setPlan(id, plan, paidUntil) {
   await showUsers();
 }
 
-async function linkTelegram() {
-  const chatId = prompt(
-    'Add meg a Telegram Chat ID-det!\n\n' +
-    '1. Nyisd meg a 90perc.hu botot Telegramon\n' +
-    '2. Küldd el: /fiok\n' +
-    '3. Másold ide a megjelenő számot:'
-  );
-  if (!chatId || isNaN(chatId)) return;
-  try {
-    const r = await fetch('/api/telegram/link', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chatId: chatId.trim() })
-    });
-    const d = await r.json();
-    if (d.ok) {
-      showStatus('✅ Telegram sikeresen összekapcsolva! Ellenőrizd a Telegram appot.');
-    } else {
-      showStatus('❌ ' + (d.error || 'Hiba történt'));
-    }
-  } catch(e) {
-    showStatus('❌ Kapcsolódási hiba');
-  }
-}
 </script>
 </body>
 </html>
