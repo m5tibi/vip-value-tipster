@@ -40,7 +40,10 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
     const u = updateUser(s.customer, s.customer_details?.email || s.customer_email, {
       plan: "pro", stripeCustomerId: s.customer, paidUntil
     });
-    if (u) console.log(`Stripe ✓ előfizetés aktiválva: ${u.email}`);
+    if (u) {
+      console.log(`Stripe ✓ előfizetés aktiválva: ${u.email}`);
+      mailer.sendPlanActivated(u.email, paidUntil).catch(e => console.error("Email hiba:", e.message));
+    }
     else console.warn(`Stripe: felhasználó nem található – ${s.customer_details?.email}`);
   }
 
@@ -59,7 +62,10 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
   if (event.type === "customer.subscription.deleted") {
     const sub = event.data.object;
     const u = updateUser(sub.customer, null, { plan: "free", paidUntil: null });
-    if (u) console.log(`Stripe: lemondva – ${u.email}`);
+    if (u) {
+      console.log(`Stripe: lemondva – ${u.email}`);
+      mailer.sendPlanCancelled(u.email).catch(e => console.error("Email hiba:", e.message));
+    }
   }
 
   res.json({ received: true });
@@ -952,6 +958,7 @@ function checkExpiredSubscriptions() {
   expired.forEach(u => {
     usersDb.update(u.id, { plan: "free" });
     console.log(`Előfizetés lejárt, visszaminősítve: ${u.email} (lejárt: ${u.paidUntil})`);
+    mailer.sendPlanCancelled(u.email).catch(e => console.error("Email hiba:", e.message));
   });
   console.log(`Lejárt előfizetések: ${expired.length} felhasználó visszaminősítve.`);
 }
@@ -967,6 +974,38 @@ setInterval(async () => {
   const dayKey = todayHU();                       // naponta egyszer, dupla lefutás ellen
   if (hour === 0 && minute === 1 && _lastCheckDay !== dayKey) {
     checkExpiredSubscriptions();
+  }
+  // Heti összefoglaló: minden hétfőn 08:00-kor
+  if (hour === 8 && minute === 0 && now.getDay() === 1) {
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const weekTips = history.filter(t =>
+      t.type !== "combo" && t.result && t.result !== "pending" &&
+      t.settledAt && new Date(t.settledAt) >= weekAgo
+    );
+    if (weekTips.length) {
+      const won = weekTips.filter(t => t.result === "won").length;
+      const lost = weekTips.filter(t => t.result === "lost").length;
+      const halfWon = weekTips.filter(t => t.result === "half_won").length;
+      const halfLost = weekTips.filter(t => t.result === "half_lost").length;
+      const push = weekTips.filter(t => t.result === "push").length;
+      const decN = won + lost + halfWon + halfLost;
+      const winRate = decN ? (((won + halfWon * 0.5) / decN) * 100).toFixed(1) : "0";
+      const profit = weekTips.reduce((s, t) => {
+        const o = parseFloat(t.odds) || 1;
+        if (t.result === "won") return s + (o - 1);
+        if (t.result === "lost") return s - 1;
+        if (t.result === "half_won") return s + (o - 1) / 2;
+        if (t.result === "half_lost") return s - 0.5;
+        return s;
+      }, 0);
+      const roi = weekTips.length ? ((profit / weekTips.length) * 100).toFixed(1) : "0";
+      const stats = { won, lost, push, halfWon, halfLost, profit, roi, winRate, settled: weekTips.length };
+      const recipients = usersDb.all().filter(u => !u.isAdmin && u.emailVerified !== false && (u.plan === "pro" || !auth.PAID_MODE));
+      console.log(`Heti összefoglaló e-mail: ${recipients.length} felhasználónak`);
+      for (const u of recipients) {
+        mailer.sendWeeklySummary(u.email, stats).catch(e => console.error(`Heti email hiba (${u.email}):`, e.message));
+      }
+    }
   }
   if (hour === 0 && minute === 3 && _lastCheckDay !== dayKey) {
     _lastCheckDay = dayKey;
@@ -1293,6 +1332,20 @@ app.post("/api/tips/send", async (req, res) => {
   saveHistory();
   const total = singlesToSend.length + combosToSend.length;
   console.log(`Tippek kiküldve Telegramra: ${total}`);
+
+  // E-mail értesítő az összes aktív előfizetőnek
+  if (singlesToSend.length || combosToSend.length) {
+    const recipients = usersDb.all().filter(u =>
+      !u.isAdmin && u.emailVerified !== false &&
+      (u.plan === "pro" || !auth.PAID_MODE)
+    );
+    console.log(`Tip e-mail küldése ${recipients.length} felhasználónak...`);
+    for (const u of recipients) {
+      mailer.sendNewTips(u.email, singlesToSend, combosToSend)
+        .catch(e => console.error(`Tip email hiba (${u.email}):`, e.message));
+    }
+  }
+
   res.json({ ok: true, sent: total });
 });
 
@@ -1386,8 +1439,16 @@ app.patch("/api/admin/users/:id", (req, res) => {
   if (!requireAdmin(req, res)) return;
   const { plan, paidUntil } = req.body;
   const validPlan = ["free","pro"].includes(plan) ? plan : "free";
+  const targetUser = usersDb.findById(req.params.id);
   usersDb.update(req.params.id, { plan: validPlan, paidUntil });
   console.log(`Felhasználó frissítve: ${req.params.id} → plan:${validPlan}`);
+  if (targetUser) {
+    if (validPlan === "pro") {
+      mailer.sendPlanActivated(targetUser.email, paidUntil).catch(e => console.error("Email hiba:", e.message));
+    } else if (validPlan === "free" && targetUser.plan === "pro") {
+      mailer.sendPlanCancelled(targetUser.email).catch(e => console.error("Email hiba:", e.message));
+    }
+  }
   res.json({ ok: true });
 });
 
