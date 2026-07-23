@@ -1525,9 +1525,8 @@ async function handleBotUpdate(update) {
       `<b>Parancsok:</b>\n` +
       `/tippek – Mai jóváhagyott tippek\n` +
       `/elemzes [meccs] – AI meccs elemzés (Pro)\n` +
-      `/fiok – Fiókod összekapcsolása\n` +
       `/help – Súgó\n\n` +
-      `A weboldalon: <a href="https://90perc.hu">90perc.hu</a>`
+      `<a href="https://90perc.hu">90perc.hu →</a>`
     );
     return;
   }
@@ -1538,8 +1537,7 @@ async function handleBotUpdate(update) {
       `<b>90perc.hu Bot – Súgó</b>\n\n` +
       `/tippek – Megmutatja a mai jóváhagyott tippeket\n` +
       `/elemzes [meccs] – AI elemzés egy meccsre (Pro előfizetők)\n` +
-      `  Példa: <code>/elemzes Bayern - Dortmund</code>\n` +
-      `/fiok – Telegram fiókod összekapcsolása a 90perc.hu fiókkal\n\n` +
+      `  Példa: <code>/elemzes Bayern - Dortmund</code>\n\n` +
       `<a href="https://90perc.hu/elofizetes.html">Pro előfizetés</a>`
     );
     return;
@@ -1564,29 +1562,6 @@ async function handleBotUpdate(update) {
     return;
   }
 
-  // /fiok
-  if (text === "/fiok") {
-    const allLinked = usersDb.all().filter(u => u.telegramChatId === String(chatId));
-    if (allLinked.length) {
-      const lines = allLinked.map(u => {
-        const plan = u.isAdmin ? "👑 Admin" : u.plan === "pro" ? "✅ Pro" : "🔓 Ingyenes";
-        return `• ${u.email} – ${plan}`;
-      }).join("\n");
-      await tgSend(chatId,
-        `<b>Kapcsolt fiókok:</b>\n${lines}\n\n` +
-        `Ha le szeretnéd választani: <a href="https://90perc.hu">90perc.hu</a>`
-      );
-    } else {
-      await tgSend(chatId,
-        `<b>Fiók összekapcsolása</b>\n\n` +
-        `1. Menj a 90perc.hu oldalra és jelentkezz be\n` +
-        `2. Kattints a Telegram összekapcsolása gombra\n` +
-        `3. Add meg ezt az azonosítót: <code>${chatId}</code>\n\n` +
-        `<a href="https://90perc.hu/tippek.html">Megyek az oldalra →</a>`
-      );
-    }
-    return;
-  }
 
   // /elemzes
   if (text.startsWith("/elemzes")) {
@@ -1639,16 +1614,19 @@ async function handleBotUpdate(update) {
     }
 
 
-    await tgSend(chatId, `🔍 Elemzem: <b>${query}</b>...\nEz 20-40 másodpercig tarthat.`);
-    await tgTyping(chatId);
+    await tgSend(chatId, `🔍 Elemzem: <b>${query}</b>...\nEz 30-60 másodpercig tarthat.`);
+    // Folyamatos "typing" jelzés amíg az AI dolgozik
+    const typingInterval = setInterval(() => tgTyping(chatId), 4000);
     try {
       const result = await analyzeForBot(query);
+      clearInterval(typingInterval);
       // Telegram max 4096 karakter
       const chunks = result.match(/.{1,4000}/gs) || [result];
       for (const chunk of chunks) await tgSend(chatId, chunk);
     } catch(e) {
+      clearInterval(typingInterval);
       console.error("Bot elemzés hiba:", e.message);
-      await tgSend(chatId, "❌ Elemzési hiba. Próbáld újra.");
+      await tgSend(chatId, "❌ Elemzési hiba. Próbáld újra néhány perc múlva.");
     }
     return;
   }
@@ -1668,27 +1646,7 @@ app.post("/api/telegram/bot", express.json(), async (req, res) => {
   try { await handleBotUpdate(req.body); } catch(e) { console.error("Bot hiba:", e.message); }
 });
 
-// ── Telegram fiók összekapcsolása a weboldalról ───────────────
-app.post("/api/telegram/link", auth.requireLogin, (req, res) => {
-  const { chatId } = req.body;
-  console.log(`Telegram link kérés: userId=${req.user?.id}, email=${req.user?.email}, chatId=${chatId}`);
-  if (!chatId) return res.status(400).json({ error: "chatId szükséges" });
-  const chatIdStr = String(chatId).trim();
-  // Töröljük az előző összekapcsolást ugyanerről a chatId-ről
-  usersDb.all().filter(u => u.telegramChatId === chatIdStr && u.id !== req.user.id)
-    .forEach(u => { usersDb.update(u.id, { telegramChatId: null }); console.log(`  Előző link törölve: ${u.email}`); });
-  const updated = usersDb.update(req.user.id, { telegramChatId: chatIdStr });
-  console.log(`Telegram összekapcsolva: ${req.user.email} ↔ chatId ${chatIdStr}, mentve: ${!!updated}, telegramChatId=${updated?.telegramChatId}`);
-  // Azonnali ellenőrzés
-  const verify = usersDb.all().find(u => u.telegramChatId === chatIdStr);
-  console.log(`  Ellenőrzés: ${verify ? verify.email : "NINCS MEGTALÁLVA!"}`);
-  tgSend(chatId,
-    `✅ <b>Sikeresen összekapcsolva!</b>\n\n` +
-    `A 90perc.hu fiókod (${req.user.email}) össze van kötve ezzel a Telegram fiókkal.\n` +
-    `Írd: /help a parancsok listájához.`
-  );
-  res.json({ ok: true });
-});
+// Telegram linking eltávolítva
 
 app.listen(PORT, () => {
   console.log(`90perc.hu fut: http://localhost:${PORT}`);
