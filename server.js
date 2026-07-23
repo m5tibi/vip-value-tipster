@@ -1658,12 +1658,17 @@ app.post("/api/telegram/bot", express.json(), async (req, res) => {
 // ── Telegram fiók összekapcsolása a weboldalról ───────────────
 app.post("/api/telegram/link", auth.requireLogin, (req, res) => {
   const { chatId } = req.body;
+  console.log(`Telegram link kérés: userId=${req.user?.id}, email=${req.user?.email}, chatId=${chatId}`);
   if (!chatId) return res.status(400).json({ error: "chatId szükséges" });
-  // Ellenőrzés: nincs-e más fiókhoz kötve
-  const existing = usersDb.all().find(u => u.telegramChatId === String(chatId) && u.id !== req.user.id);
-  if (existing) return res.status(400).json({ error: "Ez a Telegram fiók már össze van kapcsolva." });
-  usersDb.update(req.user.id, { telegramChatId: String(chatId) });
-  console.log(`Telegram összekapcsolva: ${req.user.email} ↔ chatId ${chatId}`);
+  const chatIdStr = String(chatId).trim();
+  // Töröljük az előző összekapcsolást ugyanerről a chatId-ről
+  usersDb.all().filter(u => u.telegramChatId === chatIdStr && u.id !== req.user.id)
+    .forEach(u => { usersDb.update(u.id, { telegramChatId: null }); console.log(`  Előző link törölve: ${u.email}`); });
+  const updated = usersDb.update(req.user.id, { telegramChatId: chatIdStr });
+  console.log(`Telegram összekapcsolva: ${req.user.email} ↔ chatId ${chatIdStr}, mentve: ${!!updated}, telegramChatId=${updated?.telegramChatId}`);
+  // Azonnali ellenőrzés
+  const verify = usersDb.all().find(u => u.telegramChatId === chatIdStr);
+  console.log(`  Ellenőrzés: ${verify ? verify.email : "NINCS MEGTALÁLVA!"}`);
   tgSend(chatId,
     `✅ <b>Sikeresen összekapcsolva!</b>\n\n` +
     `A 90perc.hu fiókod (${req.user.email}) össze van kötve ezzel a Telegram fiókkal.\n` +
