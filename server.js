@@ -785,8 +785,14 @@ async function checkResults() {
   const fdCache = {};
 
   // 1. Befejezett meccsek 90 perces eredményének összegyűjtése (meccsnév → eredmény)
+  // Csak azokat a sportokat kérdezzük le, amelyekhez ténylegesen van pending tipp → kredit takarékosság
+  const allPending = [...pendingSingles, ...combosToCheck.flatMap(c => c.legs || [])];
+  const neededSports = new Set(allPending.map(t => t.sportKey).filter(Boolean));
+  // Ha nincs sportKey a tippeknél, fallback: összes sport
+  const sportsToCheck = neededSports.size > 0 ? [...neededSports] : Object.keys(SPORT_MAP);
+  console.log(`  Odds API lekérés: ${sportsToCheck.length} sport (${sportsToCheck.join(", ")})`);
   const completed = {};
-  for (const sportKey of Object.keys(SPORT_MAP)) {
+  for (const sportKey of sportsToCheck) {
     try {
       const r = await fetch(`https://api.the-odds-api.com/v4/sports/${sportKey}/scores/?apiKey=${ODDS_API_KEY}&daysFrom=3`);
       if (!r.ok) continue;
