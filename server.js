@@ -38,7 +38,8 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
     const s = event.data.object;
     const paidUntil = new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString();
     const u = updateUser(s.customer, s.customer_details?.email || s.customer_email, {
-      plan: "pro", stripeCustomerId: s.customer, paidUntil
+      plan: "pro", stripeCustomerId: s.customer, paidUntil,
+      subscriptionStatus: "active", currentPeriodEnd: paidUntil
     });
     if (u) {
       console.log(`Stripe ✓ előfizetés aktiválva: ${u.email}`);
@@ -54,14 +55,14 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
       const paidUntil = periodEnd
         ? new Date(periodEnd * 1000).toISOString()
         : new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString();
-      const u = updateUser(inv.customer, null, { paidUntil });
+      const u = updateUser(inv.customer, null, { paidUntil, subscriptionStatus: "active", currentPeriodEnd: paidUntil });
       if (u) console.log(`Stripe ✓ megújítva: ${u.email}, lejár: ${paidUntil}`);
     }
   }
 
   if (event.type === "customer.subscription.deleted") {
     const sub = event.data.object;
-    const u = updateUser(sub.customer, null, { plan: "free", paidUntil: null });
+    const u = updateUser(sub.customer, null, { plan: "free", paidUntil: null, subscriptionStatus: "cancelled", currentPeriodEnd: null });
     if (u) {
       console.log(`Stripe: lemondva – ${u.email}`);
       mailer.sendPlanCancelled(u.email).catch(e => console.error("Email hiba:", e.message));
@@ -956,7 +957,7 @@ function checkExpiredSubscriptions() {
   );
   if (!expired.length) return;
   expired.forEach(u => {
-    usersDb.update(u.id, { plan: "free" });
+    usersDb.update(u.id, { plan: "free", subscriptionStatus: "cancelled" });
     console.log(`Előfizetés lejárt, visszaminősítve: ${u.email} (lejárt: ${u.paidUntil})`);
     mailer.sendPlanCancelled(u.email).catch(e => console.error("Email hiba:", e.message));
   });
@@ -1444,7 +1445,8 @@ app.patch("/api/admin/users/:id", (req, res) => {
   const { plan, paidUntil } = req.body;
   const validPlan = ["free","pro"].includes(plan) ? plan : "free";
   const targetUser = usersDb.findById(req.params.id);
-  usersDb.update(req.params.id, { plan: validPlan, paidUntil });
+  const subStatus = validPlan === "pro" ? "active" : "cancelled";
+  usersDb.update(req.params.id, { plan: validPlan, paidUntil, subscriptionStatus: subStatus, currentPeriodEnd: paidUntil || null });
   console.log(`Felhasználó frissítve: ${req.params.id} → plan:${validPlan}`);
   if (targetUser) {
     if (validPlan === "pro") {
@@ -1721,7 +1723,7 @@ app.get("/api/debug/me", (req, res) => {
   const freshUser = sessionUser ? (usersDb.findById(sessionUser?.id) || sessionUser) : null;
   res.json({
     sessionUser:  sessionUser ? { id: sessionUser.id, email: sessionUser.email, plan: sessionUser.plan, isAdmin: sessionUser.isAdmin } : null,
-    freshUser:    freshUser   ? { id: freshUser.id,   email: freshUser.email,   plan: freshUser.plan,   isAdmin: freshUser.isAdmin, paidUntil: freshUser.paidUntil } : null,
+    freshUser:    freshUser   ? { id: freshUser.id,   email: freshUser.email,   plan: freshUser.plan,   isAdmin: freshUser.isAdmin, paidUntil: freshUser.paidUntil, subscriptionStatus: freshUser.subscriptionStatus } : null,
     hasAccess:    auth.hasAccess(freshUser),
     isAdmin:      !!sessionUser?.isAdmin || isAdminReq(req),
     PAID_MODE:    auth.PAID_MODE,
