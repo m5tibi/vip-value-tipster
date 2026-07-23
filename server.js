@@ -28,6 +28,9 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
+  // Azonnal 200-at küldünk – Stripe ne próbálja újraküldeni (duplikált számla ellen)
+  res.json({ received: true });
+
   const updateUser = (customerId, email, patch) => {
     const u = (email && usersDb.findByEmail(email)) || usersDb.findByStripeCustomer(customerId);
     if (u) { usersDb.update(u.id, patch); return u; }
@@ -69,7 +72,6 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
     }
   }
 
-  res.json({ received: true });
 });
 
 app.use(express.json());
