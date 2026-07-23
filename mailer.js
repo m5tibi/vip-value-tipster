@@ -126,7 +126,7 @@ async function sendPlanActivated(to, paidUntil) {
       <p style="line-height:1.7;margin:0 0 10px">Köszönjük az előfizetést! Mostantól hozzáférsz az összes napi AI tipphez és a meccs elemzőhöz.</p>
       ${lejarat ? `<p style="color:#78909c;font-size:13px;margin:0 0 14px">Előfizetés érvényes: <b style="color:#00e676">${lejarat}</b></p>` : ""}
       ${button("https://90perc.hu/tippek.html", "⚽ Megnézem a tippeket")}
-      <p style="color:#78909c;font-size:12px;margin:14px 0 0">Az előfizetést bármikor lemondhatod az <a href="https://90perc.hu/elofizetes.html" style="color:#80cbc4">Előfizetés oldalon</a>.</p>
+      <p style="color:#78909c;font-size:12px;margin:14px 0 0">Az előfizetést bármikor kezelheted vagy mondhatod le az <a href="https://90perc.hu/elofizetes.html" style="color:#80cbc4">Előfizetés kezelése oldalon</a>.</p>
     `),
   });
 }
