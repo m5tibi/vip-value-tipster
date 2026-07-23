@@ -1597,6 +1597,7 @@ async function handleBotUpdate(update) {
     }
     // Pro ellenőrzés – ha több fiók van ugyanazzal a chat ID-vel, preferáljuk a pro/admin fiókot
     const allLinked = usersDb.all().filter(u => u.telegramChatId === String(chatId));
+    console.log(`Bot /elemzes – chatId: ${chatId}, linked fiókok: ${allLinked.map(u => u.email + "/" + u.plan + (u.isAdmin ? "/admin" : "")).join(", ") || "nincs"}`);
     const linked = allLinked.find(u => u.isAdmin || u.plan === "pro") || allLinked[0];
     const hasProAccess = linked && (linked.isAdmin || linked.plan === "pro");
     if (!hasProAccess) {
