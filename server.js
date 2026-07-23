@@ -1714,6 +1714,20 @@ app.post("/api/telegram/bot", express.json(), async (req, res) => {
 
 // Telegram linking eltávolítva
 
+
+// ── DEBUG: előfizetés státusz ellenőrzés (ideiglenesen) ──────
+app.get("/api/debug/me", (req, res) => {
+  const sessionUser = req.user;
+  const freshUser = sessionUser ? (usersDb.findById(sessionUser?.id) || sessionUser) : null;
+  res.json({
+    sessionUser:  sessionUser ? { id: sessionUser.id, email: sessionUser.email, plan: sessionUser.plan, isAdmin: sessionUser.isAdmin } : null,
+    freshUser:    freshUser   ? { id: freshUser.id,   email: freshUser.email,   plan: freshUser.plan,   isAdmin: freshUser.isAdmin, paidUntil: freshUser.paidUntil } : null,
+    hasAccess:    auth.hasAccess(freshUser),
+    isAdmin:      !!sessionUser?.isAdmin || isAdminReq(req),
+    PAID_MODE:    auth.PAID_MODE,
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`90perc.hu fut: http://localhost:${PORT}`);
   if (TG_BOT_TOKEN) {
