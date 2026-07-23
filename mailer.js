@@ -112,4 +112,112 @@ async function sendPasswordReset(to, url) {
   });
 }
 
-module.exports = { send, sendVerification, sendPasswordReset, configured };
+
+// ── Előfizetés aktiválva ──────────────────────────────────────
+async function sendPlanActivated(to, paidUntil) {
+  const lejarat = paidUntil
+    ? new Date(paidUntil).toLocaleDateString("hu-HU", { year:"numeric", month:"long", day:"numeric" })
+    : null;
+  return send({
+    to,
+    subject: "✅ Pro előfizetésed aktív – 90perc.hu",
+    text: `Üdv!\n\nPro előfizetésed aktív.${lejarat ? " Érvényes: " + lejarat + "." : ""}\n\nHozzáférsz a napi AI tippekhez és az elemzőhöz:\nhttps://90perc.hu/tippek.html`,
+    html: shell("Pro előfizetésed aktív! 🎉", `
+      <p style="line-height:1.7;margin:0 0 10px">Köszönjük az előfizetést! Mostantól hozzáférsz az összes napi AI tipphez és a meccs elemzőhöz.</p>
+      ${lejarat ? `<p style="color:#78909c;font-size:13px;margin:0 0 14px">Előfizetés érvényes: <b style="color:#00e676">${lejarat}</b></p>` : ""}
+      ${button("https://90perc.hu/tippek.html", "⚽ Megnézem a tippeket")}
+      <p style="color:#78909c;font-size:12px;margin:14px 0 0">Az előfizetést bármikor lemondhatod az <a href="https://90perc.hu/elofizetes.html" style="color:#80cbc4">Előfizetés oldalon</a>.</p>
+    `),
+  });
+}
+
+// ── Előfizetés lemondva/lejárt ────────────────────────────────
+async function sendPlanCancelled(to) {
+  return send({
+    to,
+    subject: "Előfizetésed lejárt – 90perc.hu",
+    text: `Előfizetésed lejárt vagy lemondásra került.\n\nA track record és az összesített statisztika továbbra is elérhető számodra.\nHa szeretnél újra előfizetni: https://90perc.hu/elofizetes.html`,
+    html: shell("Előfizetésed lejárt", `
+      <p style="line-height:1.7;margin:0 0 10px">Előfizetésed lejárt vagy lemondásra került. Sajnáljuk, hogy elmész!</p>
+      <p style="line-height:1.7;margin:0 0 14px;color:#78909c">A track record és a nyilvános statisztika továbbra is elérhető számodra az <a href="https://90perc.hu/statisztika.html" style="color:#80cbc4">Előzmény oldalon</a>.</p>
+      ${button("https://90perc.hu/elofizetes.html", "🔄 Újra előfizetek")}
+    `),
+  });
+}
+
+// ── Új tippek értesítő ────────────────────────────────────────
+async function sendNewTips(to, tips, combos) {
+  if (!tips.length && !combos.length) return;
+  const tipRows = tips.map(t =>
+    `<tr>
+      <td style="padding:8px 6px;border-bottom:1px solid #1e3a2f;color:#e0e0e0;font-weight:600">${t.match}</td>
+      <td style="padding:8px 6px;border-bottom:1px solid #1e3a2f;color:#80cbc4">${t.market}</td>
+      <td style="padding:8px 6px;border-bottom:1px solid #1e3a2f;color:#e0e0e0">${t.pick}</td>
+      <td style="padding:8px 6px;border-bottom:1px solid #1e3a2f;color:#f59e0b;font-weight:700">@ ${t.odds}</td>
+    </tr>`
+  ).join("");
+  const comboRows = combos.map(c =>
+    `<tr>
+      <td colspan="4" style="padding:8px 6px;border-bottom:1px solid #1e3a2f;color:#ffcc80">
+        🎰 Kombi: ${c.legs.map(l => l.pick).join(" + ")} @ <b>${c.odds}</b>
+      </td>
+    </tr>`
+  ).join("");
+  return send({
+    to,
+    subject: `⚽ ${tips.length} új tipp érkezett – 90perc.hu`,
+    text: tips.map(t => `${t.match}: ${t.pick} @ ${t.odds}`).join("\n"),
+    html: shell(`${tips.length} új tipp érkezett`, `
+      <table style="width:100%;border-collapse:collapse;margin:10px 0">
+        <thead>
+          <tr style="color:#546e7a;font-size:11px;text-transform:uppercase">
+            <th style="padding:6px;text-align:left;border-bottom:1px solid #1e3a2f">Meccs</th>
+            <th style="padding:6px;text-align:left;border-bottom:1px solid #1e3a2f">Piac</th>
+            <th style="padding:6px;text-align:left;border-bottom:1px solid #1e3a2f">Tipp</th>
+            <th style="padding:6px;text-align:left;border-bottom:1px solid #1e3a2f">Odds</th>
+          </tr>
+        </thead>
+        <tbody>${tipRows}${comboRows}</tbody>
+      </table>
+      ${button("https://90perc.hu/tippek.html", "⚽ Megnézem az összes tippet")}
+      <p style="color:#546e7a;font-size:11px;margin:10px 0 0">A tippek kizárólag tájékoztató jellegűek. A fogadás pénzügyi veszteséggel járhat.</p>
+    `),
+  });
+}
+
+// ── Heti összefoglaló ─────────────────────────────────────────
+async function sendWeeklySummary(to, stats) {
+  const { won, lost, push, halfWon, halfLost, profit, roi, winRate, settled } = stats;
+  const profitStr = (profit >= 0 ? "+" : "") + profit.toFixed(2);
+  const profitColor = profit >= 0 ? "#00e676" : "#ef4444";
+  return send({
+    to,
+    subject: `📊 Heti összefoglaló – 90perc.hu`,
+    text: `Heti eredmények:\nLezárt tippek: ${settled}\nNyert: ${won} | Vesztett: ${lost}\nProfit: ${profitStr} egység | ROI: ${roi}%`,
+    html: shell("Heti összefoglaló", `
+      <p style="color:#78909c;margin:0 0 14px">Az elmúlt 7 nap tippjeinek összesítése:</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0">
+        <div style="background:#07111d;border-radius:8px;padding:14px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#fff">${settled}</div>
+          <div style="font-size:11px;color:#546e7a;margin-top:4px">Lezárt tipp</div>
+        </div>
+        <div style="background:#07111d;border-radius:8px;padding:14px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#00e676">${winRate}%</div>
+          <div style="font-size:11px;color:#546e7a;margin-top:4px">Nyerési arány</div>
+        </div>
+        <div style="background:#07111d;border-radius:8px;padding:14px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:${profitColor}">${profitStr}</div>
+          <div style="font-size:11px;color:#546e7a;margin-top:4px">Egységnyi profit</div>
+        </div>
+        <div style="background:#07111d;border-radius:8px;padding:14px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:${profitColor}">${(roi >= 0 ? "+" : "") + roi}%</div>
+          <div style="font-size:11px;color:#546e7a;margin-top:4px">ROI</div>
+        </div>
+      </div>
+      <p style="color:#546e7a;font-size:12px;margin:8px 0">${won} nyert · ${lost} vesztett · ${(halfWon||0)+(halfLost||0)} fél · ${push||0} visszajár</p>
+      ${button("https://90perc.hu/statisztika.html", "📊 Teljes track record")}
+    `),
+  });
+}
+
+module.exports = { send, sendVerification, sendPasswordReset, sendPlanActivated, sendPlanCancelled, sendNewTips, sendWeeklySummary, configured };
