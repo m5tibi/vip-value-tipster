@@ -1136,11 +1136,13 @@ app.post("/api/auth/logout", (req, res) => {
 
 // Ki vagyok? (a frontend ezzel dönti el, mit mutasson)
 app.get("/api/auth/me", (req, res) => {
+  // Friss DB lookup – Stripe webhook utáni plan változás azonnal látszódjon
+  const freshUser = req.user ? (usersDb.findById(req.user.id) || req.user) : req.user;
   res.json({
-    user: usersDb.publicView(req.user),
-    hasAccess: auth.hasAccess(req.user),
-    paidMode: auth.PAID_MODE,
-    isAdmin: !!req.user?.isAdmin || isAdminReq(req),
+    user:      usersDb.publicView(freshUser),
+    hasAccess: auth.hasAccess(freshUser),
+    paidMode:  auth.PAID_MODE,
+    isAdmin:   !!req.user?.isAdmin || isAdminReq(req),
   });
 });
 
@@ -1473,8 +1475,9 @@ app.post("/api/stripe/checkout", auth.requireLogin, async (req, res) => {
       success_url: `${BASE_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url:  `${BASE_URL}/elofizetes.html`,
       metadata:    { userId: req.user.id },
-      locale:      "hu",
-      allow_promotion_codes: true,
+      locale:                   "hu",
+      allow_promotion_codes:    true,
+      billing_address_collection: "required",
     });
     res.json({ url: session.url });
   } catch (err) {
