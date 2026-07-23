@@ -1595,15 +1595,40 @@ async function handleBotUpdate(update) {
       await tgSend(chatId, "❓ Add meg a meccs nevét!\nPélda: <code>/elemzes Bayern - Dortmund</code>");
       return;
     }
-    // Pro ellenőrzés – ha több fiók van ugyanazzal a chat ID-vel, preferáljuk a pro/admin fiókot
-    const allLinked = usersDb.all().filter(u => u.telegramChatId === String(chatId));
-    console.log(`Bot /elemzes – chatId: ${chatId}, linked fiókok: ${allLinked.map(u => u.email + "/" + u.plan + (u.isAdmin ? "/isAdmin" : "") + (process.env.ADMIN_EMAIL === u.email ? "/ADMIN_EMAIL" : "")).join(", ") || "nincs"}`);
-    const linked = allLinked.find(u => u.isAdmin || u.plan === "pro") || allLinked[0];
-    const hasProAccess = linked && (
-      linked.isAdmin ||
-      linked.plan === "pro" ||
-      (process.env.ADMIN_EMAIL && linked.email === process.env.ADMIN_EMAIL)
-    );
+    // Admin bypass: ha ADMIN_TELEGRAM_CHAT_ID be van állítva és egyezik, azonnal engedélyezzük
+    const ADMIN_TG_ID = process.env.ADMIN_TELEGRAM_CHAT_ID;
+    if (ADMIN_TG_ID && String(chatId) === String(ADMIN_TG_ID)) {
+      console.log(`Bot /elemzes – admin bypass (ADMIN_TELEGRAM_CHAT_ID), chatId: ${chatId}`);
+      // Rate limit nincs adminra → egyből elemzünk
+    } else {
+      // Pro ellenőrzés normál felhasználóknak
+      const allLinked = usersDb.all().filter(u => u.telegramChatId === String(chatId));
+      console.log(`Bot /elemzes – chatId: ${chatId}, linked fiókok: ${allLinked.map(u => u.email + "/" + u.plan).join(", ") || "nincs"}`);
+      const linked = allLinked.find(u => u.isAdmin || u.plan === "pro") || allLinked[0];
+      const hasProAccess = linked && (linked.isAdmin || linked.plan === "pro" ||
+        (process.env.ADMIN_EMAIL && linked.email === process.env.ADMIN_EMAIL));
+      if (!hasProAccess) {
+        await tgSend(chatId,
+          `🔒 <b>Pro előfizetés szükséges</b>\n\n` +
+          `Az AI meccs elemzés csak Pro előfizetőknek elérhető.\n` +
+          `<a href="https://90perc.hu/elofizetes.html">Előfizetek – 14 990 Ft/hó →</a>`
+        );
+        return;
+      }
+      // Rate limit: max 5 elemzés/nap
+      const isAdminUser = linked.isAdmin || (process.env.ADMIN_EMAIL && linked.email === process.env.ADMIN_EMAIL);
+      if (!isAdminUser) {
+        const today = todayHU();
+        linked._tgDailyCount = linked._tgDailyCount || {};
+        const count = linked._tgDailyCount[today] || 0;
+        if (count >= 5) {
+          await tgSend(chatId, "⏳ Napi elemzési limit elérve (5/nap). Holnap folytathatod.");
+          return;
+        }
+        linked._tgDailyCount[today] = count + 1;
+        usersDb.update(linked.id, { _tgDailyCount: linked._tgDailyCount });
+      }
+    }
     if (!hasProAccess) {
       await tgSend(chatId,
         `🔒 <b>Pro előfizetés szükséges</b>\n\n` +
@@ -1612,19 +1637,7 @@ async function handleBotUpdate(update) {
       );
       return;
     }
-    // Rate limit: max 5 elemzés/nap (admin korlátlan)
-    const isAdminUser = linked.isAdmin || (process.env.ADMIN_EMAIL && linked.email === process.env.ADMIN_EMAIL);
-    if (!isAdminUser) {
-      const today = todayHU();
-      linked._tgDailyCount = linked._tgDailyCount || {};
-      const count = linked._tgDailyCount[today] || 0;
-      if (count >= 5) {
-        await tgSend(chatId, "⏳ Napi elemzési limit elérve (5/nap). Holnap folytathatod.");
-        return;
-      }
-      linked._tgDailyCount[today] = count + 1;
-      usersDb.update(linked.id, { _tgDailyCount: linked._tgDailyCount });
-    }
+
 
     await tgSend(chatId, `🔍 Elemzem: <b>${query}</b>...\nEz 20-40 másodpercig tarthat.`);
     await tgTyping(chatId);
