@@ -1597,9 +1597,13 @@ async function handleBotUpdate(update) {
     }
     // Pro ellenőrzés – ha több fiók van ugyanazzal a chat ID-vel, preferáljuk a pro/admin fiókot
     const allLinked = usersDb.all().filter(u => u.telegramChatId === String(chatId));
-    console.log(`Bot /elemzes – chatId: ${chatId}, linked fiókok: ${allLinked.map(u => u.email + "/" + u.plan + (u.isAdmin ? "/admin" : "")).join(", ") || "nincs"}`);
+    console.log(`Bot /elemzes – chatId: ${chatId}, linked fiókok: ${allLinked.map(u => u.email + "/" + u.plan + (u.isAdmin ? "/isAdmin" : "") + (process.env.ADMIN_EMAIL === u.email ? "/ADMIN_EMAIL" : "")).join(", ") || "nincs"}`);
     const linked = allLinked.find(u => u.isAdmin || u.plan === "pro") || allLinked[0];
-    const hasProAccess = linked && (linked.isAdmin || linked.plan === "pro");
+    const hasProAccess = linked && (
+      linked.isAdmin ||
+      linked.plan === "pro" ||
+      (process.env.ADMIN_EMAIL && linked.email === process.env.ADMIN_EMAIL)
+    );
     if (!hasProAccess) {
       await tgSend(chatId,
         `🔒 <b>Pro előfizetés szükséges</b>\n\n` +
@@ -1609,7 +1613,8 @@ async function handleBotUpdate(update) {
       return;
     }
     // Rate limit: max 5 elemzés/nap (admin korlátlan)
-    if (!linked.isAdmin) {
+    const isAdminUser = linked.isAdmin || (process.env.ADMIN_EMAIL && linked.email === process.env.ADMIN_EMAIL);
+    if (!isAdminUser) {
       const today = todayHU();
       linked._tgDailyCount = linked._tgDailyCount || {};
       const count = linked._tgDailyCount[today] || 0;
