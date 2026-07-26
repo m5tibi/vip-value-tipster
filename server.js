@@ -979,7 +979,7 @@ setInterval(async () => {
     checkExpiredSubscriptions();
   }
   // Heti összefoglaló: minden hétfőn 08:00-kor
-  if (hour === 8 && minute === 0 && now.getDay() === 1) {
+  if (hour === 8 && minute === 0 && new Date().getDay() === 1) {
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const weekTips = history.filter(t =>
       t.type !== "combo" && t.result && t.result !== "pending" &&
@@ -1718,6 +1718,19 @@ app.post("/api/telegram/bot", express.json(), async (req, res) => {
 
 // Telegram linking eltávolítva
 
+
+
+// ── Globális hibakezelők – szerver ne omoljon össze ──────────────
+process.on("uncaughtException", (err) => {
+  console.error("UNCAUGHT EXCEPTION:", err.message);
+  console.error(err.stack);
+  // NE lépjünk ki – a szerver maradjon fent
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("UNHANDLED REJECTION:", reason);
+  // NE lépjünk ki – a szerver maradjon fent
+});
 
 app.listen(PORT, () => {
   console.log(`90perc.hu fut: http://localhost:${PORT}`);
