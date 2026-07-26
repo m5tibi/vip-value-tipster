@@ -628,11 +628,8 @@ async function fetchAndProcess() {
   // Státusz-értesítés Telegramra (a tippek TARTALMA NEM megy ki – az csak jóváhagyás után,
   // a "📤 Jóváhagyottak küldése" gombbal). Ez csak egy heads-up, hogy lefutott a lekérdezés.
   const total = fresh.length + freshCombos.length;
-  const statusMsg = total
-    ? `🔔 <b>90perc.hu – Új tippek</b>\n${fresh.length} új tipp${freshCombos.length ? ` + ${freshCombos.length} kombi` : ""} vár jóváhagyásra a felületen.`
-    : `🔔 <b>90perc.hu – Lekérdezés</b>\nNincs új tipp.`;
-  await sendTelegram(statusMsg);
   console.log(`Frissítve – ${fresh.length} új AI tipp, ${freshCombos.length} új kombi (jóváhagyásra várnak)`);
+}
 }
 
 // ── football-data.org: 90 perces (rendes idejű) eredmény ──
