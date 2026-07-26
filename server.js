@@ -630,7 +630,6 @@ async function fetchAndProcess() {
   const total = fresh.length + freshCombos.length;
   console.log(`Frissítve – ${fresh.length} új AI tipp, ${freshCombos.length} új kombi (jóváhagyásra várnak)`);
 }
-}
 
 // ── football-data.org: 90 perces (rendes idejű) eredmény ──
 // A fogadások a rendes játékidőre dőlnek el (90' + hosszabbítás[stoppage], de
