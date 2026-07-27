@@ -220,4 +220,41 @@ async function sendWeeklySummary(to, stats) {
   });
 }
 
-module.exports = { send, sendVerification, sendPasswordReset, sendPlanActivated, sendPlanCancelled, sendNewTips, sendWeeklySummary, configured };
+
+// ── Előfizetés lemondva (de még aktív az időszak végéig) ─────
+async function sendSubscriptionCancelled(to, activeUntil) {
+  const dateStr = activeUntil
+    ? new Date(activeUntil).toLocaleDateString("hu-HU", { year:"numeric", month:"long", day:"numeric" })
+    : null;
+  return send({
+    to,
+    subject: "Az előfizetésed lemondásra került – 90perc.hu",
+    text: `Lemondtad a 90perc.hu előfizetésedet.${dateStr ? ` A hozzáférésed ${dateStr}-ig aktív marad.` : ""} Köszönjük, hogy velünk voltál!`,
+    html: shell("Előfizetés lemondva", `
+      <p style="line-height:1.7;margin:0 0 10px">Lemondtad a 90perc.hu előfizetésedet.</p>
+      ${dateStr
+        ? `<p style="line-height:1.7;margin:0 0 14px">Hozzáférésed még aktív marad <b style="color:#00e676">${dateStr}</b>-ig – addig továbbra is eléred az összes tippet és az elemzőt.</p>`
+        : `<p style="line-height:1.7;margin:0 0 14px;color:#78909c">Hozzáférésed hamarosan megszűnik.</p>`
+      }
+      ${button("https://90perc.hu/elofizetes.html", "🔄 Újra előfizetek")}
+      <p style="color:#78909c;font-size:12px;margin:14px 0 0">Köszönjük, hogy velünk voltál! A track record és a statisztika ezután is szabadon megtekinthető a <a href="https://90perc.hu/statisztika.html" style="color:#80cbc4">Statisztika oldalon</a>.</p>
+    `),
+  });
+}
+
+// ── Előfizetés lejárt (időszak vége, hozzáférés megszűnt) ────
+async function sendSubscriptionExpired(to) {
+  return send({
+    to,
+    subject: "Előfizetésed lejárt – 90perc.hu",
+    text: `A 90perc.hu előfizetésed lejárt, hozzáférésed megszűnt. Ha folytatni szeretnéd, iratkozz fel újra: https://90perc.hu/elofizetes.html`,
+    html: shell("Előfizetésed lejárt", `
+      <p style="line-height:1.7;margin:0 0 10px">A 90perc.hu előfizetésed lejárt, és a hozzáférésed megszűnt.</p>
+      <p style="line-height:1.7;margin:0 0 14px;color:#78909c">Ha újra szeretnél hozzáférni a napi tippekhez és az elemzőhöz, egyszerűen iratkozz fel újra az alábbi gombbal.</p>
+      ${button("https://90perc.hu/elofizetes.html", "🔄 Újra előfizetek – 14 990 Ft/hó")}
+      <p style="color:#78909c;font-size:12px;margin:14px 0 0">A track record és a statisztika ezután is szabadon megtekinthető a <a href="https://90perc.hu/statisztika.html" style="color:#80cbc4">Statisztika oldalon</a>.</p>
+    `),
+  });
+}
+
+module.exports = { send, sendVerification, sendPasswordReset, sendPlanActivated, sendPlanCancelled, sendSubscriptionCancelled, sendSubscriptionExpired, sendNewTips, sendWeeklySummary, configured };
