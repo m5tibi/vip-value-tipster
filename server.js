@@ -76,11 +76,11 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
   if (event.type === "customer.subscription.updated") {
     const sub  = event.data.object;
     const prev = event.data.previous_attributes || {};
-    // Csak akkor küldjük az értesítőt, ha MOST változott cancel_at_period_end-re
-    // (ha szerepel a previous_attributes-ban, akkor biztosan változott)
+    console.log(`Stripe subscription.updated – cancel_at_period_end: ${sub.cancel_at_period_end}, status: ${sub.status}, prev keys: [${Object.keys(prev).join(",")}], prev.cancel_at_period_end: ${prev.cancel_at_period_end}`);
     const justCancelled = sub.cancel_at_period_end &&
       sub.status === "active" &&
       ('cancel_at_period_end' in prev || prev.cancel_at_period_end === false);
+    console.log(`  justCancelled: ${justCancelled}`);
     if (justCancelled) {
       const cancelledAt  = new Date().toISOString();
       const periodEndTs  = sub.cancel_at || sub.current_period_end;
