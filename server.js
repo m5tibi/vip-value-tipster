@@ -1761,30 +1761,6 @@ app.post("/api/admin/sync-stripe", async (req, res) => {
 });
 
 
-// ── Disk írás teszt (átmeneti debug) ─────────────────────────
-app.get("/api/admin/disk-test", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  const fs = require("fs");
-  const path = require("path");
-  const dataDir = process.env.DATA_DIR || "/data";
-  const usersFile = path.join(dataDir, "users.json");
-  try {
-    const raw = fs.readFileSync(usersFile, "utf8");
-    const users = JSON.parse(raw);
-    const m5 = users.find(u => u.email === "m5tibi77@gmail.com");
-    res.json({
-      dataDir,
-      usersFile,
-      fileExists: fs.existsSync(usersFile),
-      fileSize: fs.statSync(usersFile).size,
-      m5tibi_paidUntil: m5?.paidUntil || null,
-      m5tibi_plan: m5?.plan || null,
-    });
-  } catch(e) {
-    res.json({ error: e.message, dataDir, usersFile });
-  }
-});
-
 app.listen(PORT, () => {
   console.log(`90perc.hu fut: http://localhost:${PORT}`);
   if (TG_BOT_TOKEN) {
