@@ -240,7 +240,8 @@
       <div id="admin-tools" style="display:none;gap:8px;flex-wrap:wrap">
         <button class="btn-send" onclick="checkResults()">🔍 Eredmények</button>
         <button class="btn-send" onclick="sendStats()">📲 Statisztika</button>
-        <button class="btn-send" style="background:#0d2233;color:#229ED9" onclick="showUsers()">👥 Tagok</button>
+        <button class="btn-send" style="background:#0d2233;color:#229ED9" onclick="syncStripe()">🔄 Stripe szinkron</button>
+        <button class="btn-send" style="background:#1b3a20;color:#00e676" onclick="showUsers()">👥 Tagok</button>
         <button class="btn-del"  onclick="clearHistory()">🗑️ Törlés</button>
       </div>
     </div>
@@ -1039,6 +1040,15 @@ async function setPlan(id, plan, paidUntil) {
     body: JSON.stringify({ plan, paidUntil: paidUntil || null })
   });
   await showUsers();
+}
+
+
+async function syncStripe() {
+  showStatus("🔄 Stripe szinkronizálás...");
+  const r = await fetch('/api/admin/sync-stripe', { method: 'POST', headers: adminHeaders(true) });
+  const d = await r.json();
+  showStatus(d.ok ? `✅ ${d.updated} tag frissítve Stripe-ból` : '❌ Hiba: ' + d.error);
+  if (d.ok) await showUsers();
 }
 
 </script>
