@@ -115,6 +115,7 @@ function publicView(u) {
     subscriptionStatus: u.subscriptionStatus,
     currentPeriodEnd: u.currentPeriodEnd,
     paidUntil: u.paidUntil || null,
+    cancelledAt: u.cancelledAt || null,
     stripeCustomerId: u.stripeCustomerId || null,
     createdAt: u.createdAt,
   };
