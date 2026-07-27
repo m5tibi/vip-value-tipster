@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Tagok – 90perc.hu Admin</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060e1b;--surf:#0c1a2e;--border:#1a2f4a;
+  --green:#00e676;--red:#ef4444;--gold:#f59e0b;
+  --text:#dce8f5;--muted:#5d7a96;--radius:10px;
+}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh;padding-bottom:40px}
+
+/* NAV */
+nav{background:var(--surf);border-bottom:1px solid var(--border);padding:12px 16px;
+    display:flex;justify-content:space-between;align-items:center;gap:8px;position:sticky;top:0;z-index:10}
+.nav-logo{display:flex;align-items:center}
+.nav-logo img{height:28px}
+.nav-actions{display:flex;gap:8px;align-items:center}
+
+/* BUTTONS */
+.btn{border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .15s}
+.btn:hover{opacity:.85}
+.btn-primary{background:var(--green);color:#060e1b}
+.btn-ghost{background:var(--surf);color:var(--muted);border:1px solid var(--border)}
+.btn-danger{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.btn-sm{padding:5px 10px;font-size:12px}
+
+/* HEADER */
+.page-header{padding:16px;border-bottom:1px solid var(--border)}
+.page-title{font-size:18px;font-weight:700;color:#fff;margin-bottom:4px}
+.page-sub{font-size:12px;color:var(--muted)}
+
+/* STATS BAR */
+.stats-bar{display:flex;gap:8px;padding:12px 16px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.stat{background:var(--surf);border:1px solid var(--border);border-radius:var(--radius);
+      padding:10px 14px;min-width:100px;text-align:center;flex-shrink:0}
+.stat-num{font-size:22px;font-weight:700;color:#fff}
+.stat-num.green{color:var(--green)}
+.stat-num.gold{color:var(--gold)}
+.stat-num.red{color:var(--red)}
+.stat-label{font-size:10px;color:var(--muted);margin-top:2px}
+
+/* FILTER */
+.filter-bar{padding:10px 16px;display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.filter-btn{background:var(--surf);border:1px solid var(--border);border-radius:20px;
+            padding:5px 14px;font-size:12px;font-weight:600;color:var(--muted);
+            cursor:pointer;white-space:nowrap;flex-shrink:0}
+.filter-btn.active{border-color:var(--green);color:var(--green);background:rgba(0,230,118,.08)}
+
+/* SEARCH */
+.search-wrap{padding:0 16px 10px}
+.search-input{width:100%;background:var(--surf);border:1px solid var(--border);
+              border-radius:8px;padding:10px 14px;color:var(--text);font-size:14px;outline:none}
+.search-input:focus{border-color:var(--green)}
+.search-input::placeholder{color:var(--muted)}
+
+/* MEMBER CARDS (mobile-first) */
+.members-list{padding:0 16px;display:flex;flex-direction:column;gap:10px}
+.member-card{background:var(--surf);border:1px solid var(--border);border-radius:var(--radius);
+             padding:14px;transition:border-color .15s}
+.member-card.pro{border-left:3px solid var(--green)}
+.member-card.cancelled{border-left:3px solid var(--red)}
+.member-card.free{border-left:3px solid var(--border)}
+
+.member-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px}
+.member-email{font-size:14px;font-weight:600;color:#fff;word-break:break-all}
+.member-badge{display:inline-flex;align-items:center;gap:4px;border-radius:5px;
+              padding:2px 8px;font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0}
+.badge-pro{background:rgba(0,230,118,.15);color:var(--green)}
+.badge-free{background:rgba(93,122,150,.15);color:var(--muted)}
+.badge-cancelled{background:rgba(239,68,68,.1);color:var(--red)}
+
+.member-meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.meta-item{font-size:11px;color:var(--muted);background:rgba(26,47,74,.5);
+           border-radius:5px;padding:2px 8px}
+.meta-item.highlight{color:var(--gold)}
+.meta-item.red{color:var(--red)}
+
+.member-actions{display:flex;gap:6px;flex-wrap:wrap}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;
+               align-items:flex-end;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surf);border:1px solid var(--border);border-radius:16px 16px 0 0;
+       padding:20px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
+.modal-title{font-size:16px;font-weight:700;color:#fff;margin-bottom:4px}
+.modal-sub{font-size:12px;color:var(--muted);margin-bottom:16px}
+.modal-label{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;display:block}
+.modal-input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;
+             padding:10px 12px;color:var(--text);font-size:14px;outline:none;margin-bottom:12px}
+.modal-input:focus{border-color:var(--green)}
+.modal-actions{display:flex;gap:8px}
+
+/* STATUS */
+#status-msg{padding:10px 16px;font-size:13px;text-align:center;min-height:36px;color:var(--green)}
+
+/* EMPTY */
+.empty{text-align:center;padding:40px 16px;color:var(--muted);font-size:14px}
+.loading{text-align:center;padding:40px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="/tippek.html"><img src="/logo-horizontal.png" alt="90perc.hu"/></a>
+  <div class="nav-actions">
+    <button class="btn btn-ghost btn-sm" onclick="syncStripe()">🔄 Stripe</button>
+    <button class="btn btn-primary btn-sm" onclick="loadMembers()">↺ Frissít</button>
+  </div>
+</nav>
+
+<div class="page-header">
+  <div class="page-title">👥 Tagok kezelése</div>
+  <div class="page-sub" id="page-sub">Betöltés...</div>
+</div>
+
+<!-- Stats -->
+<div class="stats-bar">
+  <div class="stat"><div class="stat-num green" id="s-pro">–</div><div class="stat-label">Fizető</div></div>
+  <div class="stat"><div class="stat-num" id="s-total">–</div><div class="stat-label">Összes tag</div></div>
+  <div class="stat"><div class="stat-num gold" id="s-mrr">–</div><div class="stat-label">MRR (Ft)</div></div>
+  <div class="stat"><div class="stat-num red" id="s-cancelled">–</div><div class="stat-label">Lemondott</div></div>
+</div>
+
+<!-- Filter + Search -->
+<div class="filter-bar">
+  <button class="filter-btn active" onclick="setFilter('all',this)">Összes</button>
+  <button class="filter-btn" onclick="setFilter('pro',this)">✅ Fizető</button>
+  <button class="filter-btn" onclick="setFilter('free',this)">🔓 Ingyenes</button>
+  <button class="filter-btn" onclick="setFilter('cancelled',this)">❌ Lemondott</button>
+</div>
+
+<div class="search-wrap">
+  <input class="search-input" type="search" placeholder="🔍 E-mail keresés..." oninput="renderList()" id="search"/>
+</div>
+
+<div id="status-msg"></div>
+<div id="members-list" class="members-list"><div class="loading">Betöltés...</div></div>
+
+<!-- Plan modal -->
+<div class="modal-overlay" id="plan-modal" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Csomag beállítása</div>
+    <div class="modal-sub" id="modal-email"></div>
+    <label class="modal-label">Lejárat dátuma</label>
+    <input class="modal-input" type="date" id="modal-date"/>
+    <div class="modal-actions">
+      <button class="btn btn-primary" style="flex:1" onclick="confirmSetPro()">✅ Fizető beállítása</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('plan-modal').classList.remove('open')">Mégse</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let allMembers = [];
+let currentFilter = 'all';
+let pendingUserId = null;
+
+function adminHeaders(json) {
+  const h = { 'X-Admin-Password': localStorage.getItem('vbt_admin') || '' };
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+}
+
+function showStatus(msg, isErr) {
+  const el = document.getElementById('status-msg');
+  el.textContent = msg;
+  el.style.color = isErr ? '#ef4444' : '#00e676';
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderList();
+}
+
+function renderList() {
+  const search = document.getElementById('search').value.toLowerCase();
+  let list = allMembers.filter(u => !u.isAdmin);
+  if (currentFilter === 'pro') list = list.filter(u => u.plan === 'pro');
+  if (currentFilter === 'free') list = list.filter(u => u.plan !== 'pro' && !u.cancelledAt);
+  if (currentFilter === 'cancelled') list = list.filter(u => u.cancelledAt);
+  if (search) list = list.filter(u => u.email.toLowerCase().includes(search));
+  list = list.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+
+  const el = document.getElementById('members-list');
+  if (!list.length) { el.innerHTML = '<div class="empty">Nincs találat.</div>'; return; }
+
+  el.innerHTML = list.map(u => {
+    const isPro = u.plan === 'pro';
+    const hasCancelled = !!u.cancelledAt;
+    const cardClass = isPro ? 'pro' : hasCancelled ? 'cancelled' : 'free';
+    const badge = isPro
+      ? '<span class="member-badge badge-pro">✅ FIZETŐ</span>'
+      : hasCancelled
+        ? '<span class="member-badge badge-cancelled">❌ Lemondott</span>'
+        : '<span class="member-badge badge-free">🔓 Ingyenes</span>';
+
+    const metaItems = [];
+    metaItems.push(`Csatlakozott: ${u.createdAt ? new Date(u.createdAt).toLocaleDateString('hu-HU') : '–'}`);
+    if (u.paidUntil) metaItems.push(`<span class="meta-item highlight">Lejárat: ${new Date(u.paidUntil).toLocaleDateString('hu-HU')}</span>`);
+    if (u.cancelledAt) metaItems.push(`<span class="meta-item red">Lemondva: ${new Date(u.cancelledAt).toLocaleDateString('hu-HU')}</span>`);
+    if (!u.emailVerified) metaItems.push('⏳ Nem megerősített');
+
+    const actions = isPro
+      ? `<button class="btn btn-danger btn-sm" onclick="setFree('${u.id}','${u.email}')">→ Ingyenes</button>`
+      : `<button class="btn btn-primary btn-sm" onclick="openProModal('${u.id}','${u.email}')">→ Fizető</button>`;
+
+    return `<div class="member-card ${cardClass}">
+      <div class="member-top">
+        <div class="member-email">${u.email}</div>
+        ${badge}
+      </div>
+      <div class="member-meta">
+        ${metaItems.map(i => i.startsWith('<span') ? i : `<span class="meta-item">${i}</span>`).join('')}
+      </div>
+      <div class="member-actions">${actions}</div>
+    </div>`;
+  }).join('');
+}
+
+function updateStats() {
+  const members = allMembers.filter(u => !u.isAdmin);
+  const pro = members.filter(u => u.plan === 'pro').length;
+  const cancelled = members.filter(u => u.cancelledAt).length;
+  document.getElementById('s-total').textContent = members.length;
+  document.getElementById('s-pro').textContent = pro;
+  document.getElementById('s-mrr').textContent = (pro * 14990).toLocaleString('hu-HU');
+  document.getElementById('s-cancelled').textContent = cancelled;
+  document.getElementById('page-sub').textContent = `${members.length} regisztrált tag · ${pro} fizető · MRR: ${(pro*14990).toLocaleString('hu-HU')} Ft`;
+}
+
+async function loadMembers() {
+  try {
+    const r = await fetch('/api/admin/users', { headers: adminHeaders() });
+    if (r.status === 401 || r.status === 403) {
+      document.getElementById('members-list').innerHTML =
+        '<div class="empty">🔒 Nincs jogosultságod. <a href="/tippek.html" style="color:var(--green)">Jelentkezz be adminként</a></div>';
+      return;
+    }
+    allMembers = await r.json();
+    updateStats();
+    renderList();
+  } catch(e) {
+    showStatus('Betöltési hiba: ' + e.message, true);
+  }
+}
+
+function openProModal(id, email) {
+  pendingUserId = id;
+  document.getElementById('modal-email').textContent = email;
+  const def = new Date(Date.now() + 31*24*60*60*1000).toISOString().slice(0,10);
+  document.getElementById('modal-date').value = def;
+  document.getElementById('plan-modal').classList.add('open');
+}
+
+function closeModal(e) {
+  if (e.target.id === 'plan-modal') document.getElementById('plan-modal').classList.remove('open');
+}
+
+async function confirmSetPro() {
+  const dateStr = document.getElementById('modal-date').value;
+  if (!dateStr) { showStatus('Add meg a lejárat dátumát!', true); return; }
+  const paidUntil = new Date(dateStr).toISOString();
+  document.getElementById('plan-modal').classList.remove('open');
+  await setPlan(pendingUserId, 'pro', paidUntil);
+}
+
+async function setFree(id, email) {
+  if (!confirm(`Biztosan ingyenesre állítod: ${email}?`)) return;
+  await setPlan(id, 'free', null);
+}
+
+async function setPlan(id, plan, paidUntil) {
+  showStatus('Mentés...');
+  try {
+    const r = await fetch(`/api/admin/users/${id}`, {
+      method: 'PATCH', headers: adminHeaders(true),
+      body: JSON.stringify({ plan, paidUntil })
+    });
+    const d = await r.json();
+    if (d.ok) { showStatus('✅ Mentve'); await loadMembers(); }
+    else showStatus('❌ Hiba: ' + d.error, true);
+  } catch(e) { showStatus('❌ Hiba: ' + e.message, true); }
+}
+
+async function syncStripe() {
+  showStatus('🔄 Stripe szinkronizálás...');
+  try {
+    const r = await fetch('/api/admin/sync-stripe', { method: 'POST', headers: adminHeaders(true) });
+    const d = await r.json();
+    showStatus(d.ok ? `✅ ${d.updated} tag frissítve Stripe-ból` : '❌ Hiba', !d.ok);
+    if (d.ok) await loadMembers();
+  } catch(e) { showStatus('❌ Hiba: ' + e.message, true); }
+}
+
+loadMembers();
+</script>
+</body>
+</html>
