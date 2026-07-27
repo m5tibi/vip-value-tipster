@@ -1723,21 +1723,41 @@ process.on("unhandledRejection", (reason, promise) => {
 app.post("/api/admin/sync-stripe", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   if (!stripe) return res.status(500).json({ error: "Stripe nincs konfigurálva" });
-  const proUsers = usersDb.all().filter(u => u.plan === "pro" && u.stripeCustomerId);
+  const proUsers = usersDb.all().filter(u => u.plan === "pro");
+  console.log(`Stripe sync: ${proUsers.length} pro felhasználó keresése...`);
   let updated = 0;
   for (const u of proUsers) {
     try {
-      const subs = await stripe.subscriptions.list({ customer: u.stripeCustomerId, status: "active", limit: 1 });
-      if (subs.data.length) {
-        const sub = subs.data[0];
+      let sub = null;
+      // 1. Ha van stripeCustomerId, azzal keresünk
+      if (u.stripeCustomerId) {
+        const subs = await stripe.subscriptions.list({ customer: u.stripeCustomerId, status: "active", limit: 1 });
+        if (subs.data.length) sub = subs.data[0];
+      }
+      // 2. Ha nincs vagy nem találtuk, email alapján keresünk
+      if (!sub) {
+        const customers = await stripe.customers.list({ email: u.email, limit: 1 });
+        if (customers.data.length) {
+          const cust = customers.data[0];
+          const subs = await stripe.subscriptions.list({ customer: cust.id, status: "active", limit: 1 });
+          if (subs.data.length) {
+            sub = subs.data[0];
+            usersDb.update(u.id, { stripeCustomerId: cust.id });
+            console.log(`  Stripe customer ID beállítva: ${u.email} → ${cust.id}`);
+          }
+        }
+      }
+      if (sub) {
         const paidUntil = new Date(sub.current_period_end * 1000).toISOString();
         usersDb.update(u.id, { paidUntil, subscriptionStatus: "active", currentPeriodEnd: paidUntil });
-        console.log(`Stripe sync: ${u.email} → lejár: ${paidUntil}`);
+        console.log(`  Stripe sync OK: ${u.email} → lejár: ${paidUntil}`);
         updated++;
+      } else {
+        console.log(`  Nincs aktív Stripe előfizetés: ${u.email}`);
       }
     } catch(e) { console.error(`Stripe sync hiba (${u.email}):`, e.message); }
   }
-  res.json({ ok: true, updated });
+  res.json({ ok: true, updated, total: proUsers.length });
 });
 
 app.listen(PORT, () => {
