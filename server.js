@@ -75,10 +75,19 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
 
   if (event.type === "customer.subscription.deleted") {
     const sub = event.data.object;
-    const u = updateUser(sub.customer, null, { plan: "free", paidUntil: null, subscriptionStatus: "cancelled", currentPeriodEnd: null });
+    const cancelledAt = new Date().toISOString();
+    const u = updateUser(sub.customer, null, { plan: "free", paidUntil: null, subscriptionStatus: "cancelled", currentPeriodEnd: null, cancelledAt });
     if (u) {
       console.log(`Stripe: lemondva – ${u.email}`);
       mailer.sendPlanCancelled(u.email).catch(e => console.error("Email hiba:", e.message));
+      // Admin értesítő
+      const adminEmail = process.env.ADMIN_EMAIL;
+      if (adminEmail) mailer.send({
+        to: adminEmail,
+        subject: `❌ Előfizetés lemondva – ${u.email}`,
+        text: `${u.email} lemondta az előfizetését.`,
+        html: `<p>A <b>${u.email}</b> felhasználó lemondta a 90perc.hu előfizetését.</p><p>Lemondás időpontja: ${cancelledAt}</p>`,
+      }).catch(e => console.error("Admin email hiba:", e.message));
     }
   }
 
@@ -965,9 +974,17 @@ function checkExpiredSubscriptions() {
   );
   if (!expired.length) return;
   expired.forEach(u => {
-    usersDb.update(u.id, { plan: "free", subscriptionStatus: "cancelled" });
+    const expiredAt = new Date().toISOString();
+    usersDb.update(u.id, { plan: "free", subscriptionStatus: "cancelled", cancelledAt: expiredAt });
     console.log(`Előfizetés lejárt, visszaminősítve: ${u.email} (lejárt: ${u.paidUntil})`);
     mailer.sendPlanCancelled(u.email).catch(e => console.error("Email hiba:", e.message));
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (adminEmail) mailer.send({
+      to: adminEmail,
+      subject: `⏰ Előfizetés lejárt – ${u.email}`,
+      text: `${u.email} előfizetése lejárt.`,
+      html: `<p>A <b>${u.email}</b> felhasználó előfizetése lejárt (${u.paidUntil}).</p>`,
+    }).catch(e => console.error("Admin email hiba:", e.message));
   });
   console.log(`Lejárt előfizetések: ${expired.length} felhasználó visszaminősítve.`);
 }
@@ -1441,7 +1458,8 @@ app.patch("/api/admin/users/:id", (req, res) => {
   const validPlan = ["free","pro"].includes(plan) ? plan : "free";
   const targetUser = usersDb.findById(req.params.id);
   const subStatus = validPlan === "pro" ? "active" : "cancelled";
-  usersDb.update(req.params.id, { plan: validPlan, paidUntil, subscriptionStatus: subStatus, currentPeriodEnd: paidUntil || null });
+  const cancelledAt = validPlan === "free" ? new Date().toISOString() : null;
+  usersDb.update(req.params.id, { plan: validPlan, paidUntil, subscriptionStatus: subStatus, currentPeriodEnd: paidUntil || null, ...(cancelledAt ? { cancelledAt } : {}) });
   console.log(`Felhasználó frissítve: ${req.params.id} → plan:${validPlan}`);
   if (targetUser) {
     if (validPlan === "pro") {
