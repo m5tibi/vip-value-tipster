@@ -1344,7 +1344,14 @@ app.post("/api/tips/send", async (req, res) => {
 
 app.post("/api/check-results", async (req, res) => {
   if (!requireAdmin(req, res)) return;
+  checkExpiredSubscriptions();
   await checkResults();
+  res.json({ ok: true });
+});
+
+app.post("/api/admin/check-expiry", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  checkExpiredSubscriptions();
   res.json({ ok: true });
 });
 
