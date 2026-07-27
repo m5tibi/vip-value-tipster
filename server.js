@@ -39,13 +39,23 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
 
   if (event.type === "checkout.session.completed") {
     const s = event.data.object;
-    const paidUntil = new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString();
+    let paidUntil = new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString();
+    // Stripe-tól lekérjük a tényleges előfizetési időszak végét
+    if (s.subscription && stripe) {
+      try {
+        const sub = await stripe.subscriptions.retrieve(s.subscription);
+        if (sub.current_period_end) {
+          paidUntil = new Date(sub.current_period_end * 1000).toISOString();
+        }
+      } catch(e) { console.error("Stripe subscription lekérés hiba:", e.message); }
+    }
     const u = updateUser(s.customer, s.customer_details?.email || s.customer_email, {
       plan: "pro", stripeCustomerId: s.customer, paidUntil,
-      subscriptionStatus: "active", currentPeriodEnd: paidUntil
+      subscriptionStatus: "active", currentPeriodEnd: paidUntil,
+      stripeSubscriptionId: s.subscription || null
     });
     if (u) {
-      console.log(`Stripe ✓ előfizetés aktiválva: ${u.email}`);
+      console.log(`Stripe ✓ előfizetés aktiválva: ${u.email}, lejár: ${paidUntil}`);
       mailer.sendPlanActivated(u.email, paidUntil).catch(e => console.error("Email hiba:", e.message));
     }
     else console.warn(`Stripe: felhasználó nem található – ${s.customer_details?.email}`);
@@ -1706,6 +1716,28 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason, promise) => {
   console.error("UNHANDLED REJECTION:", reason);
   // NE lépjünk ki – a szerver maradjon fent
+});
+
+
+// ── Admin: paidUntil szinkronizálás Stripe-ból ───────────────
+app.post("/api/admin/sync-stripe", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  if (!stripe) return res.status(500).json({ error: "Stripe nincs konfigurálva" });
+  const proUsers = usersDb.all().filter(u => u.plan === "pro" && u.stripeCustomerId);
+  let updated = 0;
+  for (const u of proUsers) {
+    try {
+      const subs = await stripe.subscriptions.list({ customer: u.stripeCustomerId, status: "active", limit: 1 });
+      if (subs.data.length) {
+        const sub = subs.data[0];
+        const paidUntil = new Date(sub.current_period_end * 1000).toISOString();
+        usersDb.update(u.id, { paidUntil, subscriptionStatus: "active", currentPeriodEnd: paidUntil });
+        console.log(`Stripe sync: ${u.email} → lejár: ${paidUntil}`);
+        updated++;
+      }
+    } catch(e) { console.error(`Stripe sync hiba (${u.email}):`, e.message); }
+  }
+  res.json({ ok: true, updated });
 });
 
 app.listen(PORT, () => {
