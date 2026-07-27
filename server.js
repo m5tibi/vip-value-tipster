@@ -1311,42 +1311,22 @@ app.post("/api/tips/send", async (req, res) => {
   if (!singlesToSend.length && !combosToSend.length) {
     return res.json({ ok: true, sent: 0, message: "Nincs kiküldendő (jóváhagyott, még el nem küldött) tipp." });
   }
-  let msg = `⚽ <b>90perc.hu – ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</b>\n\n`;
-  if (singlesToSend.length) {
-    msg += `🤖 <b>TIPPEK</b>\n<i>Web keresés, forma és statisztika alapján</i>\n\n`;
-    singlesToSend.forEach(t => {
-      msg += `${t.sportLabel} <b>${t.match}</b>\n`;
-      if (t.commence) msg += `🕐 ${t.commence}\n`;
-      msg += `📌 ${t.market} → <b>${t.pick}</b>\n💰 Odds: ${t.odds}\n💡 ${t.note}\n\n`;
-    });
-  }
-  if (combosToSend.length) {
-    msg += `\n🎰 <b>KOMBI TIPPEK</b>\n\n`;
-    combosToSend.forEach(c => {
-      msg += `<b>${c.legN} lábas kötés – Össz odds: ${c.odds}</b>\n`;
-      c.legs.forEach(l => { msg += `  • ${l.match}: ${l.pick} (${l.odds})\n`; });
-      msg += `\n`;
-    });
-  }
-  await sendTelegram(msg);
   const sentIds = new Set([...singlesToSend, ...combosToSend].map(t => t.id));
   const mark = t => sentIds.has(t.id) ? { ...t, sent: true } : t;
   history = history.map(mark); aiTips = aiTips.map(mark); comboTips = comboTips.map(mark);
   saveHistory();
   const total = singlesToSend.length + combosToSend.length;
-  console.log(`Tippek kiküldve Telegramra: ${total}`);
+  console.log(`Tippek kiküldve: ${total} (csak e-mail, Telegram nélkül)`);
 
   // E-mail értesítő az összes aktív előfizetőnek
-  if (singlesToSend.length || combosToSend.length) {
-    const recipients = usersDb.all().filter(u =>
-      !u.isAdmin && u.emailVerified !== false &&
-      (u.plan === "pro" || !auth.PAID_MODE)
-    );
-    console.log(`Tip e-mail küldése ${recipients.length} felhasználónak...`);
-    for (const u of recipients) {
-      mailer.sendNewTips(u.email, singlesToSend, combosToSend)
-        .catch(e => console.error(`Tip email hiba (${u.email}):`, e.message));
-    }
+  const recipients = usersDb.all().filter(u =>
+    !u.isAdmin && u.emailVerified !== false &&
+    (u.plan === "pro" || !auth.PAID_MODE)
+  );
+  console.log(`Tip e-mail küldése ${recipients.length} felhasználónak...`);
+  for (const u of recipients) {
+    mailer.sendNewTips(u.email, singlesToSend, combosToSend)
+      .catch(e => console.error(`Tip email hiba (${u.email}):`, e.message));
   }
 
   res.json({ ok: true, sent: total });
