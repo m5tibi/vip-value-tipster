@@ -73,6 +73,28 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
     }
   }
 
+  if (event.type === "customer.subscription.updated") {
+    const sub = event.data.object;
+    if (sub.cancel_at_period_end && sub.status === "active") {
+      // Lemondva, de még aktív az időszak végéig
+      const cancelledAt = new Date().toISOString();
+      const periodEnd = sub.current_period_end
+        ? new Date(sub.current_period_end * 1000).toISOString() : null;
+      const u = updateUser(sub.customer, null, { cancelledAt, paidUntil: periodEnd });
+      if (u) {
+        console.log(`Stripe: lemondva (időszak végéig aktív) – ${u.email}, lejár: ${periodEnd}`);
+        const adminEmail = process.env.ADMIN_EMAIL;
+        if (adminEmail) mailer.send({
+          to: adminEmail,
+          subject: `❌ Előfizetés lemondva – ${u.email}`,
+          text: `${u.email} lemondta előfizetését. Aktív marad: ${periodEnd}`,
+          html: `<p>A <b>${u.email}</b> lemondta a 90perc.hu előfizetését.</p><p>Aktív marad: <b>${periodEnd ? new Date(periodEnd).toLocaleDateString("hu-HU") : "–"}</b></p>`,
+        }).catch(e => console.error("Admin email hiba:", e.message));
+        mailer.sendPlanCancelled(u.email).catch(e => console.error("Email hiba:", e.message));
+      }
+    }
+  }
+
   if (event.type === "customer.subscription.deleted") {
     const sub = event.data.object;
     const cancelledAt = new Date().toISOString();
