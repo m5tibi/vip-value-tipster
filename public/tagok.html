@@ -183,7 +183,7 @@ function setFilter(f, btn) {
 function renderList() {
   const search = document.getElementById('search').value.toLowerCase();
   let list = allMembers.filter(u => !u.isAdmin);
-  if (currentFilter === 'pro') list = list.filter(u => u.plan === 'pro');
+  if (currentFilter === 'pro') list = list.filter(u => u.plan === 'pro' && !u.cancelledAt);
   if (currentFilter === 'free') list = list.filter(u => u.plan !== 'pro' && !u.cancelledAt);
   if (currentFilter === 'cancelled') list = list.filter(u => u.cancelledAt);
   if (search) list = list.filter(u => u.email.toLowerCase().includes(search));
@@ -195,12 +195,15 @@ function renderList() {
   el.innerHTML = list.map(u => {
     const isPro = u.plan === 'pro';
     const hasCancelled = !!u.cancelledAt;
-    const cardClass = isPro ? 'pro' : hasCancelled ? 'cancelled' : 'free';
-    const badge = isPro
-      ? '<span class="member-badge badge-pro">✅ FIZETŐ</span>'
-      : hasCancelled
-        ? '<span class="member-badge badge-cancelled">❌ Lemondott</span>'
-        : '<span class="member-badge badge-free">🔓 Ingyenes</span>';
+    const isActiveButCancelled = isPro && hasCancelled;
+    const cardClass = isActiveButCancelled ? 'cancelled' : isPro ? 'pro' : hasCancelled ? 'cancelled' : 'free';
+    const badge = isActiveButCancelled
+      ? '<span class="member-badge badge-cancelled">⚠️ Lemondva (még aktív)</span>'
+      : isPro
+        ? '<span class="member-badge badge-pro">✅ FIZETŐ</span>'
+        : hasCancelled
+          ? '<span class="member-badge badge-cancelled">❌ Lemondott</span>'
+          : '<span class="member-badge badge-free">🔓 Ingyenes</span>';
 
     const metaItems = [];
     metaItems.push(`Csatlakozott: ${u.createdAt ? new Date(u.createdAt).toLocaleDateString('hu-HU') : '–'}`);
@@ -227,13 +230,14 @@ function renderList() {
 
 function updateStats() {
   const members = allMembers.filter(u => !u.isAdmin);
-  const pro = members.filter(u => u.plan === 'pro').length;
+  const pro = members.filter(u => u.plan === 'pro' && !u.cancelledAt).length;
+  const proActive = members.filter(u => u.plan === 'pro').length;
   const cancelled = members.filter(u => u.cancelledAt).length;
   document.getElementById('s-total').textContent = members.length;
   document.getElementById('s-pro').textContent = pro;
   document.getElementById('s-mrr').textContent = (pro * 14990).toLocaleString('hu-HU');
   document.getElementById('s-cancelled').textContent = cancelled;
-  document.getElementById('page-sub').textContent = `${members.length} regisztrált tag · ${pro} fizető · MRR: ${(pro*14990).toLocaleString('hu-HU')} Ft`;
+  document.getElementById('page-sub').textContent = `${members.length} tag · ${pro} aktív fizető · ${cancelled} lemondott · MRR: ${(pro*14990).toLocaleString('hu-HU')} Ft`;
 }
 
 async function loadMembers() {
