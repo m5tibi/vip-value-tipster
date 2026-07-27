@@ -133,9 +133,10 @@
     <div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:12px;padding:22px;width:min(380px,100%)">
       <div id="auth-title" style="font-weight:700;color:#00e676;font-size:17px;margin-bottom:4px">Belépés</div>
       <div id="auth-sub" style="color:#78909c;font-size:12px;margin-bottom:14px">Lépj be a napi tippek megtekintéséhez.</div>
-      <input id="auth-email" type="email" placeholder="E-mail cím" autocomplete="email"
+      <form id="auth-form" onsubmit="event.preventDefault();authSubmit()" autocomplete="on">
+      <input id="auth-email" type="email" name="email" placeholder="E-mail cím" autocomplete="email"
              style="width:100%;box-sizing:border-box;padding:11px;border-radius:8px;border:1px solid #1e3a2f;background:#07111d;color:#e0e0e0;font-size:14px;margin-bottom:8px">
-      <input id="auth-pwd" type="password" placeholder="Jelszó" autocomplete="current-password"
+      <input id="auth-pwd" type="password" name="password" placeholder="Jelszó" autocomplete="current-password"
              onkeydown="if(event.key==='Enter')authSubmit()"
              style="width:100%;box-sizing:border-box;padding:11px;border-radius:8px;border:1px solid #1e3a2f;background:#07111d;color:#e0e0e0;font-size:14px;margin-bottom:8px">
       <div id="auth-err" style="color:#ef9a9a;font-size:12px;margin-bottom:10px;display:none"></div>
@@ -149,7 +150,8 @@
           <span>Elfogadom az <a href="/aszf.html" target="_blank" style="color:#00e676">ÁSZF</a>-et, és megismertem az <a href="/adatvedelem.html" target="_blank" style="color:#00e676">Adatkezelési tájékoztatót</a>.</span>
         </label>
       </div>
-      <button class="btn-send" style="width:100%;padding:11px;font-size:14px" onclick="authSubmit()" id="auth-submit">Belépés</button>
+      <button class="btn-send" type="submit" style="width:100%;padding:11px;font-size:14px" id="auth-submit">Belépés</button>
+      </form>
       <div id="auth-forgot" style="text-align:center;margin-top:10px">
         <a href="#" onclick="event.preventDefault();forgotPassword()" style="color:#546e7a;font-size:12px;text-decoration:none">Elfelejtetted a jelszavad?</a>
       </div>
