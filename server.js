@@ -1476,7 +1476,10 @@ app.get("/api/admin/users", (req, res) => {
     emailVerified: u.emailVerified !== false,
     isAdmin: !!u.isAdmin,
     createdAt: u.createdAt || null,
-    paidUntil: u.paidUntil || null
+    paidUntil: u.paidUntil || null,
+    cancelledAt: u.cancelledAt || null,
+    subscriptionStatus: u.subscriptionStatus || null,
+    stripeCustomerId: u.stripeCustomerId || null,
   }));
   res.json(list);
 });
