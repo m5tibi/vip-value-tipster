@@ -111,8 +111,11 @@ function publicView(u) {
   if (!u) return null;
   return {
     id: u.id, email: u.email, isAdmin: !!u.isAdmin, plan: u.plan,
-    emailVerified: u.emailVerified !== false,   // régi fiókok visszafelé kompatibilisen megerősítettek
-    subscriptionStatus: u.subscriptionStatus, currentPeriodEnd: u.currentPeriodEnd,
+    emailVerified: u.emailVerified !== false,
+    subscriptionStatus: u.subscriptionStatus,
+    currentPeriodEnd: u.currentPeriodEnd,
+    paidUntil: u.paidUntil || null,
+    stripeCustomerId: u.stripeCustomerId || null,
     createdAt: u.createdAt,
   };
 }
