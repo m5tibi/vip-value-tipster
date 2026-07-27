@@ -76,10 +76,11 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
   if (event.type === "customer.subscription.updated") {
     const sub  = event.data.object;
     const prev = event.data.previous_attributes || {};
-    // Csak akkor küldjük az értesítőt, ha MOST változott cancel_at_period_end true-ra
+    // Csak akkor küldjük az értesítőt, ha MOST változott cancel_at_period_end-re
+    // (ha szerepel a previous_attributes-ban, akkor biztosan változott)
     const justCancelled = sub.cancel_at_period_end &&
       sub.status === "active" &&
-      prev.cancel_at_period_end === false;
+      ('cancel_at_period_end' in prev || prev.cancel_at_period_end === false);
     if (justCancelled) {
       const cancelledAt  = new Date().toISOString();
       const periodEndTs  = sub.cancel_at || sub.current_period_end;
@@ -96,7 +97,7 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
           text: `${u.email} lemondta előfizetését. Aktív marad: ${endStr}`,
           html: `<p>A <b>${u.email}</b> lemondta a 90perc.hu előfizetését.</p><p>Aktív marad: <b>${endStr}</b></p>`,
         }).catch(e => console.error("Admin email hiba:", e.message));
-        mailer.sendPlanCancelled(u.email).catch(e => console.error("Email hiba:", e.message));
+        mailer.sendSubscriptionCancelled(u.email, periodEnd || u.paidUntil).catch(e => console.error("Email hiba:", e.message));
       }
     }
   }
@@ -107,7 +108,7 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
     const u = updateUser(sub.customer, null, { plan: "free", paidUntil: null, subscriptionStatus: "cancelled", currentPeriodEnd: null, cancelledAt });
     if (u) {
       console.log(`Stripe: lemondva – ${u.email}`);
-      mailer.sendPlanCancelled(u.email).catch(e => console.error("Email hiba:", e.message));
+      mailer.sendSubscriptionExpired(u.email).catch(e => console.error("Email hiba:", e.message));
       // Admin értesítő
       const adminEmail = process.env.ADMIN_EMAIL;
       if (adminEmail) mailer.send({
@@ -1005,7 +1006,7 @@ function checkExpiredSubscriptions() {
     const expiredAt = new Date().toISOString();
     usersDb.update(u.id, { plan: "free", subscriptionStatus: "cancelled", cancelledAt: expiredAt });
     console.log(`Előfizetés lejárt, visszaminősítve: ${u.email} (lejárt: ${u.paidUntil})`);
-    mailer.sendPlanCancelled(u.email).catch(e => console.error("Email hiba:", e.message));
+    mailer.sendSubscriptionExpired(u.email).catch(e => console.error("Email hiba:", e.message));
     const adminEmail = process.env.ADMIN_EMAIL;
     if (adminEmail) mailer.send({
       to: adminEmail,
