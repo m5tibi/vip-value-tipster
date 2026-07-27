@@ -74,21 +74,27 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
   }
 
   if (event.type === "customer.subscription.updated") {
-    const sub = event.data.object;
-    if (sub.cancel_at_period_end && sub.status === "active") {
-      // Lemondva, de még aktív az időszak végéig
-      const cancelledAt = new Date().toISOString();
-      const periodEnd = sub.current_period_end
-        ? new Date(sub.current_period_end * 1000).toISOString() : null;
-      const u = updateUser(sub.customer, null, { cancelledAt, paidUntil: periodEnd });
+    const sub  = event.data.object;
+    const prev = event.data.previous_attributes || {};
+    // Csak akkor küldjük az értesítőt, ha MOST változott cancel_at_period_end true-ra
+    const justCancelled = sub.cancel_at_period_end &&
+      sub.status === "active" &&
+      prev.cancel_at_period_end === false;
+    if (justCancelled) {
+      const cancelledAt  = new Date().toISOString();
+      const periodEndTs  = sub.cancel_at || sub.current_period_end;
+      const periodEnd    = periodEndTs ? new Date(periodEndTs * 1000).toISOString() : null;
+      const patch        = { cancelledAt, ...(periodEnd ? { paidUntil: periodEnd } : {}) };
+      const u = updateUser(sub.customer, null, patch);
       if (u) {
-        console.log(`Stripe: lemondva (időszak végéig aktív) – ${u.email}, lejár: ${periodEnd}`);
+        const endStr = periodEnd ? new Date(periodEnd).toLocaleDateString("hu-HU") : (u.paidUntil ? new Date(u.paidUntil).toLocaleDateString("hu-HU") : "–");
+        console.log(`Stripe: lemondva (időszak végéig aktív) – ${u.email}, lejár: ${endStr}`);
         const adminEmail = process.env.ADMIN_EMAIL;
         if (adminEmail) mailer.send({
           to: adminEmail,
           subject: `❌ Előfizetés lemondva – ${u.email}`,
-          text: `${u.email} lemondta előfizetését. Aktív marad: ${periodEnd}`,
-          html: `<p>A <b>${u.email}</b> lemondta a 90perc.hu előfizetését.</p><p>Aktív marad: <b>${periodEnd ? new Date(periodEnd).toLocaleDateString("hu-HU") : "–"}</b></p>`,
+          text: `${u.email} lemondta előfizetését. Aktív marad: ${endStr}`,
+          html: `<p>A <b>${u.email}</b> lemondta a 90perc.hu előfizetését.</p><p>Aktív marad: <b>${endStr}</b></p>`,
         }).catch(e => console.error("Admin email hiba:", e.message));
         mailer.sendPlanCancelled(u.email).catch(e => console.error("Email hiba:", e.message));
       }
