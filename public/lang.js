@@ -108,6 +108,8 @@
         cta_sub:        'Regisztrálj, vagy kövess minket Telegramon — és azonnal hozzáférsz a napi tippekhez.',
         cta_btn1:       'Regisztrálok →',
         cta_tg:         'Telegram csatorna',
+        card_market:    'Over 2.5 gól',
+        card_pick:      'Mindkét csapat szerez gólt',
       },
 
       /* ── STATISZTIKA ── */
@@ -154,6 +156,8 @@
         cta_sub:        'Regisztrálj és azonnal hozzáférsz a napi tippekhez – fizetési kötelezettség nélkül.',
         cta_btn:        'Regisztrálok ingyen →',
         cta_tg:         'Telegram csatorna',
+        unit:           'egység',
+        footer_note:    'Az adatok automatikusan, manipuláció nélkül kerülnek rögzítésre. 18+',
       },
 
       /* ── ELŐFIZETÉS ── */
@@ -209,6 +213,7 @@
         done_sub:       'Be is léptettünk – jó szórakozást!',
         done_btn:       'Tovább a tippekhez',
         back:           '← Vissza a főoldalra',
+        err_network:    'Hálózati hiba',
       },
 
       /* ── TIPPEK ── */
@@ -268,6 +273,21 @@
         guide_price_body:  '<strong style="color:#00e676">14 990 Ft/hó</strong> — regisztrálj, majd fizess elő a napi tippekhez.',
         no_analysis:    'Még nem futott elemzés',
         single_title:   '🤖 Single tippek',
+        paywall_title:  'Aktív előfizetés szükséges',
+        paywall_body:   'A napi tippek megtekintéséhez előfizetés kell.<br/>Az eddigi eredmények az Előzmények fülön szabadon megtekinthetők.',
+        paywall_btn:    '⭐ Előfizetek – 14 990 Ft/hó',
+        single_sub:     'Valós web keresés alapján, forma és statisztika elemzéssel',
+        combo_sub:      'Biztonságosabb lábakból, több különböző meccsről',
+        history_stats:  '📊 Előzmény & statisztika',
+        nav_analyzer:   '⚡ Elemző',
+        pending_approval: '⏳ Jóváhagyásra vár (rejtett)',
+        footer_disclaimer: '<b style="color:#ffcc80">18+</b> · A tippek <b>nem garantálnak nyereséget</b>, tájékoztató jellegűek — a fogadás minden döntése a felhasználó saját felelőssége.',
+        footer_gamble:     'A szerencsejáték függőséget okozhat. Segítség: <b style="color:#ffcc80">116-123</b> (ingyenes, éjjel-nappal)',
+        err_email_pwd:     'Add meg az e-mail címet és a jelszót!',
+        err_under18:       'A szolgáltatás csak 18 éven felülieknek érhető el.',
+        err_terms:         'A regisztrációhoz el kell fogadnod az ÁSZF-et.',
+        success_reg:       '🎉 Sikeres regisztráció – nézd meg a postafiókod!',
+        success_login:     '👋 Üdv újra!',
       },
 
       /* ── ANALYZER ── */
@@ -417,6 +437,8 @@
         cta_sub:        'Register, or follow us on Telegram — and get instant access to daily tips.',
         cta_btn1:       'Register →',
         cta_tg:         'Telegram channel',
+        card_market:    'Over 2.5 goals',
+        card_pick:      'Both teams to score',
       },
 
       /* ── STATISZTIKA ── */
@@ -463,6 +485,8 @@
         cta_sub:        'Register and get instant access to daily tips — no payment required.',
         cta_btn:        'Register for free →',
         cta_tg:         'Telegram channel',
+        unit:           'units',
+        footer_note:    'Data is recorded automatically, without manipulation. 18+',
       },
 
       /* ── ELŐFIZETÉS ── */
@@ -518,6 +542,7 @@
         done_sub:       'You\'re now logged in — enjoy!',
         done_btn:       'Go to tips',
         back:           '← Back to home',
+        err_network:    'Network error',
       },
 
       /* ── TIPPEK ── */
@@ -577,6 +602,21 @@
         guide_price_body:  '<strong style="color:#00e676">14,990 HUF/month</strong> — register, then subscribe for daily tips.',
         no_analysis:    'No analysis run yet',
         single_title:   '🤖 Single tips',
+        paywall_title:  'Active subscription required',
+        paywall_body:   'A subscription is needed to view daily tips.<br/>Past results are freely viewable in the History tab.',
+        paywall_btn:    '⭐ Subscribe – 14,990 HUF/month',
+        single_sub:     'Based on real web search, form and statistical analysis',
+        combo_sub:      'Safer legs from multiple different matches',
+        history_stats:  '📊 History & statistics',
+        nav_analyzer:   '⚡ Analyzer',
+        pending_approval: '⏳ Awaiting approval (hidden)',
+        footer_disclaimer: '<b style="color:#ffcc80">18+</b> · Tips <b>do not guarantee profit</b>, they are informational — all betting decisions are the user's own responsibility.',
+        footer_gamble:     'Gambling can be addictive. Help: <b style="color:#ffcc80">116-123</b> (free, 24/7)',
+        err_email_pwd:     'Please enter your email address and password!',
+        err_under18:       'This service is only available to users 18 and over.',
+        err_terms:         'You must accept the Terms of Service to register.',
+        success_reg:       '🎉 Registration successful – check your inbox!',
+        success_login:     '👋 Welcome back!',
       },
 
       /* ── ANALYZER ── */

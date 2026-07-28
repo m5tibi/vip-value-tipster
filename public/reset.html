@@ -70,7 +70,7 @@ async function submitReset() {
     document.getElementById('done-view').style.display = '';
   } catch(e) {
     btn.disabled = false; btn.textContent = window.t('reset.btn');
-    showErr('Hálózati hiba: ' + e.message);
+    showErr(window.t('reset.err_network') + ': ' + e.message);
   }
 }
 </script>

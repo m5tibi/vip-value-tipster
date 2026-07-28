@@ -87,7 +87,7 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
 
     <!-- Aktív előfizetés állapot -->
     <div class="status-box" id="status-box">
-      ✅ Aktív előfizetésed van – lejár: <b id="paid-until">–</b>
+      <span data-i18n="sub.active_box">✅ Aktív előfizetésed van – lejár:</span> <b id="paid-until">–</b>
     </div>
 
     <div class="plan-card">
@@ -185,7 +185,7 @@ async function openPortal() {
     const d = await r.json();
     if (d.url) window.location.href = d.url;
   } catch(e) {
-    btn.textContent = 'Hiba – próbáld újra';
+    btn.textContent = window.t('sub.err_generic');
   }
   btn.disabled = false;
 }

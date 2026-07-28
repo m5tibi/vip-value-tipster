@@ -200,7 +200,7 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
     <button class="filter-btn" onclick="setFilter('half_lost',this)" data-i18n="stat.f_half_lost">½❌ Fél veszett</button>
     <button class="filter-btn" onclick="setFilter('lost',this)" data-i18n="stat.f_lost">❌ Veszett</button>
   </div>
-  <div id="tips-table"><div class="loading">Adatok betöltése...</div></div>
+  <div id="tips-table"><div class="loading" data-i18n="stat.loading">Adatok betöltése...</div></div>
 </div>
 
 <div class="cta-box">
@@ -219,11 +219,11 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
 
 <footer>
   <p>© 2026 90perc.hu ·
-    <a href="/">Főoldal</a> ·
+    <a href="/" data-i18n="nav.main">Főoldal</a> ·
     <a href="/tippek.html" data-i18n="nav.tips">Tippek</a> ·
     <a href="/analyzer.html" data-i18n="nav.analyzer">Elemző</a> ·
-    <a href="/aszf.html">ÁSZF</a> ·
-    Az adatok automatikusan, manipuláció nélkül kerülnek rögzítésre. 18+
+    <a href="/aszf.html" data-i18n="footer.tos">ÁSZF</a> ·
+    <span data-i18n="stat.footer_note">Az adatok automatikusan, manipuláció nélkül kerülnek rögzítésre. 18+</span>
   </p>
 </footer>
 
@@ -245,6 +245,9 @@ const RESULT_CLASS = {
 
 const HU_MONTHS = ['Január','Február','Március','Április','Május','Június',
                    'Július','Augusztus','Szeptember','Október','November','December'];
+const EN_MONTHS = ['January','February','March','April','May','June',
+                   'July','August','September','October','November','December'];
+function monthName(i) { return (window.getLang&&window.getLang()==='en'?EN_MONTHS:HU_MONTHS)[i]; }
 
 function tipProfit(t) {
   const o = parseFloat(t.odds) || 1;
@@ -364,7 +367,7 @@ function setPeriod(period, btn) {
     titleNode.textContent = window.t('stat.chart_title');
   } else {
     const [year, month] = period.split('-');
-    titleNode.textContent = `${year} ${HU_MONTHS[parseInt(month, 10) - 1]} – ${window.t('stat.chart_title')}`;
+    titleNode.textContent = `${year} ${monthName(parseInt(month, 10) - 1)} – ${window.t('stat.chart_title')}`;
   }
 
   const periodTips = getPeriodTips();
@@ -379,7 +382,7 @@ function buildPeriodPicker(tips) {
   const bar = document.getElementById('period-bar');
   months.forEach(m => {
     const [year, month] = m.split('-');
-    const label = `${HU_MONTHS[parseInt(month, 10) - 1]} ${year}`;
+    const label = `${monthName(parseInt(month, 10) - 1)} ${year}`;
     const btn = document.createElement('button');
     btn.className = 'period-btn';
     btn.textContent = label;
@@ -468,7 +471,7 @@ function drawChart(tips) {
   ctx.fill();
 
   document.getElementById('chart-current').textContent =
-    (cum >= 0 ? '+' : '') + cum.toFixed(2) + ' egység';
+    (cum >= 0 ? '+' : '') + cum.toFixed(2) + ' ' + window.t('stat.unit');
   document.getElementById('chart-current').style.color = isPositive ? '#00e676' : '#ef4444';
 }
 
