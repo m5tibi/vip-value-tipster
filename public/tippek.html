@@ -289,6 +289,13 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
 </div>
 
 <script>
+// Safety fallback – ha lang.js nem töltődött be
+if (typeof window.t !== "function") {
+  window.t = function(k, fb) { return fb || k.split(".").pop(); };
+  window.getLang = function() { return "hu"; };
+  window.setLang = function() {};
+  window.toggleLang = function() {};
+}
 let aiTips = [], comboTips = [], history = [];
 let msRemaining = 0;
 let dayCounter = 0;
