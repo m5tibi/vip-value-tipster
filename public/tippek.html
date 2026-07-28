@@ -113,7 +113,7 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
         <span data-i18n="tips.paywall_btn">⭐ Előfizetek – 14 990 Ft/hó</span>
       </a>
     </div>
-    <div style="font-size:11px;color:#37474f">Bármikor lemondható · Biztonságos Stripe fizetés</div>
+    <div style="font-size:11px;color:#37474f" data-i18n="tips.cancellable">Bármikor lemondható · Biztonságos Stripe fizetés</div>
   </div>
 
   <div id="live-stats-bar" style="display:none;background:#0a1f14;border:1px solid #1e3a2f;border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:center">
@@ -277,7 +277,7 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
     <div style="margin-bottom:6px">
       <a href="/" style="color:#80cbc4;text-decoration:none" data-i18n="nav.main">Főoldal</a> ·
       <a href="/analyzer.html" style="color:#80cbc4;text-decoration:none" data-i18n="nav.analyzer">Elemző</a> ·
-      <a href="https://t.me/+rMoqrue6DBFlZmVk" target="_blank" rel="noopener" style="color:#229ED9;text-decoration:none">📱 Telegram csatorna</a> ·
+      <a href="https://t.me/+rMoqrue6DBFlZmVk" target="_blank" rel="noopener" style="color:#229ED9;text-decoration:none">📱 <span data-i18n="nav.telegram_ch">Telegram csatorna</span></a> ·
       <a href="/aszf.html" style="color:#80cbc4;text-decoration:none" data-i18n="footer.tos">ÁSZF</a> ·
       <a href="/adatvedelem.html" style="color:#80cbc4;text-decoration:none" data-i18n="footer.privacy">Adatkezelési tájékoztató</a>
     </div>
@@ -457,7 +457,7 @@ async function handleAdminResp(r, okMsg) {
   return true;
 }
 
-document.getElementById("today").textContent = new Date().toLocaleDateString("hu-HU", {year:"numeric",month:"long",day:"numeric"});
+document.getElementById("today").textContent = new Date().toLocaleDateString(window.getLang()==="en"?"en-GB":"hu-HU", {year:"numeric",month:"long",day:"numeric"});
 
 function showStatus(msg, color) {
   const el = document.getElementById("tg-status");
@@ -705,7 +705,7 @@ function renderHistory() {
     if (lsWr)  { lsWr.textContent = wr; lsWr.style.color = profit >= 0 ? "#00e676" : "#ef9a9a"; }
     if (lsPr)  { lsPr.textContent = (profit >= 0 ? "+" : "") + profit.toFixed(2); lsPr.style.color = profit >= 0 ? "#f59e0b" : "#ef9a9a"; }
     if (lsRoi) { lsRoi.textContent = roi !== "–" ? (profit >= 0 ? "+" : "") + roi + "%" : "–"; lsRoi.style.color = profit >= 0 ? "#00e676" : "#ef9a9a"; }
-    if (lsSt)  { lsSt.textContent = settled.length + " lezárt tipp alapján"; }
+    if (lsSt)  { lsSt.textContent = settled.length + " " + window.t("tips.settled_basis"); }
   }
 
   const el = document.getElementById("history-list");
@@ -851,17 +851,17 @@ function renderLocked(needSubscription) {
   document.getElementById("ai-list").innerHTML = needSubscription
     ? `<div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:12px;padding:28px;text-align:center">
          <div style="font-size:32px;margin-bottom:8px">🔒</div>
-         <div style="font-weight:700;color:#fff;font-size:16px;margin-bottom:6px" data-i18n="tips.paywall_title">Aktív előfizetés szükséges</div>
-         <div style="color:#78909c;font-size:13px;margin-bottom:18px" data-i18n-html="tips.paywall_body2">A napi tippek megtekintéséhez előfizetés kell.<br>Az eddigi eredmények az <b>Előzmények</b> fülön szabadon megtekinthetők.</div>
-         <a href="/elofizetes.html" style="display:inline-block;background:#00e676;color:#060e1b;font-weight:700;font-size:15px;padding:12px 28px;border-radius:9px;text-decoration:none;box-shadow:0 0 20px rgba(0,230,118,.25)"><span data-i18n="tips.paywall_btn">⭐ Előfizetek – 14 990 Ft/hó</span></a>
-         <div style="margin-top:10px;font-size:11px;color:#37474f">Bármikor lemondható · Biztonságos Stripe fizetés</div>
+         <div style="font-weight:700;color:#fff;font-size:16px;margin-bottom:6px">${window.t('tips.paywall_title')}</div>
+         <div style="color:#78909c;font-size:13px;margin-bottom:18px">${window.t('tips.paywall_body2')}</div>
+         <a href="/elofizetes.html" style="display:inline-block;background:#00e676;color:#060e1b;font-weight:700;font-size:15px;padding:12px 28px;border-radius:9px;text-decoration:none;box-shadow:0 0 20px rgba(0,230,118,.25)">${window.t('tips.paywall_btn')}</a>
+         <div style="margin-top:10px;font-size:11px;color:#37474f">${window.t('tips.cancellable')}</div>
        </div>`
     : `<div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:12px;padding:24px;text-align:center">
          <div style="font-size:32px;margin-bottom:8px">🔒</div>
-         <div style="font-weight:700;color:#00e676;font-size:16px;margin-bottom:6px" data-i18n="tips.login_cta_title">A napi tippekhez lépj be</div>
-         <div style="color:#78909c;font-size:13px;margin-bottom:14px" data-i18n-html="tips.login_cta_body">A regisztráció <b style="color:#a5d6a7">ingyenes</b>, és azonnal látod az aznapi tippeket.<br>Az eddigi eredményeinket az <b>Előzmények</b> fülön előzetesen is megnézheted.</div>
+         <div style="font-weight:700;color:#00e676;font-size:16px;margin-bottom:6px">${window.t('tips.login_cta_title')}</div>
+         <div style="color:#78909c;font-size:13px;margin-bottom:14px">${window.t('tips.login_cta_body')}</div>
          <button class="btn-send" style="padding:11px 22px;font-size:14px" onclick="openAuthModal('register')">${window.t('tips.reg_cta')}</button>
-         <div style="margin-top:10px;font-size:12px;color:#546e7a"><span data-i18n="tips.has_account">Van már fiókod?</span> <a href="#" onclick="event.preventDefault();openAuthModal('login')" style="color:#00e676;font-weight:700;text-decoration:none" data-i18n="tips.login_link">Lépj be</a></div>
+         <div style="margin-top:10px;font-size:12px;color:#546e7a">${window.t('tips.has_account')} <a href="#" onclick="event.preventDefault();openAuthModal('login')" style="color:#00e676;font-weight:700;text-decoration:none">${window.t('tips.login_link')}</a></div>
        </div>`;
 }
 
@@ -882,7 +882,7 @@ async function loadTips() {
     tipsEverLoaded = true;
     tipsRetryDelay = 3000;
     tipsErrLogged  = false;
-    document.getElementById("last-update").textContent="Frissítve: "+new Date().toLocaleTimeString("hu-HU");
+    document.getElementById("last-update").textContent="Frissítve: "+new Date().toLocaleTimeString(window.getLang()==="en"?"en-GB":"hu-HU");
     renderTips();
   } catch(e) {
     // Egyszer logolunk, nem árasztjuk el a konzolt. A meglévő tippeket NEM ürítjük.

@@ -20,6 +20,7 @@
 
       nav: {
         tips:      'Tippek',
+        telegram_ch: 'Telegram csatorna',
         analyzer:  'Elemző',
         track:     'Track Record',
         telegram:  'Telegram',
@@ -288,6 +289,8 @@
         err_terms:         'A regisztrációhoz el kell fogadnod az ÁSZF-et.',
         success_reg:       '🎉 Sikeres regisztráció – nézd meg a postafiókod!',
         success_login:     '👋 Üdv újra!',
+        cancellable:        'Bármikor lemondható · Biztonságos Stripe fizetés',
+        settled_basis:      'lezárt tipp alapján',
         combo_title:        '🎰 Kombi tippek',
         footer_disclaimer2: '<b style="color:#ffcc80">18+</b> · A tippek <b>nem garantálnak nyereséget</b>, tájékoztató jellegűek — a fogadás pénzügyi veszteséggel járhat.',
         login_cta_title:    'A napi tippekhez lépj be',
@@ -361,6 +364,7 @@
 
       nav: {
         tips:      'Tips',
+        telegram_ch: 'Telegram channel',
         analyzer:  'Analyzer',
         track:     'Track Record',
         telegram:  'Telegram',
@@ -629,6 +633,8 @@
         err_terms:         'You must accept the Terms of Service to register.',
         success_reg:       '🎉 Registration successful – check your inbox!',
         success_login:     '👋 Welcome back!',
+        cancellable:        'Cancel anytime · Secure Stripe payment',
+        settled_basis:      'settled tips',
         combo_title:        '🎰 Combo tips',
         footer_disclaimer2: '<b style="color:#ffcc80">18+</b> · Tips <b>do not guarantee profit</b>, they are informational — betting can result in financial loss.',
         login_cta_title:    'Sign in for daily tips',
@@ -712,14 +718,13 @@
   };
 
   window.getLang  = () => lang;
+  window.applyLangDOM = applyDOM;
   window.setLang  = function (l) {
     lang = l;
     localStorage.setItem('90perc_lang', l);
     applyDOM();
-    // Re-render JS-driven pages
-    if (typeof window.R === 'function') window.R();
-    // Re-render tippek page if applicable
-    if (typeof window.renderTips === 'function') window.renderTips();
+    if (typeof window.R === 'function') { window.R(); applyDOM(); }
+    if (typeof window.renderTips === 'function') { window.renderTips(); applyDOM(); }
   };
   window.toggleLang = () => window.setLang(lang === 'hu' ? 'en' : 'hu');
 

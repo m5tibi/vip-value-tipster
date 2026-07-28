@@ -211,7 +211,7 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
       <a class="btn-primary" href="/tippek.html" data-i18n="stat.cta_btn">Regisztrálok ingyen →</a>
       <a class="btn-tg" href="https://t.me/+rMoqrue6DBFlZmVk" target="_blank" rel="noopener">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248l-2.018 9.51c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.881.71z"/></svg>
-        Telegram csatorna
+        <span data-i18n="nav.telegram_ch">Telegram csatorna</span>
       </a>
     </div>
   </div>
@@ -261,7 +261,7 @@ function tipProfit(t) {
 function formatDate(d) {
   if (!d) return '–';
   const dt = new Date(d);
-  return dt.toLocaleDateString('hu-HU', { month:'short', day:'numeric' });
+  return dt.toLocaleDateString(window.getLang()==='en'?'en-GB':'hu-HU', { month:'short', day:'numeric' });
 }
 
 function getYearMonth(dateStr) {
