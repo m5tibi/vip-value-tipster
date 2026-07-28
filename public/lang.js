@@ -1,0 +1,641 @@
+/**
+ * 90perc.hu – Language / i18n system
+ * Usage:
+ *   window.t('key.sub')   → translated string
+ *   window.toggleLang()   → switch HU ↔ EN
+ *   window.getLang()      → 'hu' | 'en'
+ *   data-i18n="key"       → textContent replacement
+ *   data-i18n-html="key"  → innerHTML replacement
+ *   data-i18n-placeholder="key" → placeholder replacement
+ */
+(function () {
+
+  /* ─────────────────────────────────────────
+     TRANSLATION DICTIONARY
+  ───────────────────────────────────────── */
+  const T = {
+
+    hu: {
+      lang_toggle: '🇬🇧 EN',
+
+      nav: {
+        tips:      'Tippek',
+        analyzer:  'Elemző',
+        track:     'Track Record',
+        telegram:  'Telegram',
+        login:     'Belépés',
+        free_cta:  'Ingyenes belépés →',
+        back:      '← Vissza',
+        main:      'Főoldal',
+        pro:       '⭐ Pro',
+      },
+
+      footer: {
+        disclaimer: 'A 90perc.hu nem nyújt pénzügyi tanácsadást. Fogadj felelősen, csak 18 éven felülieknek.',
+        privacy:    'Adatvédelem',
+        tos:        'ÁSZF',
+        main:       'Főoldal',
+      },
+
+      /* ── INDEX ── */
+      index: {
+        title:          '90perc.hu – AI-alapú foci elemzés és tippek',
+        hero_eyebrow:   'Élő AI elemzés · Ingyenes hozzáférés',
+        hero_h1:        'Fogadj okosabban.<br/><em>Minden meccsnél.</em>',
+        hero_sub:       'A 90perc.hu mesterséges intelligenciával elemzi a közelgő foci meccseket — valós formát, sérüléseket és statisztikákat figyelembe véve. Nem tipp. <strong>Érvelés.</strong>',
+        hero_cta1:      'Regisztrálok',
+        hero_cta2:      'Hogyan működik?',
+        card_time:      'Ma 20:45',
+        card_badge:     '✓ NYERT',
+        stat_wr:        'Nyerési arány (single tippek)',
+        stat_profit:    'Egységnyi profit',
+        stat_roi:       'ROI',
+        stat_leagues:   'Liga figyelve folyamatosan',
+        prob_eyebrow:   'Miért van erre szükség?',
+        prob_title:     'A fogadás nem szerencse.<br/>De az elemzés időbe kerül.',
+        prob_sub:       'Jó döntést hozni egy fogadásnál nem lehetetlen — csak rengeteg munkával jár, amit a legtöbb embernek nincs ideje elvégezni.',
+        p1_title:       'Órákat vesz el',
+        p1_body:        'Forma, sérülések, H2H, motiváció — minden egyes meccs előtt manuálisan utánaolvasni elfáraszt.',
+        p2_title:       'A tipsterek nem átláthatók',
+        p2_body:        'Nem tudod, ki áll mögöttük, mi az érvelés, és a rossz tippeket simán el lehet tüntetni.',
+        p3_title:       'Az AI önmagában nem elég',
+        p3_body:        'Egy sima ChatGPT promptból hiányoznak a valós, friss adatok — és az sem tudja, hogyan kérdezz.',
+        how_eyebrow:    'A rendszer',
+        how_title:      'Hogyan működik a 90perc.hu?',
+        how_sub:        'Három lépés, teljesen automatizálva — emberi felügyelettel.',
+        step1_h:        'Valós idejű adatgyűjtés',
+        step1_p:        'A rendszer 36 liga közelgő meccseit figyeli folyamatosan. Minden meccsre lekéri a valós bookmaker oddsokat több fogadóirodától — hendikep, gólszám és győztes piacokon egyaránt.',
+        step2_h:        'AI elemzés web kereséssel',
+        step2_p:        'A Claude AI minden egyes meccsre valós web keresést végez: aktuális forma, sérülési lista, egymás elleni előzmények, taktikai kontextus. Az elemzés nem sablonból dolgozik — minden meccshez friss adatokat keres.',
+        step3_h:        'Emberi jóváhagyás, majd közzététel',
+        step3_p:        'Minden AI-javaslatot admin ellenőriz, mielőtt megjelenne. A jóváhagyott tippek egyszerre kerülnek fel a weboldalra és a Telegram-csatornára. Az eredményeket a rendszer automatikusan ellenőrzi és rögzíti.',
+        feat_eyebrow:   'Mit kapsz?',
+        feat_title:     'Minden, ami kell a jobb döntéshez.',
+        f1_h:           'Napi AI tippek',
+        f1_p:           'Rendszeres single tippek és kombinációk, kizárólag a legerősebb lehetőségekre — indoklással együtt.',
+        f1_tag:         'Főoldalon',
+        f2_h:           'Meccs elemző',
+        f2_p:           'Bármely foci mérkőzésre kérhetsz mély elemzést. Írd be a meccset, és az AI megbízhatóság szerint rangsorolva adja a tipp-javaslatokat.',
+        f2_tag:         'Elemző oldal',
+        f3_h:           'Telegram értesítések',
+        f3_p:           'A jóváhagyott tippek azonnal megérkeznek a Telegram-csatornára — nem maradsz le semmiről.',
+        f3_tag:         'Telegram',
+        f4_h:           'Átlátható track record',
+        f4_p:           'Minden tipp időbélyeggel kerül fel, az eredmény automatikusan rögzítve. Semmi sem tüntethető el utólag.',
+        f4_tag:         'Előzmény oldal',
+        tr_eyebrow:     'Miért bízz bennünk?',
+        tr_title:       'A track record mindent megmutat.',
+        tr_sub:         'Az egyetlen dolog, ami egy tipp-szolgáltatásnál igazán számít: mit mutat a múlt?',
+        tr_p1:          'A 90perc.hu-n minden tipp <strong>nyilvánosan látható időbélyeggel</strong> kerül fel — még azelőtt, hogy a meccs elkezdődne. Nem utólag, nem szerkesztve. Amit kinn van, az marad.',
+        tr_p2:          'Az eredményeket <strong>automatikusan értékeli ki a rendszer</strong> a mérkőzés után, valós eredmény-adatbázis alapján. Nincs kézi beavatkozás, nincs „elfelejtett" vesztes tipp.',
+        tr_p3:          'Az Előzmény oldalon bárki visszanézhet minden korábbi tippet: <strong>nyert, vesztett, visszajár</strong> — a nyers számokkal együtt. Ez a mi bizonyítványunk. Ha nem állná meg a helyét, nem mutatnánk meg.',
+        faq_eyebrow:    'Kérdések',
+        faq_title:      'Amit a legtöbben kérdeznek.',
+        faq1_q:         'Garantált a nyereség?',
+        faq1_a:         'Nem, és aki ezt állítja, az hazudik. A sportfogadás hosszú távon is rizikóval jár. A 90perc.hu célja, hogy jobb döntések születhessenek több adat és alaposabb elemzés alapján — de a nyereség soha nem garantálható. Felelősen, a saját döntésed alapján fogadj.',
+        faq2_q:         'Miért jobb ez egy sima tipster Telegram-csatornánál?',
+        faq2_a:         'Két okból. Először: az elemzés látható — nem csak a tipp, hanem az érvelés is, konkrét adatokkal. Másodszor: az eredmények automatikusan, manipuláció nélkül kerülnek rögzítésre. Egy tipster-csatornán a rossz tippek egyszerűen eltüntethetők. Nálunk nem.',
+        faq3_q:         'Miért nem elég egy sima ChatGPT-előfizetés helyette?',
+        faq3_a:         'Egy általános AI-nak nincs valós idejű hozzáférése a bookmaker oddsokhoz, a friss sérülési listákhoz és a mai forma-adatokhoz. A 90perc.hu rendszere pontosan ezeket gyűjti össze és adja az AI-nak — plusz az eredmények nyomon követése, Telegram integráció és az előzmény mind olyan réteg, amit egy sima chatbottal magadnak kellene felépíteni.',
+        faq4_q:         'Mennyibe kerül az előfizetés?',
+        faq4_a:         'A havi előfizetés díja 14 990 Ft/hó, bármikor lemondható. A regisztráció ingyenes — előfizetés nélkül a lezárt tippek és a track record szabadon megtekinthető.',
+        faq5_q:         'Hogyan értékelitek ki az eredményeket?',
+        faq5_a:         'Automatikusan, valós eredmény-adatbázisból. A rendszer a mérkőzés befejezése után lekéri a végleges eredményt, és az ázsiai hendikepes tételeket is pontosan kalkulálja (fél nyert, fél visszajár logikával). Kézi módosításra csak adminisztrátori jóváhagyással van lehetőség, és az is naplózásra kerül.',
+        faq6_q:         'Milyen ligákat követ a rendszer?',
+        faq6_a:         '36 ligát és kupát folyamatosan — a Premier League-től a Bundesligán, La Ligán, Serie A-n és Ligue 1-en át egészen a Copa Libertadoresig, MLS-ig és a J1 League-ig. A VB 2026-os meccseket szintén elemzi.',
+        cta_badge:      '✦ 14 990 Ft/hó · Bármikor lemondható',
+        cta_h2:         'Próbáld ki.<br/><em>Nem kerül semmibe.</em>',
+        cta_sub:        'Regisztrálj, vagy kövess minket Telegramon — és azonnal hozzáférsz a napi tippekhez.',
+        cta_btn1:       'Regisztrálok →',
+        cta_tg:         'Telegram csatorna',
+      },
+
+      /* ── STATISZTIKA ── */
+      stat: {
+        title:          'Track Record – 90perc.hu',
+        page_title:     'Track Record – 90perc.hu',
+        eyebrow:        'Élő adatok · Automatikusan frissítve',
+        h1:             'Minden tipp.<br/><em>Nyilvánosan.</em>',
+        sub:            'Nem törölhetünk, nem módosíthatunk. Amit kinn van, az marad – az eredménnyel együtt.',
+        period_label:   '📅 Időszak',
+        all_time:       '📊 Összes (all-time)',
+        s_settled:      'Lezárt tipp',
+        s_wr:           'Nyerési arány',
+        s_wr_sub:       'döntetlen és fél-eredmény nélkül',
+        s_profit:       'Profit (egység)',
+        s_profit_sub:   '1 egység = 1 téted',
+        s_roi:          'ROI',
+        s_roi_sub:      'return on investment',
+        chart_title:    'Kumulatív profit alakulása',
+        f_all:          'Összes',
+        f_won:          '✅ Nyert',
+        f_half_won:     '½✅ Fél nyert',
+        f_push:         '↩️ Visszajár',
+        f_half_lost:    '½❌ Fél veszett',
+        f_lost:         '❌ Veszett',
+        th_date:        'Dátum',
+        th_match:       'Meccs',
+        th_pick:        'Tipp',
+        th_odds:        'Odds',
+        th_result:      'Eredmény',
+        th_pl:          'P/L',
+        r_won:          '✅ Nyert',
+        r_lost:         '❌ Veszett',
+        r_push:         '↩️ Visszajár',
+        r_half_won:     '½✅ Fél nyert',
+        r_half_lost:    '½❌ Fél veszett',
+        r_pending:      '⏳ Folyamatban',
+        no_data:        'Nincs adat ebben az időszakban',
+        no_filter:      'Nincs találat ebben a szűrőben.',
+        loading:        'Adatok betöltése...',
+        load_err:       'Adatok betöltése sikértelen. Próbáld újra később.',
+        settled_count:  'lezárt tipp ebben a nézetben',
+        cta_h2:         'Meggyőzött a track record?<br/><em>Csatlakozz ingyen.</em>',
+        cta_sub:        'Regisztrálj és azonnal hozzáférsz a napi tippekhez – fizetési kötelezettség nélkül.',
+        cta_btn:        'Regisztrálok ingyen →',
+        cta_tg:         'Telegram csatorna',
+      },
+
+      /* ── ELŐFIZETÉS ── */
+      sub: {
+        title:          'Előfizetés – 90perc.hu',
+        eyebrow:        'Prémium hozzáférés',
+        h1:             'Egyetlen csomag.<br/><em>Minden benne van.</em>',
+        sub:            'Nincs próbaidőszak, nincs rejtett díj – bármikor lemondható.',
+        active_box:     '✅ Aktív előfizetésed van – lejár:',
+        plan_name:      'Pro csomag',
+        plan_period:    '/ hó',
+        plan_renew:     'Automatikusan megújul – bármikor lemondható',
+        f1:             'Napi AI tippek – azonnal jóváhagyás után',
+        f2:             'Telegram értesítő minden új tippnél',
+        f3:             'Teljes előzmény és statisztika',
+        f4:             'Meccs elemző hozzáférés',
+        f5:             'Prioritás ügyfélszolgálat',
+        btn_checkout:   'Előfizetek most →',
+        redirecting:    'Átirányítás...',
+        secure:         '🔒 Biztonságos fizetés – Stripe · Visa, Mastercard, Apple Pay',
+        manage_btn:     'Előfizetés kezelése / lemondás',
+        err_login:      'Kérjük, először jelentkezz be!',
+        err_generic:    'Hiba történt, próbáld újra.',
+        footer_note:    'A fizetést a Stripe Inc. kezeli. A 90perc.hu nem tárol bankkártya adatokat.',
+      },
+
+      /* ── SUCCESS ── */
+      success: {
+        title:          'Sikeres előfizetés – 90perc.hu',
+        h1:             'Üdvözlünk a<br/><em>Pro csomagban!</em>',
+        body:           'Az előfizetésed aktív. Mostantól hozzáférsz az összes jóváhagyott napi tipphez, a teljes előzményhez és a meccs elemzőhöz.',
+        btn_tips:       'Megnézem a tippeket →',
+        btn_tg:         'Telegram csatorna',
+        note:           'Visszaigazolót küldtünk e-mailben. Az előfizetés kezeléséhez látogass az',
+        note_link:      'Előfizetés',
+        note_end:       'oldalra.',
+      },
+
+      /* ── RESET ── */
+      reset: {
+        title:          'Új jelszó beállítása – 90perc.hu',
+        h1:             'Új jelszó beállítása',
+        sub:            'Add meg az új jelszavad (legalább 8 karakter).',
+        pwd1:           'Új jelszó',
+        pwd2:           'Új jelszó még egyszer',
+        btn:            'Jelszó mentése',
+        saving:         'Mentés...',
+        err_short:      'A jelszó legalább 8 karakter legyen.',
+        err_mismatch:   'A két jelszó nem egyezik.',
+        err_no_link:    'Hiányzó link. Kérj új jelszó-visszaállító e-mailt.',
+        err_missing:    'Hiányzó vagy hibás link. Kérj új jelszó-visszaállító e-mailt.',
+        done_h1:        'Jelszó megváltoztatva',
+        done_sub:       'Be is léptettünk – jó szórakozást!',
+        done_btn:       'Tovább a tippekhez',
+        back:           '← Vissza a főoldalra',
+      },
+
+      /* ── TIPPEK ── */
+      tips: {
+        tab_today:      '📊 Mai tippek',
+        tab_history:    '📁 Előzmények',
+        btn_login:      '🔑 Belépés',
+        btn_logout:     '🚪 Kilépés',
+        auth_title_login: 'Belépés',
+        auth_title_reg:   'Regisztráció',
+        auth_sub_login:   'Lépj be a napi tippek megtekintéséhez.',
+        auth_sub_reg:     'Regisztrálj ingyen a napi tippek megtekintéséhez.',
+        email_ph:       'E-mail cím',
+        pwd_ph:         'Jelszó',
+        pwd_ph_reg:     'Jelszó (min. 8 karakter)',
+        btn_submit_login: 'Belépés',
+        btn_submit_reg:   'Regisztráció',
+        consent_18:     'Elmúltam <b>18 éves</b>.',
+        consent_tos:    'Elfogadom az <a href="/aszf.html" target="_blank" style="color:#00e676">ÁSZF</a>-et, és megismertem az <a href="/adatvedelem.html" target="_blank" style="color:#00e676">Adatkezelési tájékoztatót</a>.',
+        forgot:         'Elfelejtetted a jelszavad?',
+        no_account:     'Még nincs fiókod?',
+        has_account:    'Már van fiókod?',
+        reg_free:       'Regisztrálj ingyen',
+        login_link:     'Lépj be',
+        cancel:         'Mégse',
+        verify_banner:  '📧 Erősítsd meg az e-mail címed! Elküldtük a megerősítő linket.',
+        resend:         'Újraküldés',
+        guide_title:    '📖 Hogyan működik a 90perc.hu?',
+        stat_all:       'Összes',
+        stat_pending:   'Folyamatban',
+        stat_won:       'Nyert',
+        stat_lost:      'Vesztett',
+        stat_push:      'Visszajár',
+        stat_wr:        'Win %',
+        stat_profit:    'Profit (e.)',
+        unit:           'egység',
+        no_tips:        'Még nincsenek mai tippek.',
+        no_history:     'Nincs előzmény.',
+        reg_cta:        '✨ Ingyenes regisztráció',
+        result_won:     '✅ Nyert',
+        result_lost:    '❌ Veszett',
+        result_push:    '↩️ Visszajár',
+        result_pending: '⏳ Folyamatban',
+        result_half_won: '½✅ Fél nyert',
+        result_half_lost: '½❌ Fél veszett',
+        combo_label:    '🎰 Kombi',
+        odds_label:     'odds',
+        confidence:     'Megbízhatóság',
+      },
+
+      /* ── ANALYZER ── */
+      analyzer: {
+        title:          '90perc.hu – Meccs Elemző',
+        nav_sub:        'AI meccs elemzés',
+        back:           '← Főoldal',
+        tab_analyzer:   'Elemzés',
+        tab_history:    'Előzmények',
+        key_label:      'Claude API Kulcs',
+        key_valid:      'Kulcs érvényes!',
+        key_test_btn:   'Kulcs tesztelése és mentése',
+        key_testing:    'Ellenőrzés...',
+        key_note:       'Csak a böngésződben tárolódik. Soha nem kerül a szerverre.',
+        key_update:     'Kulcs frissítése',
+        key_add:        'Kulcs megadása',
+        key_save_btn:   'Kulcs mentése',
+        key_saved:      'Kulcs mentve!',
+        key_del_btn:    'Kulcs törlése',
+        match_label:    'Meccs és fogadási opció',
+        match_ph:       'Pl.: Brazília - Norvégia  (csak meccs → rangsorolt tipp-javaslatok)\nPl.: Belgium - Szenegál; mindkét csapat szerez gólt + Over 2.5',
+        examples_label: 'Példák:',
+        analyze_btn:    'Elemzés indítása',
+        analyzing:      'Elemzés folyamatban...',
+        cost_note:      'Egy elemzés kb. 40-50 Ft (~$0.10-0.15) a saját Anthropic számládra',
+        ai_label:       'AI Elemzés',
+        error_label:    'Hiba az elemzés során.',
+        no_history:     'Még nincs mentett elemzés.',
+        clear_history:  'Előzmények törlése',
+        clear_confirm:  'Törölni az összes előzményt?',
+        loading:        'Betöltés...',
+      },
+
+      /* ── LEGAL ── */
+      legal: {
+        en_notice:      'This document is currently only available in Hungarian.',
+      },
+    },
+
+    /* ════════════════════════════════════════
+       ENGLISH TRANSLATIONS
+    ════════════════════════════════════════ */
+    en: {
+      lang_toggle: '🇭🇺 HU',
+
+      nav: {
+        tips:      'Tips',
+        analyzer:  'Analyzer',
+        track:     'Track Record',
+        telegram:  'Telegram',
+        login:     'Sign In',
+        free_cta:  'Free Access →',
+        back:      '← Back',
+        main:      'Home',
+        pro:       '⭐ Pro',
+      },
+
+      footer: {
+        disclaimer: '90perc.hu does not provide financial advice. Bet responsibly, 18+ only.',
+        privacy:    'Privacy Policy',
+        tos:        'Terms of Service',
+        main:       'Home',
+      },
+
+      /* ── INDEX ── */
+      index: {
+        title:          '90perc.hu – AI-Powered Football Analysis & Tips',
+        hero_eyebrow:   'Live AI Analysis · Free Access',
+        hero_h1:        'Bet smarter.<br/><em>Every match.</em>',
+        hero_sub:       '90perc.hu uses artificial intelligence to analyse upcoming football matches — taking real form, injuries, and statistics into account. Not just a tip. <strong>Reasoning.</strong>',
+        hero_cta1:      'Register',
+        hero_cta2:      'How does it work?',
+        card_time:      'Today 20:45',
+        card_badge:     '✓ WON',
+        stat_wr:        'Win rate (single tips)',
+        stat_profit:    'Profit (units)',
+        stat_roi:       'ROI',
+        stat_leagues:   'Leagues monitored',
+        prob_eyebrow:   'Why do you need this?',
+        prob_title:     'Betting isn\'t luck.<br/>But analysis takes time.',
+        prob_sub:       'Making a good decision on a bet is possible — it just takes a lot of work that most people simply don\'t have time for.',
+        p1_title:       'Hours of research',
+        p1_body:        'Form, injuries, H2H, motivation — manually researching every match before it starts is exhausting.',
+        p2_title:       'Tipsters lack transparency',
+        p2_body:        'You don\'t know who\'s behind them, what the reasoning is, and bad tips can simply be deleted.',
+        p3_title:       'AI alone isn\'t enough',
+        p3_body:        'A plain ChatGPT prompt lacks real, up-to-date data — and it doesn\'t know how to ask the right questions.',
+        how_eyebrow:    'The system',
+        how_title:      'How does 90perc.hu work?',
+        how_sub:        'Three steps, fully automated — with human oversight.',
+        step1_h:        'Real-time data collection',
+        step1_p:        'The system continuously monitors upcoming matches from 36 leagues. For each match it fetches live bookmaker odds from multiple sources — across handicap, totals, and winner markets.',
+        step2_h:        'AI analysis with web search',
+        step2_p:        'Claude AI performs live web searches for every match: current form, injury lists, head-to-head history, tactical context. Analysis is never template-based — fresh data is fetched for each match.',
+        step3_h:        'Human review, then publish',
+        step3_p:        'Every AI suggestion is reviewed by an admin before going live. Approved tips appear simultaneously on the website and Telegram channel. Results are automatically verified and recorded.',
+        feat_eyebrow:   'What do you get?',
+        feat_title:     'Everything you need to make better decisions.',
+        f1_h:           'Daily AI Tips',
+        f1_p:           'Regular single tips and combinations, only on the strongest opportunities — with reasoning included.',
+        f1_tag:         'Main page',
+        f2_h:           'Match Analyzer',
+        f2_p:           'Request a deep analysis for any football match. Enter the match and the AI returns ranked tip suggestions by confidence level.',
+        f2_tag:         'Analyzer page',
+        f3_h:           'Telegram Notifications',
+        f3_p:           'Approved tips land instantly on the Telegram channel — you never miss a tip.',
+        f3_tag:         'Telegram',
+        f4_h:           'Transparent Track Record',
+        f4_p:           'Every tip is posted with a timestamp, results recorded automatically. Nothing can be deleted after the fact.',
+        f4_tag:         'History page',
+        tr_eyebrow:     'Why trust us?',
+        tr_title:       'The track record says it all.',
+        tr_sub:         'The only thing that really matters about a tipping service: what does the past show?',
+        tr_p1:          'On 90perc.hu every tip is posted with a <strong>public timestamp</strong> — before the match kicks off. Not retroactively, not edited. What\'s out there stays.',
+        tr_p2:          'Results are <strong>evaluated automatically by the system</strong> after the match, from a real results database. No manual intervention, no "forgotten" losing tip.',
+        tr_p3:          'On the History page anyone can look back through every previous tip: <strong>won, lost, push</strong> — with the raw numbers. This is our track record. If it didn\'t hold up, we wouldn\'t show it.',
+        faq_eyebrow:    'FAQ',
+        faq_title:      'Frequently asked questions.',
+        faq1_q:         'Is profit guaranteed?',
+        faq1_a:         'No, and anyone who claims otherwise is lying. Sports betting carries risk even in the long run. 90perc.hu aims to help you make better decisions with more data and thorough analysis — but profit can never be guaranteed. Bet responsibly, on your own judgment.',
+        faq2_q:         'Why is this better than a typical tipster Telegram channel?',
+        faq2_a:         'Two reasons. First: the analysis is visible — not just the tip, but the reasoning with specific data. Second: results are recorded automatically, without manipulation. On a tipster channel bad tips can simply be deleted. Not here.',
+        faq3_q:         'Why isn\'t a simple ChatGPT subscription enough instead?',
+        faq3_a:         'A general AI has no real-time access to bookmaker odds, current injury lists, or today\'s form data. 90perc.hu collects exactly these and feeds them to the AI — plus result tracking, Telegram integration and the history are all layers you\'d have to build yourself with a plain chatbot.',
+        faq4_q:         'How much does the subscription cost?',
+        faq4_a:         'The monthly subscription is 14,990 HUF/month, cancellable at any time. Registration is free — without a subscription you can still view settled tips and the track record.',
+        faq5_q:         'How are results evaluated?',
+        faq5_a:         'Automatically, from a real results database. The system fetches the final result after the match ends and accurately calculates Asian handicap outcomes too (half-win / half-push logic). Manual corrections require admin approval and are logged.',
+        faq6_q:         'Which leagues does the system monitor?',
+        faq6_a:         '36 leagues and cups continuously — from the Premier League, Bundesliga, La Liga, Serie A and Ligue 1 to the Copa Libertadores, MLS and J1 League. The 2026 World Cup matches are also analysed.',
+        cta_badge:      '✦ 14,990 HUF/month · Cancel anytime',
+        cta_h2:         'Give it a try.<br/><em>It\'s free.</em>',
+        cta_sub:        'Register, or follow us on Telegram — and get instant access to daily tips.',
+        cta_btn1:       'Register →',
+        cta_tg:         'Telegram channel',
+      },
+
+      /* ── STATISZTIKA ── */
+      stat: {
+        title:          'Track Record – 90perc.hu',
+        page_title:     'Track Record – 90perc.hu',
+        eyebrow:        'Live data · Updated automatically',
+        h1:             'Every tip.<br/><em>Publicly.</em>',
+        sub:            'We can\'t delete, we can\'t edit. What\'s out there stays — results included.',
+        period_label:   '📅 Period',
+        all_time:       '📊 All-time',
+        s_settled:      'Settled tips',
+        s_wr:           'Win rate',
+        s_wr_sub:       'excl. push & half results',
+        s_profit:       'Profit (units)',
+        s_profit_sub:   '1 unit = 1 stake',
+        s_roi:          'ROI',
+        s_roi_sub:      'return on investment',
+        chart_title:    'Cumulative profit',
+        f_all:          'All',
+        f_won:          '✅ Won',
+        f_half_won:     '½✅ Half won',
+        f_push:         '↩️ Push',
+        f_half_lost:    '½❌ Half lost',
+        f_lost:         '❌ Lost',
+        th_date:        'Date',
+        th_match:       'Match',
+        th_pick:        'Pick',
+        th_odds:        'Odds',
+        th_result:      'Result',
+        th_pl:          'P/L',
+        r_won:          '✅ Won',
+        r_lost:         '❌ Lost',
+        r_push:         '↩️ Push',
+        r_half_won:     '½✅ Half won',
+        r_half_lost:    '½❌ Half lost',
+        r_pending:      '⏳ Pending',
+        no_data:        'No data for this period',
+        no_filter:      'No results for this filter.',
+        loading:        'Loading data...',
+        load_err:       'Failed to load data. Please try again later.',
+        settled_count:  'settled tips in this view',
+        cta_h2:         'Convinced by the track record?<br/><em>Join for free.</em>',
+        cta_sub:        'Register and get instant access to daily tips — no payment required.',
+        cta_btn:        'Register for free →',
+        cta_tg:         'Telegram channel',
+      },
+
+      /* ── ELŐFIZETÉS ── */
+      sub: {
+        title:          'Subscription – 90perc.hu',
+        eyebrow:        'Premium access',
+        h1:             'One plan.<br/><em>Everything included.</em>',
+        sub:            'No trial period, no hidden fees — cancel anytime.',
+        active_box:     '✅ You have an active subscription — expires:',
+        plan_name:      'Pro plan',
+        plan_period:    '/ month',
+        plan_renew:     'Auto-renews — cancel anytime',
+        f1:             'Daily AI tips — immediately after approval',
+        f2:             'Telegram notification for every new tip',
+        f3:             'Full history and statistics',
+        f4:             'Match analyzer access',
+        f5:             'Priority customer support',
+        btn_checkout:   'Subscribe now →',
+        redirecting:    'Redirecting...',
+        secure:         '🔒 Secure payment – Stripe · Visa, Mastercard, Apple Pay',
+        manage_btn:     'Manage / cancel subscription',
+        err_login:      'Please log in first!',
+        err_generic:    'An error occurred, please try again.',
+        footer_note:    'Payments processed by Stripe Inc. 90perc.hu does not store card data.',
+      },
+
+      /* ── SUCCESS ── */
+      success: {
+        title:          'Subscription successful – 90perc.hu',
+        h1:             'Welcome to<br/><em>Pro!</em>',
+        body:           'Your subscription is active. You now have access to all approved daily tips, the full history and the match analyzer.',
+        btn_tips:       'View the tips →',
+        btn_tg:         'Telegram channel',
+        note:           'We\'ve sent a confirmation email. To manage your subscription, visit the',
+        note_link:      'Subscription',
+        note_end:       'page.',
+      },
+
+      /* ── RESET ── */
+      reset: {
+        title:          'Set new password – 90perc.hu',
+        h1:             'Set a new password',
+        sub:            'Enter your new password (at least 8 characters).',
+        pwd1:           'New password',
+        pwd2:           'Confirm new password',
+        btn:            'Save password',
+        saving:         'Saving...',
+        err_short:      'Password must be at least 8 characters.',
+        err_mismatch:   'Passwords do not match.',
+        err_no_link:    'Missing link. Request a new password reset email.',
+        err_missing:    'Missing or invalid link. Request a new password reset email.',
+        done_h1:        'Password changed',
+        done_sub:       'You\'re now logged in — enjoy!',
+        done_btn:       'Go to tips',
+        back:           '← Back to home',
+      },
+
+      /* ── TIPPEK ── */
+      tips: {
+        tab_today:      '📊 Today\'s tips',
+        tab_history:    '📁 History',
+        btn_login:      '🔑 Sign In',
+        btn_logout:     '🚪 Sign Out',
+        auth_title_login: 'Sign In',
+        auth_title_reg:   'Register',
+        auth_sub_login:   'Log in to view daily tips.',
+        auth_sub_reg:     'Register for free to view daily tips.',
+        email_ph:       'Email address',
+        pwd_ph:         'Password',
+        pwd_ph_reg:     'Password (min. 8 characters)',
+        btn_submit_login: 'Sign In',
+        btn_submit_reg:   'Register',
+        consent_18:     'I am over <b>18 years old</b>.',
+        consent_tos:    'I accept the <a href="/aszf.html" target="_blank" style="color:#00e676">Terms of Service</a> and have read the <a href="/adatvedelem.html" target="_blank" style="color:#00e676">Privacy Policy</a>.',
+        forgot:         'Forgot your password?',
+        no_account:     'Don\'t have an account?',
+        has_account:    'Already have an account?',
+        reg_free:       'Register for free',
+        login_link:     'Sign in',
+        cancel:         'Cancel',
+        verify_banner:  '📧 Please confirm your email! We sent you a verification link.',
+        resend:         'Resend',
+        guide_title:    '📖 How does 90perc.hu work?',
+        stat_all:       'All',
+        stat_pending:   'Pending',
+        stat_won:       'Won',
+        stat_lost:      'Lost',
+        stat_push:      'Push',
+        stat_wr:        'Win %',
+        stat_profit:    'Profit (u.)',
+        unit:           'units',
+        no_tips:        'No tips for today yet.',
+        no_history:     'No history yet.',
+        reg_cta:        '✨ Free Registration',
+        result_won:     '✅ Won',
+        result_lost:    '❌ Lost',
+        result_push:    '↩️ Push',
+        result_pending: '⏳ Pending',
+        result_half_won: '½✅ Half won',
+        result_half_lost: '½❌ Half lost',
+        combo_label:    '🎰 Combo',
+        odds_label:     'odds',
+        confidence:     'Confidence',
+      },
+
+      /* ── ANALYZER ── */
+      analyzer: {
+        title:          '90perc.hu – Match Analyzer',
+        nav_sub:        'AI match analysis',
+        back:           '← Home',
+        tab_analyzer:   'Analyze',
+        tab_history:    'History',
+        key_label:      'Claude API Key',
+        key_valid:      'Key is valid!',
+        key_test_btn:   'Test and save key',
+        key_testing:    'Checking...',
+        key_note:       'Stored in your browser only. Never sent to our server.',
+        key_update:     'Update key',
+        key_add:        'Add key',
+        key_save_btn:   'Save key',
+        key_saved:      'Key saved!',
+        key_del_btn:    'Delete key',
+        match_label:    'Match and betting option',
+        match_ph:       'E.g.: Brazil - Norway  (match only → ranked tip suggestions)\nE.g.: Belgium - Senegal; both teams to score + Over 2.5',
+        examples_label: 'Examples:',
+        analyze_btn:    'Run analysis',
+        analyzing:      'Analysis in progress...',
+        cost_note:      'One analysis costs approx. $0.10–0.15 from your Anthropic account',
+        ai_label:       'AI Analysis',
+        error_label:    'Error during analysis.',
+        no_history:     'No saved analyses yet.',
+        clear_history:  'Clear history',
+        clear_confirm:  'Delete all history?',
+        loading:        'Loading...',
+      },
+
+      /* ── LEGAL ── */
+      legal: {
+        en_notice: 'This document is currently only available in Hungarian.',
+      },
+    },
+  };
+
+  /* ─────────────────────────────────────────
+     CORE ENGINE
+  ───────────────────────────────────────── */
+  let lang = localStorage.getItem('90perc_lang') || 'hu';
+
+  window.t = function (key, fallback) {
+    const parts = key.split('.');
+    let val = T[lang];
+    for (const p of parts) { val = val && val[p]; }
+    if (val != null) return val;
+    // Fallback to HU if EN key missing
+    val = T['hu'];
+    for (const p of parts) { val = val && val[p]; }
+    return val != null ? val : (fallback || key);
+  };
+
+  window.getLang  = () => lang;
+  window.setLang  = function (l) {
+    lang = l;
+    localStorage.setItem('90perc_lang', l);
+    applyDOM();
+    // Re-render JS-driven pages
+    if (typeof window.R === 'function') window.R();
+    // Re-render tippek page if applicable
+    if (typeof window.renderTips === 'function') window.renderTips();
+  };
+  window.toggleLang = () => window.setLang(lang === 'hu' ? 'en' : 'hu');
+
+  function applyDOM() {
+    document.documentElement.lang = lang;
+
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      el.textContent = window.t(el.dataset.i18n);
+    });
+    document.querySelectorAll('[data-i18n-html]').forEach(el => {
+      el.innerHTML = window.t(el.dataset.i18nHtml);
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      el.placeholder = window.t(el.dataset.i18nPlaceholder);
+    });
+
+    // Page title
+    const titleKey = document.documentElement.dataset.i18nTitle;
+    if (titleKey) document.title = window.t(titleKey);
+
+    // Toggle buttons
+    document.querySelectorAll('.lang-toggle').forEach(btn => {
+      btn.textContent = window.t('lang_toggle');
+    });
+
+    // Legal notice injection
+    const notice = document.getElementById('legal-lang-notice');
+    if (notice) notice.style.display = lang === 'en' ? 'block' : 'none';
+  }
+
+  document.addEventListener('DOMContentLoaded', applyDOM);
+
+})();
