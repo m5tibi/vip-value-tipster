@@ -257,12 +257,18 @@ function formatDate(d) {
   return dt.toLocaleDateString('hu-HU', { month:'short', day:'numeric' });
 }
 
+function getYearMonth(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}
+
 function getPeriodTips() {
   if (currentPeriod === 'all') return allTips;
-  return allTips.filter(t => {
-    const d = t.addedAt || t.commence || '';
-    return d.startsWith(currentPeriod);
-  });
+  return allTips.filter(t => getYearMonth(t.addedAt || t.commence) === currentPeriod);
 }
 
 function calcStats(tips) {
@@ -364,15 +370,12 @@ function setPeriod(period, btn) {
 }
 
 function buildPeriodPicker(tips) {
-  const months = [...new Set(tips.map(t => {
-    const d = t.addedAt || t.commence || '';
-    return d.length >= 7 ? d.slice(0, 7) : null;
-  }).filter(Boolean))].sort().reverse();
+  const months = [...new Set(tips.map(t => getYearMonth(t.addedAt || t.commence)).filter(Boolean))].sort().reverse();
 
   const bar = document.getElementById('period-bar');
   months.forEach(m => {
     const [year, month] = m.split('-');
-    const label = `${HU_MONTHS[parseInt(month) - 1]} ${year}`;
+    const label = `${HU_MONTHS[parseInt(month, 10) - 1]} ${year}`;
     const btn = document.createElement('button');
     btn.className = 'period-btn';
     btn.textContent = label;
