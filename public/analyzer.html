@@ -287,7 +287,51 @@ function analyze(){
       hiddenCtx+='[/BELSŐ HÁTTÉR-KONTEXTUS]\n';
     }
 
-    var prompt=
+    var isEN = window.getLang && window.getLang() === 'en';
+    var prompt = isEN ? (
+      'You are a professional football betting analyst preparing analyses for paying subscribers.\n\n'+
+      'STYLE AND LANGUAGE:\n'+
+      '- Write exclusively in correct, professional English.\n'+
+      '- Be concise and specific. Avoid generalities — only make claims backed by numbers.\n'+
+      '- Never refer to any other source, system or analysis. The analysis is the result of your own research.\n\n'+
+      'IMPORTANT: If you cannot identify a football match from the request, or if the request is not related to football, DO NOT begin an analysis! Instead write exactly:\n'+
+      'NOT UNDERSTOOD: [brief explanation and suggestion for the correct format, e.g.: "Team1 - Team2" or "Team1 - Team2; Over 2.5"]\n\n'+
+      'User request:\n"'+q+'"\n'+
+      hiddenCtx+'\n\n'+
+      'Use web search for real, up-to-date data (form, injuries, H2H). Two cases are possible:\n\n'+
+      '=== (A) IF THE REQUEST CONTAINS A SPECIFIC BETTING OPTION ===\n'+
+      '(e.g. "Over 2.5", "home win", "both teams to score"), evaluate THAT option deeply, in EXACTLY this structure:\n\n'+
+      'MATCH CONTEXT:\n[Tournament, round, stakes — 1-2 concise sentences]\n\n'+
+      'HOME TEAM FORM:\n[Last 5 matches with exact results and dates, goals average calculated]\n\n'+
+      'AWAY TEAM FORM:\n[Last 5 matches with exact results and dates, goals average calculated]\n\n'+
+      'H2H HISTORY:\n[Last 3-5 head-to-head results, goals average, trends]\n\n'+
+      'INJURIES / ABSENCES:\n[Injury and suspension status of key players from both teams]\n\n'+
+      'BETTING OPTION EVALUATION:\n[Detailed analysis of the given market: what supports it, what goes against it, with specific numbers — 5-6 sentences]\n\n'+
+      'After a blank line, give the verdict and justify it in one sentence:\n'+
+      'VERDICT: RECOMMENDED — [one sentence reason]\n'+
+      'or: VERDICT: UNCERTAIN — [one sentence reason]\n'+
+      'or: VERDICT: NOT RECOMMENDED — [one sentence reason]\n\n'+
+      '=== (B) IF THE REQUEST CONTAINS ONLY A MATCH, NO BETTING OPTION ===\n'+
+      '(e.g. "Brazil - Norway"), prepare a full analysis and provide several specific tip suggestions, in EXACTLY this structure:\n\n'+
+      'MATCH CONTEXT:\n[Tournament, round, stakes — 1-2 concise sentences]\n\n'+
+      'HOME TEAM FORM:\n[Last 5 matches with exact results and dates, goals average calculated]\n\n'+
+      'AWAY TEAM FORM:\n[Last 5 matches with exact results and dates, goals average calculated]\n\n'+
+      'H2H HISTORY:\n[Last 3-5 head-to-head results, goals average, trends]\n\n'+
+      'INJURIES / ABSENCES:\n[Injury and suspension status of key players from both teams]\n\n'+
+      'TIP SUGGESTIONS:\n'+
+      'Give 4-5 specific betting suggestions in DECREASING ORDER OF CONFIDENCE. Each suggestion should be from a different market (e.g. goals, winner, handicap, BTTS). Exactly in this format:\n\n'+
+      '1. [Market and specific tip, e.g. Over 2.5 goals] — Confidence: HIGH\n'+
+      '   Reasoning: [2-3 sentences backed by specific numbers, goals average, statistics]\n\n'+
+      '2. [Market and specific tip] — Confidence: HIGH\n'+
+      '   Reasoning: [2-3 sentences]\n\n'+
+      '3. [Market and specific tip] — Confidence: MEDIUM\n'+
+      '   Reasoning: [2-3 sentences]\n\n'+
+      '4. [Market and specific tip] — Confidence: MEDIUM\n'+
+      '   Reasoning: [2-3 sentences]\n\n'+
+      '5. [Market and specific tip] — Confidence: LOW\n'+
+      '   Reasoning: [2-3 sentences — explain why it is riskier]\n\n'+
+      'Rules: do not use asterisk (*) or hashtag (#) formatting. Provide real, verified numbers. Correct, professional English only.'
+    ) : (
       'Te egy profi labdarúgás-fogadási elemző vagy, aki fizetős előfizetők számára készít elemzéseket.\n\n'+
       'STÍLUS ÉS NYELVEZET:\n'+
       '- Kizárólag helyes, igényes magyar nyelven írj. Kerüld a hibás tükörfordításokat és a sportnyelvi zsargont (pl. ne írd: "félszívóban", "nyomás alatt lép pályára" helyett írj "fáradtan érkezik", "a kapus a bal kapufánál" stb.).\n'+
@@ -329,7 +373,8 @@ function analyze(){
       '   Indoklás: [2-3 mondat]\n\n'+
       '5. [Piac és konkrét tipp] — Megbízhatóság: ALACSONY\n'+
       '   Indoklás: [2-3 mondat — magyarázd el, miért kockázatosabb]\n\n'+
-      'Szabályok: ne használj csillag (*) vagy hashtag (#) formázást. Adj valódi, ellenőrzött számokat. Kizárólag helyes, igényes magyar nyelvezet.';
+      'Szabályok: ne használj csillag (*) vagy hashtag (#) formázást. Adj valódi, ellenőrzött számokat. Kizárólag helyes, igényes magyar nyelvezet.'
+    );
 
     fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
@@ -421,7 +466,7 @@ function rAnalyzer(){
   var html=
     '<div class="card" style="border-color:#7c3aed33">'+
     '<label class="lbl">'+window.t('analyzer.match_label')+'</label>'+
-    '<textarea id="qi" class="tarea" placeholder="Pl.: Brazília - Norvégia  (csak meccs → rangsorolt tipp-javaslatok)&#10;Pl.: Belgium - Szenegál; mindkét csapat szerez gólt + Over 2.5" oninput="S.query=this.value">'+esc(S.query)+'</textarea>'+
+    '<textarea id="qi" class="tarea" placeholder="'+window.t('analyzer.match_ph')+'" oninput="S.query=this.value">'+esc(S.query)+'</textarea>'+
     '<div style="margin-top:10px"><div style="font-size:11px;color:#4b5563;margin-bottom:6px">Példák:</div>'+exBtns+'</div>'+
     '</div>'+
     (!S.claudeKey?'<div class="card" style="border-color:#fbbf2433;color:#fbbf24;font-size:13px;text-align:center;margin-bottom:14px">'+
