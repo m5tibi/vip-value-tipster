@@ -68,6 +68,18 @@
   .chart-title span{color:var(--green);font-family:'Oswald',sans-serif;font-size:16px;letter-spacing:0}
   #profit-chart{width:100%;height:140px;display:block}
 
+  /* PERIOD PICKER */
+  .period-wrap{max-width:860px;margin:28px auto 0;padding:0 20px}
+  .period-header{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1px;
+                 text-transform:uppercase;margin-bottom:10px}
+  .period-bar{display:flex;gap:8px;flex-wrap:wrap}
+  .period-btn{background:var(--surf);border:1px solid var(--border);border-radius:8px;
+              padding:6px 16px;font-size:12px;font-weight:600;color:var(--muted);
+              cursor:pointer;transition:all .15s}
+  .period-btn.active{border-color:#f59e0b;color:#f59e0b;background:rgba(245,158,11,.08)}
+  .period-btn:hover{border-color:#f59e0b;color:#f59e0b}
+  .period-btn.all-time{border-color:rgba(245,158,11,.3)}
+
   /* FILTER + TABLE */
   .table-wrap{max-width:860px;margin:24px auto 0;padding:0 20px 60px}
   .filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
@@ -153,6 +165,13 @@
   <p class="hero-sub">Nem törölhetünk, nem módosíthatunk. Amit kinn van, az marad – az eredménnyel együtt.</p>
 </div>
 
+<div class="period-wrap">
+  <div class="period-header">📅 Időszak</div>
+  <div class="period-bar" id="period-bar">
+    <button class="period-btn all-time active" onclick="setPeriod('all',this)">📊 Összes (all-time)</button>
+  </div>
+</div>
+
 <div class="scoreboard" id="scoreboard">
   <div class="score-card"><div class="score-num" id="s-settled">–</div><div class="score-label">Lezárt tipp</div></div>
   <div class="score-card"><div class="score-num green" id="s-wr">–</div><div class="score-label">Nyerési arány</div><div class="score-sub">döntetlen és fél-eredmény nélkül</div></div>
@@ -209,6 +228,7 @@
 <script>
 let allTips = [];
 let currentFilter = 'all';
+let currentPeriod = 'all'; // 'all' | 'YYYY-MM'
 
 const RESULT_LABELS = {
   won:'✅ Nyert', lost:'❌ Veszett', push:'↩️ Visszajár',
@@ -218,6 +238,9 @@ const RESULT_CLASS = {
   won:'won', lost:'lost', push:'push',
   half_won:'half_won', half_lost:'half_lost', pending:'pending'
 };
+
+const HU_MONTHS = ['Január','Február','Március','Április','Május','Június',
+                   'Július','Augusztus','Szeptember','Október','November','December'];
 
 function tipProfit(t) {
   const o = parseFloat(t.odds) || 1;
@@ -232,6 +255,53 @@ function formatDate(d) {
   if (!d) return '–';
   const dt = new Date(d);
   return dt.toLocaleDateString('hu-HU', { month:'short', day:'numeric' });
+}
+
+function getPeriodTips() {
+  if (currentPeriod === 'all') return allTips;
+  return allTips.filter(t => {
+    const d = t.addedAt || t.commence || '';
+    return d.startsWith(currentPeriod);
+  });
+}
+
+function calcStats(tips) {
+  const settled = tips.filter(t => ['won','lost','push','half_won','half_lost'].includes(t.result));
+  const won      = settled.filter(t => t.result === 'won').length;
+  const lost     = settled.filter(t => t.result === 'lost').length;
+  const halfWon  = settled.filter(t => t.result === 'half_won').length;
+  const halfLost = settled.filter(t => t.result === 'half_lost').length;
+  const decN     = won + lost + halfWon + halfLost;
+  const winRate  = decN ? (((won + halfWon * 0.5) / decN) * 100).toFixed(1) : null;
+  const profit   = settled.reduce((sum, t) => sum + tipProfit(t), 0);
+  const roi      = settled.length ? ((profit / settled.length) * 100).toFixed(1) : null;
+  return { settled: settled.length, winRate, profit: parseFloat(profit.toFixed(2)), roi };
+}
+
+function updateScoreboard(stats) {
+  const sEl = id => document.getElementById(id);
+  sEl('s-settled').textContent = stats.settled ?? '–';
+  if (stats.winRate != null) {
+    sEl('s-wr').textContent = stats.winRate + '%';
+  } else {
+    sEl('s-wr').textContent = '–';
+  }
+  if (stats.profit != null) {
+    const p = stats.profit;
+    sEl('s-profit').textContent = (p >= 0 ? '+' : '') + p.toFixed(2);
+    sEl('s-profit').className = 'score-num ' + (p >= 0 ? 'gold' : 'red');
+  } else {
+    sEl('s-profit').textContent = '–';
+    sEl('s-profit').className = 'score-num gold';
+  }
+  if (stats.roi != null) {
+    const r = parseFloat(stats.roi);
+    sEl('s-roi').textContent = (r >= 0 ? '+' : '') + r + '%';
+    sEl('s-roi').className = 'score-num ' + (r >= 0 ? 'green' : 'red');
+  } else {
+    sEl('s-roi').textContent = '–';
+    sEl('s-roi').className = 'score-num';
+  }
 }
 
 function renderTable(tips) {
@@ -270,7 +340,45 @@ function setFilter(f, btn) {
   currentFilter = f;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  renderTable(allTips);
+  renderTable(getPeriodTips());
+}
+
+function setPeriod(period, btn) {
+  currentPeriod = period;
+  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const chartTitleEl = document.querySelector('.chart-title');
+  const titleNode = chartTitleEl.childNodes[0];
+  if (period === 'all') {
+    titleNode.textContent = 'Kumulatív profit alakulása';
+  } else {
+    const [year, month] = period.split('-');
+    titleNode.textContent = `${year} ${HU_MONTHS[parseInt(month) - 1]} – profit alakulása`;
+  }
+
+  const periodTips = getPeriodTips();
+  updateScoreboard(calcStats(periodTips));
+  drawChart(periodTips.slice().reverse());
+  renderTable(periodTips);
+}
+
+function buildPeriodPicker(tips) {
+  const months = [...new Set(tips.map(t => {
+    const d = t.addedAt || t.commence || '';
+    return d.length >= 7 ? d.slice(0, 7) : null;
+  }).filter(Boolean))].sort().reverse();
+
+  const bar = document.getElementById('period-bar');
+  months.forEach(m => {
+    const [year, month] = m.split('-');
+    const label = `${HU_MONTHS[parseInt(month) - 1]} ${year}`;
+    const btn = document.createElement('button');
+    btn.className = 'period-btn';
+    btn.textContent = label;
+    btn.onclick = () => setPeriod(m, btn);
+    bar.appendChild(btn);
+  });
 }
 
 function drawChart(tips) {
@@ -283,11 +391,20 @@ function drawChart(tips) {
   canvas.height = H * dpr;
   ctx.scale(dpr, dpr);
 
-  const settled = tips.filter(t => t.result && t.result !== 'pending')
-                      .sort((a,b) => (a.addedAt||'').localeCompare(b.addedAt||''));
-  if (!settled.length) return;
+  const settled = tips
+    .filter(t => t.result && t.result !== 'pending')
+    .sort((a,b) => (a.addedAt||a.commence||'').localeCompare(b.addedAt||b.commence||''));
 
-  // Cumulative profit points
+  if (!settled.length) {
+    ctx.fillStyle = '#5d7a96';
+    ctx.font = '13px Inter,sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Nincs adat ebben az időszakban', W/2, H/2);
+    document.getElementById('chart-current').textContent = '–';
+    document.getElementById('chart-current').style.color = '#5d7a96';
+    return;
+  }
+
   let cum = 0;
   const points = [{ x:0, y:0 }];
   settled.forEach((t, i) => {
@@ -305,7 +422,6 @@ function drawChart(tips) {
   const cx = x => PAD.l + x * cW;
   const cy = y => PAD.t + cH - ((y - minY) / range) * cH;
 
-  // Zero line
   ctx.beginPath();
   ctx.strokeStyle = 'rgba(93,122,150,.3)';
   ctx.lineWidth   = 1;
@@ -315,7 +431,6 @@ function drawChart(tips) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Y axis label
   ctx.fillStyle = '#5d7a96';
   ctx.font = '10px Inter,sans-serif';
   ctx.textAlign = 'right';
@@ -323,18 +438,15 @@ function drawChart(tips) {
     ctx.fillText((v >= 0 ? '+' : '') + v.toFixed(1), PAD.l - 4, cy(v) + 3);
   });
 
-  // Fill under/over line
   const isPositive = cum >= 0;
-  const fillColor  = isPositive ? 'rgba(0,230,118,.08)' : 'rgba(239,68,68,.08)';
   ctx.beginPath();
   ctx.moveTo(cx(points[0].x), cy(0));
   points.forEach(p => ctx.lineTo(cx(p.x), cy(p.y)));
   ctx.lineTo(cx(points[points.length-1].x), cy(0));
   ctx.closePath();
-  ctx.fillStyle = fillColor;
+  ctx.fillStyle = isPositive ? 'rgba(0,230,118,.08)' : 'rgba(239,68,68,.08)';
   ctx.fill();
 
-  // Line
   ctx.beginPath();
   ctx.strokeStyle = isPositive ? '#00e676' : '#ef4444';
   ctx.lineWidth   = 2;
@@ -342,7 +454,6 @@ function drawChart(tips) {
   points.forEach((p,i) => i ? ctx.lineTo(cx(p.x), cy(p.y)) : ctx.moveTo(cx(p.x), cy(p.y)));
   ctx.stroke();
 
-  // Last point dot
   const last = points[points.length - 1];
   ctx.beginPath();
   ctx.arc(cx(last.x), cy(last.y), 4, 0, Math.PI * 2);
@@ -356,33 +467,17 @@ function drawChart(tips) {
 
 async function loadData() {
   try {
-    const [statsRes, histRes] = await Promise.all([
-      fetch('/api/public-stats'),
-      fetch('/api/history')
-    ]);
-    const stats = await statsRes.json();
-    const hist  = await histRes.json();
+    const histRes = await fetch('/api/history');
+    const hist    = await histRes.json();
 
-    // Stats scoreboard
-    const sEl = id => document.getElementById(id);
-    if (stats.settled != null) sEl('s-settled').textContent = stats.settled;
-    if (stats.winRate != null) sEl('s-wr').textContent = stats.winRate + '%';
-    if (stats.profit  != null) {
-      const p = stats.profit;
-      sEl('s-profit').textContent = (p >= 0 ? '+' : '') + p.toFixed(2);
-      sEl('s-profit').className = 'score-num ' + (p >= 0 ? 'gold' : 'red');
-    }
-    if (stats.roi != null) {
-      const r = parseFloat(stats.roi);
-      sEl('s-roi').textContent = (r >= 0 ? '+' : '') + r + '%';
-      sEl('s-roi').className = 'score-num ' + (r >= 0 ? 'green' : 'red');
-    }
-
-    // Only soccer, only settled (public endpoint már szűrt)
     allTips = (Array.isArray(hist) ? hist : [])
       .filter(t => t.type !== 'combo')
       .sort((a,b) => (b.addedAt||b.commence||'').localeCompare(a.addedAt||a.commence||''));
 
+    buildPeriodPicker(allTips);
+
+    const stats = calcStats(allTips);
+    updateScoreboard(stats);
     drawChart(allTips.slice().reverse());
     renderTable(allTips);
   } catch(e) {
@@ -393,7 +488,7 @@ async function loadData() {
 
 window.addEventListener('load', loadData);
 window.addEventListener('resize', () => {
-  if (allTips.length) drawChart(allTips.slice().reverse());
+  if (allTips.length) drawChart(getPeriodTips().slice().reverse());
 });
 </script>
 </body>
