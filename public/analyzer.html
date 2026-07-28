@@ -53,6 +53,13 @@
 <body>
 <div id="root"><div style="padding:40px;text-align:center;color:#6b7280">Loading...</div></div>
 <script>
+// Safety fallback – ha lang.js nem töltődött be
+if (typeof window.t !== "function") {
+  window.t = function(k, fb) { return fb || k.split(".").pop(); };
+  window.getLang = function() { return "hu"; };
+  window.setLang = function() {};
+  window.toggleLang = function() {};
+}
 // ── Biztonságos localStorage ──────────────────────────────
 var KS='vbt_ck', HS='vbt_ah3';
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
