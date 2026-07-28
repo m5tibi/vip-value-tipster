@@ -231,7 +231,7 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
     <div id="ai-list"><div class="no-value">📭 Jelenleg nincs kiadott tipp.</div></div>
     <div id="combo-wrap" style="display:none">
       <hr class="divider">
-      <div class="section-title" style="color:#ffcc80">🎰 Kombi tippek</div>
+      <div class="section-title" style="color:#ffcc80" data-i18n="tips.combo_title">🎰 Kombi tippek</div>
       <div class="section-sub" data-i18n="tips.combo_sub">Biztonságosabb lábakból, több különböző meccsről</div>
       <div id="combo-list"></div>
     </div>
@@ -260,7 +260,7 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
       <div class="stat-card"><div class="stat-label">ROI</div><div class="stat-value" id="h-roi">–</div></div>
     </div>
     <div id="combo-stats" style="display:none;background:#0d1b2a;border:1px solid #5d4037;border-radius:10px;padding:12px;margin-bottom:12px">
-      <div style="font-weight:700;color:#ffcc80;font-size:14px;margin-bottom:8px">🎰 Kombi tippek</div>
+      <div style="font-weight:700;color:#ffcc80;font-size:14px;margin-bottom:8px" data-i18n="tips.combo_title">🎰 Kombi tippek</div>
       <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:#cfd8dc">
         <span>✅ <b id="c-won">0</b></span>
         <span>❌ <b id="c-lost">0</b></span>
@@ -282,7 +282,7 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
       <a href="/adatvedelem.html" style="color:#80cbc4;text-decoration:none" data-i18n="footer.privacy">Adatkezelési tájékoztató</a>
     </div>
     <div style="background:#1a1214;border:1px solid #5d4037;border-radius:8px;padding:10px 14px;margin-top:8px;color:#a1887f">
-      <b style="color:#ffcc80">18+</b> · A tippek <b>nem garantálnak nyereséget</b>, tájékoztató jellegűek — a fogadás pénzügyi veszteséggel járhat.<br>
+      <span data-i18n-html="tips.footer_disclaimer2"><b style="color:#ffcc80">18+</b> · A tippek <b>nem garantálnak nyereséget</b>, tájékoztató jellegűek — a fogadás pénzügyi veszteséggel járhat.</span><br>
       <span data-i18n-html="tips.footer_gamble">A szerencsejáték függőséget okozhat. Segítség: <b style="color:#ffcc80">116-123</b> (ingyenes, éjjel-nappal)</span>
     </div>
   </footer>
@@ -338,8 +338,8 @@ function applyAuthModal() {
   const reg = authMode === 'register';
   document.getElementById('auth-title').textContent = reg ? window.t('tips.auth_title_reg') : window.t('tips.auth_title_login');
   document.getElementById('auth-sub').textContent   = reg
-    ? 'Hozz létre ingyenes fiókot, és nézd meg a napi tippeket.'
-    : 'Lépj be a napi tippek megtekintéséhez.';
+    ? window.t('tips.auth_sub_reg')
+    : window.t('tips.auth_sub_login');
   document.getElementById('auth-submit').textContent = reg ? window.t('tips.btn_submit_reg') : window.t('tips.btn_submit_login');
   document.getElementById('auth-pwd').setAttribute('autocomplete', reg ? 'new-password' : 'current-password');
   document.getElementById('auth-pwd').placeholder = reg ? window.t('tips.pwd_ph_reg') : window.t('tips.pwd_ph');
@@ -787,7 +787,7 @@ function renderHistory() {
       });
     }
     if (done.length) {
-      html += `<div class="section-header" style="background:#0d1b2a;color:#80cbc4;margin-top:8px">📋 Lezárt ${kind} tippek</div>`;
+      html += `<div class="section-header" style="background:#0d1b2a;color:#80cbc4;margin-top:8px">📋 ${window.t("tips.closed")} ${kind} ${window.t("tips.tips_word")}</div>`;
       const currentMonth = monthKeyOf(todayKey());
       const monthsToDays = {};
       Object.keys(doneByDay).forEach(day => {
@@ -852,16 +852,16 @@ function renderLocked(needSubscription) {
     ? `<div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:12px;padding:28px;text-align:center">
          <div style="font-size:32px;margin-bottom:8px">🔒</div>
          <div style="font-weight:700;color:#fff;font-size:16px;margin-bottom:6px" data-i18n="tips.paywall_title">Aktív előfizetés szükséges</div>
-         <div style="color:#78909c;font-size:13px;margin-bottom:18px">A napi tippek megtekintéséhez előfizetés kell.<br>Az eddigi eredmények az <b>Előzmények</b> fülön szabadon megtekinthetők.</div>
+         <div style="color:#78909c;font-size:13px;margin-bottom:18px" data-i18n-html="tips.paywall_body2">A napi tippek megtekintéséhez előfizetés kell.<br>Az eddigi eredmények az <b>Előzmények</b> fülön szabadon megtekinthetők.</div>
          <a href="/elofizetes.html" style="display:inline-block;background:#00e676;color:#060e1b;font-weight:700;font-size:15px;padding:12px 28px;border-radius:9px;text-decoration:none;box-shadow:0 0 20px rgba(0,230,118,.25)"><span data-i18n="tips.paywall_btn">⭐ Előfizetek – 14 990 Ft/hó</span></a>
          <div style="margin-top:10px;font-size:11px;color:#37474f">Bármikor lemondható · Biztonságos Stripe fizetés</div>
        </div>`
     : `<div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:12px;padding:24px;text-align:center">
          <div style="font-size:32px;margin-bottom:8px">🔒</div>
-         <div style="font-weight:700;color:#00e676;font-size:16px;margin-bottom:6px">A napi tippekhez lépj be</div>
-         <div style="color:#78909c;font-size:13px;margin-bottom:14px">A regisztráció <b style="color:#a5d6a7">ingyenes</b>, és azonnal látod az aznapi tippeket.<br>Az eddigi eredményeinket az <b>Előzmények</b> fülön előzetesen is megnézheted.</div>
+         <div style="font-weight:700;color:#00e676;font-size:16px;margin-bottom:6px" data-i18n="tips.login_cta_title">A napi tippekhez lépj be</div>
+         <div style="color:#78909c;font-size:13px;margin-bottom:14px" data-i18n-html="tips.login_cta_body">A regisztráció <b style="color:#a5d6a7">ingyenes</b>, és azonnal látod az aznapi tippeket.<br>Az eddigi eredményeinket az <b>Előzmények</b> fülön előzetesen is megnézheted.</div>
          <button class="btn-send" style="padding:11px 22px;font-size:14px" onclick="openAuthModal('register')">${window.t('tips.reg_cta')}</button>
-         <div style="margin-top:10px;font-size:12px;color:#546e7a">Van már fiókod? <a href="#" onclick="event.preventDefault();openAuthModal('login')" style="color:#00e676;font-weight:700;text-decoration:none">Lépj be</a></div>
+         <div style="margin-top:10px;font-size:12px;color:#546e7a"><span data-i18n="tips.has_account">Van már fiókod?</span> <a href="#" onclick="event.preventDefault();openAuthModal('login')" style="color:#00e676;font-weight:700;text-decoration:none" data-i18n="tips.login_link">Lépj be</a></div>
        </div>`;
 }
 
