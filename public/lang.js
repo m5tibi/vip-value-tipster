@@ -610,7 +610,7 @@
         history_stats:  '📊 History & statistics',
         nav_analyzer:   '⚡ Analyzer',
         pending_approval: '⏳ Awaiting approval (hidden)',
-        footer_disclaimer: '<b style="color:#ffcc80">18+</b> · Tips <b>do not guarantee profit</b>, they are informational — all betting decisions are the user's own responsibility.',
+        footer_disclaimer: '<b style="color:#ffcc80">18+</b> · Tips <b>do not guarantee profit</b>, they are informational — all betting decisions are the user\'s own responsibility.',
         footer_gamble:     'Gambling can be addictive. Help: <b style="color:#ffcc80">116-123</b> (free, 24/7)',
         err_email_pwd:     'Please enter your email address and password!',
         err_under18:       'This service is only available to users 18 and over.',
