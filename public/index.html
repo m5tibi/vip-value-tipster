@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="hu">
+<html lang="hu" data-i18n-title="index.title">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -313,41 +313,41 @@
   @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition: none !important; }
   }
+button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:#5d7a96;cursor:pointer;transition:all .15s}button.lang-toggle:hover{border-color:#00e676;color:#00e676}
 </style>
+<script src="/lang.js"></script>
 </head>
 <body>
 
 <!-- NAV -->
 <nav>
   <a href="/" style="display:flex;align-items:center;text-decoration:none"><img src="/logo-horizontal.png" alt="90perc.hu" style="height:36px;width:auto"/></a>
-  <a class="nav-cta" href="/tippek.html#auth-modal">Ingyenes belépés →</a>
+  <button class="lang-toggle" onclick="toggleLang()">🇬🇧 EN</button> <a class="nav-cta" href="/tippek.html#auth-modal" data-i18n="nav.free_cta">Ingyenes belépés →</a>
 </nav>
 
 <!-- HERO -->
 <section class="hero">
   <div class="hero-eyebrow">
     <span class="dot"></span>
-    Élő AI elemzés · Ingyenes hozzáférés
+    <span data-i18n="index.hero_eyebrow">Élő AI elemzés · Ingyenes hozzáférés</span>
   </div>
 
-  <h1>Fogadj okosabban.<br/><em>Minden meccsnél.</em></h1>
+  <h1 data-i18n-html="index.hero_h1">Fogadj okosabban.<br/><em>Minden meccsnél.</em></h1>
 
   <p class="hero-sub">
-    A 90perc.hu mesterséges intelligenciával elemzi a közelgő foci meccseket —
-    valós formát, sérüléseket és statisztikákat figyelembe véve.
-    Nem tipp. <strong>Érvelés.</strong>
+    <span data-i18n-html="index.hero_sub">A 90perc.hu mesterséges intelligenciával elemzi a közelgő foci meccseket — valós formát, sérüléseket és statisztikákat figyelembe véve. Nem tipp. <strong>Érvelés.</strong></span>
   </p>
 
   <div class="hero-btns">
-    <a class="btn-primary" href="/tippek.html">Regisztrálok</a>
-    <a class="btn-secondary" href="#hogyan-mukodik">Hogyan működik?</a>
+    <a class="btn-primary" href="/tippek.html" data-i18n="index.hero_cta1">Regisztrálok</a>
+    <a class="btn-secondary" href="#hogyan-mukodik" data-i18n="index.hero_cta2">Hogyan működik?</a>
   </div>
 
   <!-- Animált mintakártya -->
   <div class="hero-card">
     <div class="card-top">
       <span class="card-league">⚽ Premier League</span>
-      <span class="card-time">Ma 20:45</span>
+      <span class="card-time" data-i18n="index.card_time">Ma 20:45</span>
     </div>
     <div class="card-match">Manchester City vs Arsenal</div>
     <div class="card-row">
@@ -355,7 +355,7 @@
       <span class="card-pick">Mindkét csapat szerez gólt</span>
       <span class="card-odds">@ 1.82</span>
     </div>
-    <div class="card-badge">✓ NYERT</div>
+    <div class="card-badge" data-i18n="index.card_badge">✓ NYERT</div>
   </div>
 </section>
 
@@ -364,19 +364,19 @@
   <div class="stats-inner">
     <div>
       <div class="stat-num" id="stat-wr">–</div>
-      <div class="stat-label">Nyerési arány (single tippek)</div>
+      <div class="stat-label" data-i18n="index.stat_wr">Nyerési arány (single tippek)</div>
     </div>
     <div>
       <div class="stat-num gold" id="stat-profit">–</div>
-      <div class="stat-label">Egységnyi profit</div>
+      <div class="stat-label" data-i18n="index.stat_profit">Egységnyi profit</div>
     </div>
     <div>
       <div class="stat-num" id="stat-roi">–</div>
-      <div class="stat-label">ROI</div>
+      <div class="stat-label" data-i18n="index.stat_roi">ROI</div>
     </div>
     <div>
       <div class="stat-num">36</div>
-      <div class="stat-label">Liga figyelve folyamatosan</div>
+      <div class="stat-label" data-i18n="index.stat_leagues">Liga figyelve folyamatosan</div>
     </div>
   </div>
 </div>
@@ -384,27 +384,26 @@
 <!-- PROBLÉMA -->
 <section>
   <div class="section-inner">
-    <div class="section-eyebrow">Miért van erre szükség?</div>
-    <h2 class="section-title">A fogadás nem szerencse.<br/>De az elemzés időbe kerül.</h2>
+    <div class="section-eyebrow" data-i18n="index.prob_eyebrow">Miért van erre szükség?</div>
+    <h2 class="section-title" data-i18n-html="index.prob_title">A fogadás nem szerencse.<br/>De az elemzés időbe kerül.</h2>
     <p class="section-sub">
-      Jó döntést hozni egy fogadásnál nem lehetetlen — csak rengeteg munkával jár,
-      amit a legtöbb embernek nincs ideje elvégezni.
+      <span data-i18n="index.prob_sub">Jó döntést hozni egy fogadásnál nem lehetetlen — csak rengeteg munkával jár, amit a legtöbb embernek nincs ideje elvégezni.</span>
     </p>
     <div class="problem-grid">
       <div class="problem-card">
         <div class="problem-icon">⏱️</div>
-        <h3>Órákat vesz el</h3>
-        <p>Forma, sérülések, H2H, motiváció — minden egyes meccs előtt manuálisan utánaolvasni elfáraszt.</p>
+        <h3 data-i18n="index.p1_title">Órákat vesz el</h3>
+        <p data-i18n="index.p1_body">Forma, sérülések, H2H, motiváció — minden egyes meccs előtt manuálisan utánaolvasni elfáraszt.</p>
       </div>
       <div class="problem-card">
         <div class="problem-icon">🤷</div>
-        <h3>A tipsterek nem átláthatók</h3>
-        <p>Nem tudod, ki áll mögöttük, mi az érvelés, és a rossz tippeket simán el lehet tüntetni.</p>
+        <h3 data-i18n="index.p2_title">A tipsterek nem átláthatók</h3>
+        <p data-i18n="index.p2_body">Nem tudod, ki áll mögöttük, mi az érvelés, és a rossz tippeket simán el lehet tüntetni.</p>
       </div>
       <div class="problem-card">
         <div class="problem-icon">🤖</div>
-        <h3>Az AI önmagában nem elég</h3>
-        <p>Egy sima ChatGPT promptból hiányoznak a valós, friss adatok — és az sem tudja, hogyan kérdezz.</p>
+        <h3 data-i18n="index.p3_title">Az AI önmagában nem elég</h3>
+        <p data-i18n="index.p3_body">Egy sima ChatGPT promptból hiányoznak a valós, friss adatok — és az sem tudja, hogyan kérdezz.</p>
       </div>
     </div>
   </div>
@@ -413,29 +412,29 @@
 <!-- HOGYAN MŰKÖDIK -->
 <section class="how-bg" id="hogyan-mukodik">
   <div class="section-inner">
-    <div class="section-eyebrow">A rendszer</div>
-    <h2 class="section-title">Hogyan működik a 90perc.hu?</h2>
-    <p class="section-sub">Három lépés, teljesen automatizálva — emberi felügyelettel.</p>
+    <div class="section-eyebrow" data-i18n="index.how_eyebrow">A rendszer</div>
+    <h2 class="section-title" data-i18n="index.how_title">Hogyan működik a 90perc.hu?</h2>
+    <p class="section-sub" data-i18n="index.how_sub">Három lépés, teljesen automatizálva — emberi felügyelettel.</p>
 
     <div class="steps">
       <div class="step">
         <div class="step-num">1</div>
         <div class="step-body">
-          <h3>Valós idejű adatgyűjtés</h3>
+          <h3 data-i18n="index.step1_h">Valós idejű adatgyűjtés</h3>
           <p>A rendszer 36 liga közelgő meccseit figyeli folyamatosan. Minden meccsre lekéri a valós bookmaker oddsokat több fogadóirodától — hendikep, gólszám és győztes piacokon egyaránt.</p>
         </div>
       </div>
       <div class="step">
         <div class="step-num">2</div>
         <div class="step-body">
-          <h3>AI elemzés web kereséssel</h3>
+          <h3 data-i18n="index.step2_h">AI elemzés web kereséssel</h3>
           <p>A Claude AI minden egyes meccsre valós web keresést végez: aktuális forma, sérülési lista, egymás elleni előzmények, taktikai kontextus. Az elemzés nem sablonból dolgozik — minden meccshez friss adatokat keres.</p>
         </div>
       </div>
       <div class="step">
         <div class="step-num">3</div>
         <div class="step-body">
-          <h3>Emberi jóváhagyás, majd közzététel</h3>
+          <h3 data-i18n="index.step3_h">Emberi jóváhagyás, majd közzététel</h3>
           <p>Minden AI-javaslatot admin ellenőriz, mielőtt megjelenne. A jóváhagyott tippek egyszerre kerülnek fel a weboldalra és a Telegram-csatornára. Az eredményeket a rendszer automatikusan ellenőrzi és rögzíti.</p>
         </div>
       </div>
@@ -446,33 +445,33 @@
 <!-- FEATURES -->
 <section>
   <div class="section-inner">
-    <div class="section-eyebrow">Mit kapsz?</div>
-    <h2 class="section-title">Minden, ami kell a jobb döntéshez.</h2>
+    <div class="section-eyebrow" data-i18n="index.feat_eyebrow">Mit kapsz?</div>
+    <h2 class="section-title" data-i18n="index.feat_title">Minden, ami kell a jobb döntéshez.</h2>
 
     <div class="features-grid">
       <div class="feature-card">
         <div class="feature-icon">📊</div>
-        <h3>Napi AI tippek</h3>
+        <h3 data-i18n="index.f1_h">Napi AI tippek</h3>
         <p>Rendszeres single tippek és kombinációk, kizárólag a legerősebb lehetőségekre — indoklással együtt.</p>
-        <span class="feature-tag">Főoldalon</span>
+        <span class="feature-tag" data-i18n="index.f1_tag">Főoldalon</span>
       </div>
       <div class="feature-card">
         <div class="feature-icon">⚡</div>
-        <h3>Meccs elemző</h3>
+        <h3 data-i18n="index.f2_h">Meccs elemző</h3>
         <p>Bármely foci mérkőzésre kérhetsz mély elemzést. Írd be a meccset, és az AI megbízhatóság szerint rangsorolva adja a tipp-javaslatokat.</p>
-        <span class="feature-tag">Elemző oldal</span>
+        <span class="feature-tag" data-i18n="index.f2_tag">Elemző oldal</span>
       </div>
       <div class="feature-card">
         <div class="feature-icon">📱</div>
-        <h3>Telegram értesítések</h3>
+        <h3 data-i18n="index.f3_h">Telegram értesítések</h3>
         <p>A jóváhagyott tippek azonnal megérkeznek a Telegram-csatornára — nem maradsz le semmiről.</p>
-        <span class="feature-tag">Telegram</span>
+        <span class="feature-tag" data-i18n="index.f3_tag">Telegram</span>
       </div>
       <div class="feature-card">
         <div class="feature-icon">📈</div>
-        <h3>Átlátható track record</h3>
+        <h3 data-i18n="index.f4_h">Átlátható track record</h3>
         <p>Minden tipp időbélyeggel kerül fel, az eredmény automatikusan rögzítve. Semmi sem tüntethető el utólag.</p>
-        <span class="feature-tag">Előzmény oldal</span>
+        <span class="feature-tag" data-i18n="index.f4_tag">Előzmény oldal</span>
       </div>
     </div>
   </div>
@@ -481,8 +480,8 @@
 <!-- TRACK RECORD -->
 <section class="tr-bg">
   <div class="section-inner">
-    <div class="section-eyebrow">Miért bízz bennünk?</div>
-    <h2 class="section-title">A track record mindent megmutat.</h2>
+    <div class="section-eyebrow" data-i18n="index.tr_eyebrow">Miért bízz bennünk?</div>
+    <h2 class="section-title" data-i18n="index.tr_title">A track record mindent megmutat.</h2>
     <p class="section-sub">Az egyetlen dolog, ami egy tipp-szolgáltatásnál igazán számít: mit mutat a múlt?</p>
 
     <div class="tr-highlight">
@@ -508,13 +507,13 @@
 <!-- FAQ -->
 <section class="faq-bg">
   <div class="section-inner">
-    <div class="section-eyebrow">Kérdések</div>
-    <h2 class="section-title">Amit a legtöbben kérdeznek.</h2>
+    <div class="section-eyebrow" data-i18n="index.faq_eyebrow">Kérdések</div>
+    <h2 class="section-title" data-i18n="index.faq_title">Amit a legtöbben kérdeznek.</h2>
 
     <div class="faq-list">
       <div class="faq-item">
         <button class="faq-q" onclick="toggleFaq(this)">
-          Garantált a nyereség?
+          <span data-i18n="index.faq1_q">Garantált a nyereség?</span>
           <span class="arrow">+</span>
         </button>
         <div class="faq-a">
@@ -525,7 +524,7 @@
       </div>
       <div class="faq-item">
         <button class="faq-q" onclick="toggleFaq(this)">
-          Miért jobb ez egy sima tipster Telegram-csatornánál?
+          <span data-i18n="index.faq2_q">Miért jobb ez egy sima tipster Telegram-csatornánál?</span>
           <span class="arrow">+</span>
         </button>
         <div class="faq-a">
@@ -537,7 +536,7 @@
       </div>
       <div class="faq-item">
         <button class="faq-q" onclick="toggleFaq(this)">
-          Miért nem elég egy sima ChatGPT-előfizetés helyette?
+          <span data-i18n="index.faq3_q">Miért nem elég egy sima ChatGPT-előfizetés helyette?</span>
           <span class="arrow">+</span>
         </button>
         <div class="faq-a">
@@ -550,7 +549,7 @@
       </div>
       <div class="faq-item">
         <button class="faq-q" onclick="toggleFaq(this)">
-          Mennyibe kerül az előfizetés?
+          <span data-i18n="index.faq4_q">Mennyibe kerül az előfizetés?</span>
           <span class="arrow">+</span>
         </button>
         <div class="faq-a">
@@ -559,7 +558,7 @@
       </div>
       <div class="faq-item">
         <button class="faq-q" onclick="toggleFaq(this)">
-          Hogyan értékelitek ki az eredményeket?
+          <span data-i18n="index.faq5_q">Hogyan értékelitek ki az eredményeket?</span>
           <span class="arrow">+</span>
         </button>
         <div class="faq-a">
@@ -571,7 +570,7 @@
       </div>
       <div class="faq-item">
         <button class="faq-q" onclick="toggleFaq(this)">
-          Milyen ligákat követ a rendszer?
+          <span data-i18n="index.faq6_q">Milyen ligákat követ a rendszer?</span>
           <span class="arrow">+</span>
         </button>
         <div class="faq-a">
@@ -586,11 +585,11 @@
 
 <!-- CTA -->
 <section class="cta-section">
-  <div class="free-badge">✦ 14 990 Ft/hó · Bármikor lemondható</div>
-  <h2>Próbáld ki.<br/><em>Nem kerül semmibe.</em></h2>
+  <div class="free-badge" data-i18n="index.cta_badge">✦ 14 990 Ft/hó · Bármikor lemondható</div>
+  <h2 data-i18n-html="index.cta_h2">Próbáld ki.<br/><em>Nem kerül semmibe.</em></h2>
   <p>Regisztrálj, vagy kövess minket Telegramon — és azonnal hozzáférsz a napi tippekhez.</p>
   <div class="cta-btns">
-    <a class="btn-primary" href="/tippek.html">Regisztrálok →</a>
+    <a class="btn-primary" href="/tippek.html" data-i18n="index.cta_btn1">Regisztrálok →</a>
     <a class="btn-tg" href="https://t.me/+rMoqrue6DBFlZmVk" target="_blank" rel="noopener">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248l-2.018 9.51c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.881.71z"/></svg>
       Telegram csatorna
@@ -600,7 +599,7 @@
 
 <!-- FOOTER -->
 <footer>
-  <p>© 2026 90perc.hu · <a href="/tippek.html">Tippek</a> · <a href="/analyzer.html">Elemző</a> · <a href="/statisztika.html">Track Record</a> · A 90perc.hu nem nyújt pénzügyi tanácsadást. Fogadj felelősen, csak 18 éven felülieknek.</p>
+  <p>© 2026 90perc.hu · <a href="/tippek.html" data-i18n="nav.tips">Tippek</a> · <a href="/analyzer.html" data-i18n="nav.analyzer">Elemző</a> · <a href="/statisztika.html">Track Record</a> · <span data-i18n="footer.disclaimer">A 90perc.hu nem nyújt pénzügyi tanácsadást. Fogadj felelősen, csak 18 éven felülieknek.</span></p>
 </footer>
 
 <script>

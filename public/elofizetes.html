@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="hu">
+<html lang="hu" data-i18n-title="sub.title">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -68,20 +68,22 @@
 
   footer{padding:20px;text-align:center;font-size:11px;color:#5d7a96;border-top:1px solid #1a2f4a}
   footer a{color:#5d7a96;text-decoration:none}
+button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:#5d7a96;cursor:pointer;transition:all .15s}button.lang-toggle:hover{border-color:#00e676;color:#00e676}
 </style>
+<script src="/lang.js"></script>
 </head>
 <body>
 
 <nav>
   <a class="nav-logo" href="/"><img src="/logo-horizontal.png" alt="90perc.hu"/></a>
-  <a class="nav-back" href="/tippek.html">← Vissza</a>
+  <button class="lang-toggle" onclick="toggleLang()">🇬🇧 EN</button> <a class="nav-back" href="/tippek.html" data-i18n="nav.back">← Vissza</a>
 </nav>
 
 <main>
   <div class="pricing-wrap">
-    <div class="eyebrow">Prémium hozzáférés</div>
-    <h1>Egyetlen csomag.<br/><em>Minden benne van.</em></h1>
-    <p class="sub">Nincs próbaidőszak, nincs rejtett díj – bármikor lemondható.</p>
+    <div class="eyebrow" data-i18n="sub.eyebrow">Prémium hozzáférés</div>
+    <h1 data-i18n-html="sub.h1">Egyetlen csomag.<br/><em>Minden benne van.</em></h1>
+    <p class="sub" data-i18n="sub.sub">Nincs próbaidőszak, nincs rejtett díj – bármikor lemondható.</p>
 
     <!-- Aktív előfizetés állapot -->
     <div class="status-box" id="status-box">
@@ -89,35 +91,35 @@
     </div>
 
     <div class="plan-card">
-      <div class="plan-name">Pro csomag</div>
+      <div class="plan-name" data-i18n="sub.plan_name">Pro csomag</div>
       <div class="plan-price">
         <span class="amount">14 990</span>
         <span class="currency">Ft</span>
-        <span class="period">/ hó</span>
+        <span class="period" data-i18n="sub.plan_period">/ hó</span>
       </div>
-      <p class="plan-sub">Automatikusan megújul – bármikor lemondható</p>
+      <p class="plan-sub" data-i18n="sub.plan_renew">Automatikusan megújul – bármikor lemondható</p>
 
       <ul class="features">
-        <li>Napi AI tippek – azonnal jóváhagyás után</li>
-        <li>Telegram értesítő minden új tippnél</li>
-        <li>Teljes előzmény és statisztika</li>
-        <li>Meccs elemző hozzáférés</li>
-        <li>Prioritás ügyfélszolgálat</li>
+        <li data-i18n="sub.f1">Napi AI tippek – azonnal jóváhagyás után</li>
+        <li data-i18n="sub.f2">Telegram értesítő minden új tippnél</li>
+        <li data-i18n="sub.f3">Teljes előzmény és statisztika</li>
+        <li data-i18n="sub.f4">Meccs elemző hozzáférés</li>
+        <li data-i18n="sub.f5">Prioritás ügyfélszolgálat</li>
       </ul>
 
-      <button class="btn-checkout" id="checkout-btn" onclick="startCheckout()">
+      <button class="btn-checkout" id="checkout-btn" onclick="startCheckout()" data-i18n="sub.btn_checkout">
         Előfizetek most →
       </button>
 
       <div id="msg"></div>
 
       <div class="secure">
-        🔒 Biztonságos fizetés – Stripe · Visa, Mastercard, Apple Pay
+        <span data-i18n="sub.secure">🔒 Biztonságos fizetés – Stripe · Visa, Mastercard, Apple Pay</span>
       </div>
 
       <hr class="divider"/>
 
-      <button class="manage-btn" id="manage-btn" onclick="openPortal()">
+      <button class="manage-btn" id="manage-btn" onclick="openPortal()" data-i18n="sub.manage_btn">
         Előfizetés kezelése / lemondás
       </button>
     </div>
@@ -125,8 +127,8 @@
 </main>
 
 <footer>
-  <p>© 2026 90perc.hu · <a href="/aszf.html">ÁSZF</a> · <a href="/adatvedelem.html">Adatvédelem</a><br/>
-  A fizetést a Stripe Inc. kezeli. A 90perc.hu nem tárol bankkártya adatokat.</p>
+  <p>© 2026 90perc.hu · <a href="/aszf.html" data-i18n="footer.tos">ÁSZF</a> · <a href="/adatvedelem.html" data-i18n="footer.privacy">Adatvédelem</a><br/>
+  <span data-i18n="sub.footer_note">A fizetést a Stripe Inc. kezeli. A 90perc.hu nem tárol bankkártya adatokat.</span></p>
 </footer>
 
 <script>
@@ -149,7 +151,7 @@ async function startCheckout() {
   const btn = document.getElementById('checkout-btn');
   const msg = document.getElementById('msg');
   btn.disabled = true;
-  btn.textContent = 'Átirányítás...';
+  btn.textContent = window.t('sub.redirecting');
   msg.textContent = '';
   msg.className   = '';
   try {
@@ -158,11 +160,11 @@ async function startCheckout() {
     const d = await r.json();
     if (d.url) { window.location.href = d.url; return; }
     if (d.error === 'Unauthenticated') {
-      msg.textContent = 'Kérjük, először jelentkezz be!';
+      msg.textContent = window.t('sub.err_login');
       msg.className = 'err';
       setTimeout(() => window.location.href = '/tippek.html', 1500);
     } else {
-      msg.textContent = d.error || 'Hiba történt, próbáld újra.';
+      msg.textContent = d.error || window.t('sub.err_generic');
       msg.className = 'err';
     }
   } catch(e) {
@@ -170,13 +172,13 @@ async function startCheckout() {
     msg.className   = 'err';
   }
   btn.disabled    = false;
-  btn.textContent = 'Előfizetek most →';
+  btn.textContent = window.t('sub.btn_checkout');
 }
 
 async function openPortal() {
   const btn = document.getElementById('manage-btn');
   btn.disabled = true;
-  btn.textContent = 'Átirányítás...';
+  btn.textContent = window.t('sub.redirecting');
   try {
     const r = await fetch('/api/stripe/portal', { method: 'POST',
       headers: { 'Content-Type': 'application/json' } });

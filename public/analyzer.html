@@ -46,10 +46,12 @@
     .step{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px}
     .snum{width:24px;height:24px;border-radius:50%;background:#7c3aed22;border:1px solid #7c3aed55;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#a78bfa;flex-shrink:0}
     @media(max-width:600px){.body{padding:14px 16px}}
-  </style>
+  button.lang-toggle{background:transparent;border:1px solid #2a2d3e;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:#6b7280;cursor:pointer;transition:all .15s}button.lang-toggle:hover{border-color:#a78bfa;color:#a78bfa}
+</style>
+<script src="/lang.js"></script>
 </head>
 <body>
-<div id="root"><div style="padding:40px;text-align:center;color:#6b7280">Betöltés...</div></div>
+<div id="root"><div style="padding:40px;text-align:center;color:#6b7280">Loading...</div></div>
 <script>
 // ── Biztonságos localStorage ──────────────────────────────
 var KS='vbt_ck', HS='vbt_ah3';
@@ -363,7 +365,7 @@ function rHdr(){
     '<div class="dot" style="background:#4ade80"></div>'+
     '<span style="font-size:11px;color:#4ade80;font-weight:600">Claude</span></div>':'';
   return '<div class="hdr">'+
-    '<div><img src="/logo-horizontal.png" alt="90perc.hu" style="height:32px;width:auto;display:block;margin-bottom:2px"/><div class="hsub" style="margin-top:4px">AI meccs elemzés</div></div>'+
+    '<div><img src="/logo-horizontal.png" alt="90perc.hu" style="height:32px;width:auto;display:block;margin-bottom:2px"/><div class="hsub" style="margin-top:4px">'+window.t('analyzer.nav_sub')+'</div></div>'+
     '<div class="hright">'+badge+'<a href="https://t.me/+rMoqrue6DBFlZmVk" target="_blank" rel="noopener" style="color:#229ED9;text-decoration:none;font-size:13px;font-weight:700;margin-right:10px">📱 Telegram</a><a class="back" href="/">← Főoldal</a></div>'+
     '</div>';
 }
@@ -393,13 +395,13 @@ function rOnboard(){
     '<div style="font-size:12px;font-weight:700;color:#a78bfa;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px">Hogyan szerezz API kulcsot?</div>'+
     sh+'</div>'+
     '<div class="card">'+
-    '<label class="lbl">Claude API Kulcs</label>'+
+    '<label class="lbl">'+window.t('analyzer.key_label')+'</label>'+
     '<div class="pwrap"><input id="ob-key" class="inp imono" type="password" placeholder="sk-ant-api03-..." oninput="S.keyIn=this.value;S.keyMsg=null">'+
     '<button class="ptgl" onclick="pwt(\'ob-key\',this)">&#128065;</button></div>'+
-    (S.keyMsg==='ok'?'<div style="margin-top:8px;font-size:12px;color:#4ade80">Kulcs érvényes!</div>':'')+
+    (S.keyMsg==='ok'?'<div style="margin-top:8px;font-size:12px;color:#4ade80">'+window.t('analyzer.key_valid')+'</div>':'')+
     (S.keyMsg==='error'?'<div style="margin-top:8px;font-size:12px;color:#f87171">Érvénytelen kulcs.</div>':'')+
     '<button class="btn bfull btn-p" style="margin-top:14px" onclick="saveKey()">'+
-    (S.savingKey?'Ellenőrzés...':'Kulcs tesztelése és mentése')+'</button>'+
+    (S.savingKey?window.t('analyzer.key_testing'):window.t('analyzer.key_test_btn'))+'</button>'+
     '<div style="margin-top:12px;font-size:11px;color:#4b5563;text-align:center;line-height:1.5">'+
     'Csak a böngésződben tárolódik. Soha nem kerül a szerverre.</div>'+
     '</div></div>';
@@ -413,14 +415,14 @@ function rAnalyzer(){
   }
   var html=
     '<div class="card" style="border-color:#7c3aed33">'+
-    '<label class="lbl">Meccs és fogadási opció</label>'+
+    '<label class="lbl">'+window.t('analyzer.match_label')+'</label>'+
     '<textarea id="qi" class="tarea" placeholder="Pl.: Brazília - Norvégia  (csak meccs → rangsorolt tipp-javaslatok)&#10;Pl.: Belgium - Szenegál; mindkét csapat szerez gólt + Over 2.5" oninput="S.query=this.value">'+esc(S.query)+'</textarea>'+
     '<div style="margin-top:10px"><div style="font-size:11px;color:#4b5563;margin-bottom:6px">Példák:</div>'+exBtns+'</div>'+
     '</div>'+
     (!S.claudeKey?'<div class="card" style="border-color:#fbbf2433;color:#fbbf24;font-size:13px;text-align:center;margin-bottom:14px">'+
     'API kulcs hiányzik — add meg a Beállítások fülön</div>':'')+
     '<button class="btn bfull '+(canGo?'btn-p':'btn-off')+'" onclick="analyze()">'+
-    (S.loading?'Elemzés folyamatban...':'Elemzés indítása')+'</button>'+
+    (S.loading?window.t('analyzer.analyzing'):window.t('analyzer.analyze_btn'))+'</button>'+
     '<div style="margin-top:8px;font-size:11px;color:#374151;text-align:center">'+
     'Egy elemzés kb. 40-50 Ft (~$0.10-0.15) a saját Anthropic számládra</div>';
 
@@ -438,7 +440,7 @@ function rAnalyzer(){
       '<div style="font-size:15px;font-weight:700;color:#e2e8f0;margin-bottom:4px">'+esc(r.query)+'</div>'+
       '<div style="font-size:12px;color:#6b7280;margin-bottom:14px">'+r.ts+'</div>'+
       '<div class="div">'+
-      '<div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">AI Elemzés</div>'+
+      '<div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">'+window.t('analyzer.ai_label')+'</div>'+
       '<div class="aitext">'+renderAI(body)+'</div>'+
       (v?'<div class="verdict-box" style="'+verdictStyle(v)+'">'+esc(v)+'</div>':'')+
       '</div></div>';
@@ -452,11 +454,11 @@ function rAnalyzer(){
 
 function rHistory(){
   if(!S.history.length){
-    return '<div style="text-align:center;color:#6b7280;padding:50px 20px;font-size:14px">Még nincs mentett elemzés.</div>';
+    return '<div style="text-align:center;color:#6b7280;padding:50px 20px;font-size:14px">'+window.t('analyzer.no_history')+'</div>';
   }
   var html='<button class="btn btn-del bsm" style="margin-bottom:14px" '+
     'onclick="if(confirm(\'Törölni az összes előzményt?\')){S.history=[];lsRemove(\''+HS+'\');clearServerHistory();R()}">'+
-    'Előzmények törlése</button>';
+    window.t('analyzer.clear_history')+'</button>';
   for(var i=0;i<S.history.length;i++){
     var h=S.history[i];
     var isExp=S.expanded===i;
@@ -489,18 +491,18 @@ function rSettings(){
     '<label class="lbl">'+(S.claudeKey?'Kulcs frissítése':'Kulcs megadása')+'</label>'+
     '<div class="pwrap"><input id="st-key" class="inp imono" type="password" placeholder="sk-ant-api03-..." oninput="S.keyIn=this.value;S.keyMsg=null">'+
     '<button class="ptgl" onclick="pwt(\'st-key\',this)">&#128065;</button></div>'+
-    (S.keyMsg==='ok'?'<div style="margin-top:8px;font-size:12px;color:#4ade80">Kulcs mentve!</div>':'')+
+    (S.keyMsg==='ok'?'<div style="margin-top:8px;font-size:12px;color:#4ade80">'+window.t('analyzer.key_saved')+'</div>':'')+
     (S.keyMsg==='error'?'<div style="margin-top:8px;font-size:12px;color:#f87171">Érvénytelen kulcs.</div>':'')+
     '<button class="btn bfull bsm btn-p" style="margin-top:12px" onclick="saveKey()">'+
-    (S.savingKey?'Ellenőrzés...':'Kulcs mentése')+'</button>'+
+    (S.savingKey?window.t('analyzer.key_testing'):window.t('analyzer.key_save_btn'))+'</button>'+
     (S.claudeKey?'<button class="btn bfull btn-del bsm" style="margin-top:8px" onclick="delKey()">Kulcs törlése</button>':'')+
     '<div style="margin-top:12px;font-size:11px;color:#4b5563;text-align:center;line-height:1.5">'+
-    'Csak a böngésződben tárolódik. Soha nem kerül a szerverre.</div></div>';
+    window.t('analyzer.key_note')+'</div></div>';
 }
 
 function rApp(){
   var tabs='<div class="tabs">'+
-    '<button '+tabSt('analyzer')+' onclick="S.tab=\'analyzer\';R()">Elemzés</button>'+
+    '<button '+tabSt('analyzer')+' onclick="S.tab=\'analyzer\';R()">'+window.t('analyzer.tab_analyzer')+'</button>'+
     '<button '+tabSt('history')+' onclick="S.tab=\'history\';R()">Előzmények ('+S.history.length+')</button>'+
     '<button '+tabSt('settings')+' onclick="S.tab=\'settings\';R()">Beállítások</button>'+
     '</div>';

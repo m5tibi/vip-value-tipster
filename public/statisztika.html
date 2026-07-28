@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="hu">
+<html lang="hu" data-i18n-title="stat.page_title">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -145,44 +145,46 @@
     thead th:nth-child(1),td:nth-child(1){display:none}
   }
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:#5d7a96;cursor:pointer;transition:all .15s}button.lang-toggle:hover{border-color:#00e676;color:#00e676}
 </style>
+<script src="/lang.js"></script>
 </head>
 <body>
 
 <nav>
   <a class="nav-logo" href="/"><img src="/logo-horizontal.png" alt="90perc.hu"/></a>
   <div class="nav-links">
-    <a href="/tippek.html">Tippek</a>
-    <a href="/analyzer.html">Elemző</a>
+    <a href="/tippek.html" data-i18n="nav.tips">Tippek</a>
+    <a href="/analyzer.html" data-i18n="nav.analyzer">Elemző</a>
     <a href="https://t.me/+rMoqrue6DBFlZmVk" target="_blank" rel="noopener" style="color:#229ED9">Telegram</a>
-    <a class="nav-cta" href="/tippek.html">Belépés</a>
+    <button class="lang-toggle" onclick="toggleLang()">🇬🇧 EN</button> <a class="nav-cta" href="/tippek.html" data-i18n="nav.login">Belépés</a>
   </div>
 </nav>
 
 <div class="hero">
-  <div class="hero-eyebrow"><span class="dot"></span>Élő adatok · Automatikusan frissítve</div>
-  <h1>Minden tipp.<br/><em>Nyilvánosan.</em></h1>
-  <p class="hero-sub">Nem törölhetünk, nem módosíthatunk. Amit kinn van, az marad – az eredménnyel együtt.</p>
+  <div class="hero-eyebrow"><span class="dot"></span><span data-i18n="stat.eyebrow">Élő adatok · Automatikusan frissítve</span></div>
+  <h1 data-i18n-html="stat.h1">Minden tipp.<br/><em>Nyilvánosan.</em></h1>
+  <p class="hero-sub" data-i18n="stat.sub">Nem törölhetünk, nem módosíthatunk. Amit kinn van, az marad – az eredménnyel együtt.</p>
 </div>
 
 <div class="period-wrap">
-  <div class="period-header">📅 Időszak</div>
+  <div class="period-header" data-i18n="stat.period_label">📅 Időszak</div>
   <div class="period-bar" id="period-bar">
-    <button class="period-btn all-time active" onclick="setPeriod('all',this)">📊 Összes (all-time)</button>
+    <button class="period-btn all-time active" onclick="setPeriod('all',this)" data-i18n="stat.all_time">📊 Összes (all-time)</button>
   </div>
 </div>
 
 <div class="scoreboard" id="scoreboard">
-  <div class="score-card"><div class="score-num" id="s-settled">–</div><div class="score-label">Lezárt tipp</div></div>
-  <div class="score-card"><div class="score-num green" id="s-wr">–</div><div class="score-label">Nyerési arány</div><div class="score-sub">döntetlen és fél-eredmény nélkül</div></div>
-  <div class="score-card"><div class="score-num gold" id="s-profit">–</div><div class="score-label">Profit (egység)</div><div class="score-sub">1 egység = 1 téted</div></div>
-  <div class="score-card"><div class="score-num" id="s-roi">–</div><div class="score-label">ROI</div><div class="score-sub">return on investment</div></div>
+  <div class="score-card"><div class="score-num" id="s-settled">–</div><div class="score-label" data-i18n="stat.s_settled">Lezárt tipp</div></div>
+  <div class="score-card"><div class="score-num green" id="s-wr">–</div><div class="score-label" data-i18n="stat.s_wr">Nyerési arány</div><div class="score-sub" data-i18n="stat.s_wr_sub">döntetlen és fél-eredmény nélkül</div></div>
+  <div class="score-card"><div class="score-num gold" id="s-profit">–</div><div class="score-label" data-i18n="stat.s_profit">Profit (egység)</div><div class="score-sub" data-i18n="stat.s_profit_sub">1 egység = 1 téted</div></div>
+  <div class="score-card"><div class="score-num" id="s-roi">–</div><div class="score-label" data-i18n="stat.s_roi">ROI</div><div class="score-sub" data-i18n="stat.s_roi_sub">return on investment</div></div>
 </div>
 
 <div class="chart-wrap">
   <div class="chart-box">
     <div class="chart-title">
-      Kumulatív profit alakulása
+      <span data-i18n="stat.chart_title">Kumulatív profit alakulása</span>
       <span id="chart-current">–</span>
     </div>
     <canvas id="profit-chart"></canvas>
@@ -191,22 +193,22 @@
 
 <div class="table-wrap">
   <div class="filter-bar">
-    <button class="filter-btn active" onclick="setFilter('all',this)">Összes</button>
-    <button class="filter-btn" onclick="setFilter('won',this)">✅ Nyert</button>
-    <button class="filter-btn" onclick="setFilter('half_won',this)">½✅ Fél nyert</button>
-    <button class="filter-btn" onclick="setFilter('push',this)">↩️ Visszajár</button>
-    <button class="filter-btn" onclick="setFilter('half_lost',this)">½❌ Fél veszett</button>
-    <button class="filter-btn" onclick="setFilter('lost',this)">❌ Veszett</button>
+    <button class="filter-btn active" onclick="setFilter('all',this)" data-i18n="stat.f_all">Összes</button>
+    <button class="filter-btn" onclick="setFilter('won',this)" data-i18n="stat.f_won">✅ Nyert</button>
+    <button class="filter-btn" onclick="setFilter('half_won',this)" data-i18n="stat.f_half_won">½✅ Fél nyert</button>
+    <button class="filter-btn" onclick="setFilter('push',this)" data-i18n="stat.f_push">↩️ Visszajár</button>
+    <button class="filter-btn" onclick="setFilter('half_lost',this)" data-i18n="stat.f_half_lost">½❌ Fél veszett</button>
+    <button class="filter-btn" onclick="setFilter('lost',this)" data-i18n="stat.f_lost">❌ Veszett</button>
   </div>
   <div id="tips-table"><div class="loading">Adatok betöltése...</div></div>
 </div>
 
 <div class="cta-box">
   <div class="cta-inner">
-    <h2>Meggyőzött a track record?<br/><em>Csatlakozz ingyen.</em></h2>
-    <p>Regisztrálj és azonnal hozzáférsz a napi tippekhez – fizetési kötelezettség nélkül.</p>
+    <h2 data-i18n-html="stat.cta_h2">Meggyőzött a track record?<br/><em>Csatlakozz ingyen.</em></h2>
+    <p data-i18n="stat.cta_sub">Regisztrálj és azonnal hozzáférsz a napi tippekhez – fizetési kötelezettség nélkül.</p>
     <div class="cta-btns">
-      <a class="btn-primary" href="/tippek.html">Regisztrálok ingyen →</a>
+      <a class="btn-primary" href="/tippek.html" data-i18n="stat.cta_btn">Regisztrálok ingyen →</a>
       <a class="btn-tg" href="https://t.me/+rMoqrue6DBFlZmVk" target="_blank" rel="noopener">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248l-2.018 9.51c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.881.71z"/></svg>
         Telegram csatorna
@@ -218,8 +220,8 @@
 <footer>
   <p>© 2026 90perc.hu ·
     <a href="/">Főoldal</a> ·
-    <a href="/tippek.html">Tippek</a> ·
-    <a href="/analyzer.html">Elemző</a> ·
+    <a href="/tippek.html" data-i18n="nav.tips">Tippek</a> ·
+    <a href="/analyzer.html" data-i18n="nav.analyzer">Elemző</a> ·
     <a href="/aszf.html">ÁSZF</a> ·
     Az adatok automatikusan, manipuláció nélkül kerülnek rögzítésre. 18+
   </p>
@@ -230,10 +232,12 @@ let allTips = [];
 let currentFilter = 'all';
 let currentPeriod = 'all'; // 'all' | 'YYYY-MM'
 
-const RESULT_LABELS = {
-  won:'✅ Nyert', lost:'❌ Veszett', push:'↩️ Visszajár',
-  half_won:'½✅ Fél nyert', half_lost:'½❌ Fél veszett', pending:'⏳ Folyamatban'
-};
+function RESULT_LABELS() {
+  return {
+    won: window.t('stat.r_won'), lost: window.t('stat.r_lost'), push: window.t('stat.r_push'),
+    half_won: window.t('stat.r_half_won'), half_lost: window.t('stat.r_half_lost'), pending: window.t('stat.r_pending')
+  };
+}
 const RESULT_CLASS = {
   won:'won', lost:'lost', push:'push',
   half_won:'half_won', half_lost:'half_lost', pending:'pending'
@@ -314,7 +318,7 @@ function renderTable(tips) {
   const el = document.getElementById('tips-table');
   const filtered = currentFilter === 'all' ? tips : tips.filter(t => t.result === currentFilter);
   const settled  = filtered.filter(t => t.result && t.result !== 'pending');
-  if (!filtered.length) { el.innerHTML = '<div class="empty">Nincs találat ebben a szűrőben.</div>'; return; }
+  if (!filtered.length) { el.innerHTML = `<div class="empty">${window.t('stat.no_filter')}</div>`; return; }
 
   const rows = filtered.map(t => {
     const pl = tipProfit(t);
@@ -326,19 +330,19 @@ function renderTable(tips) {
       <td class="td-match">${t.match || '–'}</td>
       <td class="td-pick"><span style="color:var(--muted);font-size:11px">${t.market || ''}</span><br/>${t.pick || ''}</td>
       <td class="td-odds">${parseFloat(t.odds).toFixed(2)}</td>
-      <td><span class="badge ${rc}">${RESULT_LABELS[t.result] || '–'}</span></td>
+      <td><span class="badge ${rc}">${RESULT_LABELS()[t.result] || '–'}</span></td>
       <td class="td-pl ${plClass}">${plText}</td>
     </tr>`;
   }).join('');
 
   el.innerHTML = `<table>
     <thead><tr>
-      <th>Dátum</th><th>Meccs</th><th>Tipp</th><th>Odds</th><th>Eredmény</th><th style="text-align:right">P/L</th>
+      <th data-i18n='stat.th_date'>Dátum</th><th data-i18n='stat.th_match'>Meccs</th><th data-i18n='stat.th_pick'>Tipp</th><th data-i18n='stat.th_odds'>Odds</th><th data-i18n='stat.th_result'>Eredmény</th><th style='text-align:right' data-i18n='stat.th_pl'>P/L</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>
   <p style="font-size:11px;color:var(--muted);margin-top:12px;text-align:right">
-    ${settled.length} lezárt tipp ebben a nézetben
+    ${settled.length} ${window.t("stat.settled_count")}
   </p>`;
 }
 
@@ -357,10 +361,10 @@ function setPeriod(period, btn) {
   const chartTitleEl = document.querySelector('.chart-title');
   const titleNode = chartTitleEl.childNodes[0];
   if (period === 'all') {
-    titleNode.textContent = 'Kumulatív profit alakulása';
+    titleNode.textContent = window.t('stat.chart_title');
   } else {
     const [year, month] = period.split('-');
-    titleNode.textContent = `${year} ${HU_MONTHS[parseInt(month) - 1]} – profit alakulása`;
+    titleNode.textContent = `${year} ${HU_MONTHS[parseInt(month, 10) - 1]} – ${window.t('stat.chart_title')}`;
   }
 
   const periodTips = getPeriodTips();
@@ -402,7 +406,7 @@ function drawChart(tips) {
     ctx.fillStyle = '#5d7a96';
     ctx.font = '13px Inter,sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Nincs adat ebben az időszakban', W/2, H/2);
+    ctx.fillText(window.t('stat.no_data'), W/2, H/2);
     document.getElementById('chart-current').textContent = '–';
     document.getElementById('chart-current').style.color = '#5d7a96';
     return;
@@ -485,7 +489,7 @@ async function loadData() {
     renderTable(allTips);
   } catch(e) {
     document.getElementById('tips-table').innerHTML =
-      '<div class="empty">Adatok betöltése sikertelen. Próbáld újra később.</div>';
+      `<div class="empty">${window.t('stat.load_err')}</div>`;
   }
 }
 

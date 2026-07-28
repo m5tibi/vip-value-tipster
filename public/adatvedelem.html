@@ -21,11 +21,14 @@
   li { margin-bottom:6px; }
   .back { display:inline-block; margin-bottom:18px; padding:7px 16px; background:#0d1b2a; border:1px solid #1e3a2f; border-radius:8px; text-decoration:none; font-weight:700; font-size:14px; }
   footer { margin-top:36px; padding-top:16px; border-top:1px solid #1e3a2f; color:#546e7a; font-size:12px; }
+#legal-lang-notice{display:none;background:#1a2f0e;border:1px solid rgba(0,230,118,.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;color:#a7d9a0;font-size:13px}
+button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:#5d7a96;cursor:pointer;transition:all .15s}button.lang-toggle:hover{border-color:#00e676;color:#00e676}
 </style>
+<script src="/lang.js"></script>
 </head>
 <body>
-<div class="wrap">
-  <a href="/" class="back">← Vissza a főoldalra</a>
+<div class="wrap"><div id="legal-lang-notice">This document is currently only available in Hungarian.</div>
+  <button class="lang-toggle" onclick="toggleLang()">🇬🇧 EN</button> <a href="/" class="back">← Vissza a főoldalra</a>
 
   <h1>Adatkezelési tájékoztató</h1>
   <div class="meta">Hatályos: 2026. július 14-től · GDPR (EU) 2016/679 · AI Foci Tippek</div>

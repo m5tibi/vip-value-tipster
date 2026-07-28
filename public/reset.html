@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="hu">
+<html lang="hu" data-i18n-title="reset.title">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -20,24 +20,26 @@
   .ok  { color:#69f0ae; font-size:14px; line-height:1.6; }
   a { color:#00e676; text-decoration:none; font-weight:700; }
   .foot { text-align:center; margin-top:14px; font-size:12px; color:#546e7a; }
+button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:#5d7a96;cursor:pointer;transition:all .15s}button.lang-toggle:hover{border-color:#00e676;color:#00e676}
 </style>
+<script src="/lang.js"></script>
 </head>
 <body>
-<div class="card">
+<div class="card"><div style="text-align:right;margin-bottom:8px"><button class="lang-toggle" onclick="toggleLang()">🇬🇧 EN</button></div>
   <div id="form-view">
-    <h1>Új jelszó beállítása</h1>
-    <div class="sub">Add meg az új jelszavad (legalább 8 karakter).</div>
-    <input id="pwd1" type="password" placeholder="Új jelszó" autocomplete="new-password">
-    <input id="pwd2" type="password" placeholder="Új jelszó még egyszer" autocomplete="new-password"
+    <h1 data-i18n="reset.h1">Új jelszó beállítása</h1>
+    <div class="sub" data-i18n="reset.sub">Add meg az új jelszavad (legalább 8 karakter).</div>
+    <input id="pwd1" type="password" data-i18n-placeholder="reset.pwd1" placeholder="Új jelszó" autocomplete="new-password">
+    <input id="pwd2" type="password" data-i18n-placeholder="reset.pwd2" placeholder="Új jelszó még egyszer" autocomplete="new-password"
            onkeydown="if(event.key==='Enter')submitReset()">
     <div id="err" class="err"></div>
-    <button id="btn" onclick="submitReset()">Jelszó mentése</button>
-    <div class="foot"><a href="/">← Vissza a főoldalra</a></div>
+    <button id="btn" onclick="submitReset()" data-i18n="reset.btn">Jelszó mentése</button>
+    <div class="foot"><a href="/" data-i18n="reset.back">← Vissza a főoldalra</a></div>
   </div>
   <div id="done-view" style="display:none;text-align:center">
     <div style="font-size:40px;margin-bottom:8px">✅</div>
-    <h1>Jelszó megváltoztatva</h1>
-    <div class="ok">Be is léptettünk – jó szórakozást!</div>
+    <h1 data-i18n="reset.done_h1">Jelszó megváltoztatva</h1>
+    <div class="ok" data-i18n="reset.done_sub">Be is léptettünk – jó szórakozást!</div>
     <div style="margin-top:18px"><a href="/" style="display:inline-block;background:#00e676;color:#07111d;padding:11px 22px;border-radius:8px">Tovább a tippekhez</a></div>
   </div>
 </div>
@@ -46,28 +48,28 @@ const token = new URLSearchParams(location.search).get('token') || '';
 const err = document.getElementById('err');
 const showErr = m => { err.textContent = m; err.style.display = 'block'; };
 
-if (!token) showErr('Hiányzó vagy hibás link. Kérj új jelszó-visszaállító e-mailt.');
+if (!token) showErr(window.t('reset.err_missing'));
 
 async function submitReset() {
   const p1 = document.getElementById('pwd1').value;
   const p2 = document.getElementById('pwd2').value;
   err.style.display = 'none';
-  if (p1.length < 8)  return showErr('A jelszó legalább 8 karakter legyen.');
-  if (p1 !== p2)      return showErr('A két jelszó nem egyezik.');
-  if (!token)         return showErr('Hiányzó link. Kérj új jelszó-visszaállító e-mailt.');
+  if (p1.length < 8)  return showErr(window.t('reset.err_short'));
+  if (p1 !== p2)      return showErr(window.t('reset.err_mismatch'));
+  if (!token)         return showErr(window.t('reset.err_no_link'));
   const btn = document.getElementById('btn');
-  btn.disabled = true; btn.textContent = 'Mentés...';
+  btn.disabled = true; btn.textContent = window.t('reset.saving');
   try {
     const r = await fetch('/api/auth/reset', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token, newPassword: p1 })
     });
     const d = await r.json().catch(()=>({}));
-    if (!r.ok) { btn.disabled = false; btn.textContent = 'Jelszó mentése'; return showErr(d.error || 'Hiba történt.'); }
+    if (!r.ok) { btn.disabled = false; btn.textContent = window.t('reset.btn'); return showErr(d.error || 'Hiba történt.'); }
     document.getElementById('form-view').style.display = 'none';
     document.getElementById('done-view').style.display = '';
   } catch(e) {
-    btn.disabled = false; btn.textContent = 'Jelszó mentése';
+    btn.disabled = false; btn.textContent = window.t('reset.btn');
     showErr('Hálózati hiba: ' + e.message);
   }
 }
