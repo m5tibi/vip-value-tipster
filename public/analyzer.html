@@ -171,7 +171,7 @@ function R(){
     '<div style="font-size:13px;font-weight:700;color:#a78bfa;margin-bottom:10px">'+window.t('analyzer.how_title')+'</div>'+
     '<div style="font-size:13px;color:#6b7280;line-height:1.7">'+
     window.t('analyzer.how_body')+
-    '<br><br><strong style="color:#94a3b8">'+window.t('analyzer.how_format')+'</strong> Csapat1 - Csapat2; '+window.t('analyzer.how_option')+'<br>'+
+    '<br><br><strong style="color:#94a3b8">'+window.t('analyzer.how_format')+'</strong> '+window.t('analyzer.team_example')+' '+window.t('analyzer.how_option')+'<br>'+
     '<span style="color:#4b5563">'+window.t('analyzer.how_example')+'</span>'+
     '</div></div>';
 
@@ -266,7 +266,7 @@ function setEx(idx){
 
 // ── Elemzés ───────────────────────────────────────────────
 function analyze(){
-  if(!S.claudeKey){alert('Kérlek add meg a Claude API kulcsodat a Beállítások fülön!');return;}
+  if(!S.claudeKey){alert(window.t('analyzer.no_key_alert'));return;}
   if(S.loading) return;
   var q=(S.query||'').trim();
   if(!q){alert(window.t('analyzer.no_match_alert'));return;}
@@ -343,7 +343,7 @@ function analyze(){
     .then(function(d){
       var texts=[];
       if(d.content){for(var i=0;i<d.content.length;i++){if(d.content[i].type==='text')texts.push(d.content[i].text);}}
-      var ai=texts.length?texts.map(function(s){return (s||'').trim();}).filter(Boolean).join('\n\n'):'Elemzés sikertelen.';
+      var ai=texts.length?texts.map(function(s){return (s||'').trim();}).filter(Boolean).join('\n\n'):window.t('analyzer.analysis_failed');
       ai=ai.replace(/VERDIKT\s*:\s*AJANLOTT/gi,'VERDIKT: \u2705 AJÁNLOTT')
            .replace(/VERDIKT\s*:\s*NEM AJANLOTT/gi,'VERDIKT: \u274C NEM AJÁNLOTT')
            .replace(/VERDIKT\s*:\s*BIZONYTALAN/gi,'VERDIKT: \u26A0\uFE0F BIZONYTALAN')
@@ -425,11 +425,11 @@ function rAnalyzer(){
     '<div style="margin-top:10px"><div style="font-size:11px;color:#4b5563;margin-bottom:6px">Példák:</div>'+exBtns+'</div>'+
     '</div>'+
     (!S.claudeKey?'<div class="card" style="border-color:#fbbf2433;color:#fbbf24;font-size:13px;text-align:center;margin-bottom:14px">'+
-    'API kulcs hiányzik — add meg a Beállítások fülön</div>':'')+
+    window.t('analyzer.no_api_key')+'</div>':'')+
     '<button class="btn bfull '+(canGo?'btn-p':'btn-off')+'" onclick="analyze()">'+
     (S.loading?window.t('analyzer.analyzing'):window.t('analyzer.analyze_btn'))+'</button>'+
     '<div style="margin-top:8px;font-size:11px;color:#374151;text-align:center">'+
-    'Egy elemzés kb. 40-50 Ft (~$0.10-0.15) a saját Anthropic számládra</div>';
+    window.t('analyzer.cost_note')+'</div>';
 
   if(S.result&&S.result.unclear){
     html+='<div class="card" style="margin-top:14px;border-color:#fbbf2433">'+
@@ -508,8 +508,8 @@ function rSettings(){
 function rApp(){
   var tabs='<div class="tabs">'+
     '<button '+tabSt('analyzer')+' onclick="S.tab=\'analyzer\';R()">'+window.t('analyzer.tab_analyzer')+'</button>'+
-    '<button '+tabSt('history')+' onclick="S.tab=\'history\';R()">Előzmények ('+S.history.length+')</button>'+
-    '<button '+tabSt('settings')+' onclick="S.tab=\'settings\';R()">Beállítások</button>'+
+    '<button '+tabSt('history')+' onclick="S.tab=\'history\';R()">'+window.t('analyzer.tab_history')+'('+S.history.length+')</button>'+
+    '<button '+tabSt('settings')+' onclick="S.tab=\'settings\';R()">'+window.t('analyzer.tab_settings')+'</button>'+
     '</div>';
   var content=S.tab==='analyzer'?rAnalyzer():S.tab==='history'?rHistory():rSettings();
   return rHdr()+tabs+'<div class="body">'+content+'</div>';
