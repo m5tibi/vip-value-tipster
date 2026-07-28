@@ -161,11 +161,11 @@ function R(){
   try{
     var howItWorks=
     '<div class="card" style="border-color:#1e2130;margin-bottom:14px">'+
-    '<div style="font-size:13px;font-weight:700;color:#a78bfa;margin-bottom:10px">Hogyan használd?</div>'+
+    '<div style="font-size:13px;font-weight:700;color:#a78bfa;margin-bottom:10px">'+window.t('analyzer.how_title')+'</div>'+
     '<div style="font-size:13px;color:#6b7280;line-height:1.7">'+
-    'Írj be egy foci meccset szabad szövegként. Ha csak a meccset adod meg (pl. Brazília - Norvégia), általános elemzést és megbízhatóság szerint rangsorolt tipp-javaslatokat kapsz. Ha konkrét opciót is írsz, azt értékeli. A Claude rákeres az aktuális formára, H2H előzményekre, sérülésekre.<br><br>'+
-    '<strong style="color:#94a3b8">Javasolt formátum:</strong> Csapat1 - Csapat2; fogadási opció<br>'+
-    '<span style="color:#4b5563">Pl.: Belgium - Szenegál; mindkét csapat szerez gólt + Over 2.5</span>'+
+    window.t('analyzer.how_body')+
+    '<br><br><strong style="color:#94a3b8">'+window.t('analyzer.how_format')+'</strong> Csapat1 - Csapat2; '+window.t('analyzer.how_option')+'<br>'+
+    '<span style="color:#4b5563">'+window.t('analyzer.how_example')+'</span>'+
     '</div></div>';
 
     var html=howItWorks+(S.screen==='onboarding'?rOnboard():rApp());
@@ -262,7 +262,7 @@ function analyze(){
   if(!S.claudeKey){alert('Kérlek add meg a Claude API kulcsodat a Beállítások fülön!');return;}
   if(S.loading) return;
   var q=(S.query||'').trim();
-  if(!q){alert('Kérlek írj be egy meccset (fogadási opció megadása nem kötelező)!');return;}
+  if(!q){alert(window.t('analyzer.no_match_alert'));return;}
   S.loading=true;S.result=null;R();
 
   // Háttér-kontextus: főoldali tippek lekérése (NEM jelenik meg az elemzésben)
@@ -372,12 +372,12 @@ function rHdr(){
 
 function rOnboard(){
   var steps=[
-    ['1','Menj a console.anthropic.com oldalra'],
-    ['2','Regisztrálj ingyenesen'],
-    ['3','API Keys menü → Create Key'],
-    ['4','Másold ki — csak egyszer látható!'],
-    ['5','Mentsd el biztonságos helyre'],
-    ['6','Illeszd be az alábbi mezőbe']
+    ['1',window.t('analyzer.step1')],
+    ['2',window.t('analyzer.step2')],
+    ['3','API Keys → Create Key'],
+    ['4',window.t('analyzer.step4')],
+    ['5',window.t('analyzer.step5')],
+    ['6',window.t('analyzer.step6')]
   ];
   var sh='';
   for(var i=0;i<steps.length;i++){
@@ -387,12 +387,10 @@ function rOnboard(){
   return rHdr()+
     '<div class="ob">'+
     '<div class="card" style="border-color:#7c3aed44;margin-bottom:16px">'+
-    '<div style="font-size:16px;font-weight:700;margin-bottom:8px">Üdvözöllek!</div>'+
-    '<div style="font-size:14px;color:#94a3b8;line-height:1.65">Ez az elemző a saját '+
-    '<strong style="color:#e2e8f0">Claude API kulcsoddal</strong> működik. Írd be bármely '+
-    'foci meccset — akár csak a két csapatot (pl. Brazília - Norvégia), akár konkrét fogadási opcióval. Az AI rákeres és elvégzi az elemzést.</div></div>'+
+    '<div style="font-size:16px;font-weight:700;margin-bottom:8px">'+window.t('analyzer.welcome_title')+'</div>'+
+    '<div style="font-size:14px;color:#94a3b8;line-height:1.65">'+window.t('analyzer.welcome_body')+'</div></div>'+
     '<div class="card" style="margin-bottom:16px">'+
-    '<div style="font-size:12px;font-weight:700;color:#a78bfa;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px">Hogyan szerezz API kulcsot?</div>'+
+    '<div style="font-size:12px;font-weight:700;color:#a78bfa;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px">'+window.t('analyzer.api_key_howto')+'</div>'+
     sh+'</div>'+
     '<div class="card">'+
     '<label class="lbl">'+window.t('analyzer.key_label')+'</label>'+
