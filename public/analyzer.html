@@ -53,13 +53,8 @@
 <body>
 <div id="root"><div style="padding:40px;text-align:center;color:#6b7280">Loading...</div></div>
 <script>
-// Safety fallback – ha lang.js nem töltődött be
-if (typeof window.t !== "function") {
-  window.t = function(k, fb) { return fb || k.split(".").pop(); };
-  window.getLang = function() { return "hu"; };
-  window.setLang = function() {};
-  window.toggleLang = function() {};
-}
+// Safety fallback
+if(typeof window.t!=="function"){window.t=function(k,fb){return fb||k.split(".").pop();};window.getLang=function(){return"hu";};window.setLang=function(){};window.toggleLang=function(){};}
 // ── Biztonságos localStorage ──────────────────────────────
 var KS='vbt_ck', HS='vbt_ah3';
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
@@ -170,8 +165,8 @@ function R(){
     '<div class="card" style="border-color:#1e2130;margin-bottom:14px">'+
     '<div style="font-size:13px;font-weight:700;color:#a78bfa;margin-bottom:10px">'+window.t('analyzer.how_title')+'</div>'+
     '<div style="font-size:13px;color:#6b7280;line-height:1.7">'+
-    window.t('analyzer.how_body')+
-    '<br><br><strong style="color:#94a3b8">'+window.t('analyzer.how_format')+'</strong> '+window.t('analyzer.team_example')+' '+window.t('analyzer.how_option')+'<br>'+
+    ''+window.t('analyzer.how_body')+'<br><br>'+
+    '<strong style="color:#94a3b8">'+window.t('analyzer.how_format')+'</strong> '+window.t('analyzer.team_example')+' '+window.t('analyzer.how_option')+'<br>'+
     '<span style="color:#4b5563">'+window.t('analyzer.how_example')+'</span>'+
     '</div></div>';
 
@@ -289,90 +284,44 @@ function analyze(){
 
     var isEN = window.getLang && window.getLang() === 'en';
     var prompt = isEN ? (
-      'You are a professional football betting analyst preparing analyses for paying subscribers.\n\n'+
-      'STYLE AND LANGUAGE:\n'+
-      '- Write exclusively in correct, professional English.\n'+
-      '- Be concise and specific. Avoid generalities — only make claims backed by numbers.\n'+
-      '- Never refer to any other source, system or analysis. The analysis is the result of your own research.\n\n'+
-      'IMPORTANT: If you cannot identify a football match from the request, or if the request is not related to football, DO NOT begin an analysis! Instead write exactly:\n'+
-      'NOT UNDERSTOOD: [brief explanation and suggestion for the correct format, e.g.: "Team1 - Team2" or "Team1 - Team2; Over 2.5"]\n\n'+
-      'User request:\n"'+q+'"\n'+
-      hiddenCtx+'\n\n'+
-      'Use web search for real, up-to-date data (form, injuries, H2H). Two cases are possible:\n\n'+
-      '=== (A) IF THE REQUEST CONTAINS A SPECIFIC BETTING OPTION ===\n'+
-      '(e.g. "Over 2.5", "home win", "both teams to score"), evaluate THAT option deeply, in EXACTLY this structure:\n\n'+
-      'MATCH CONTEXT:\n[Tournament, round, stakes — 1-2 concise sentences]\n\n'+
-      'HOME TEAM FORM:\n[Last 5 matches with exact results and dates, goals average calculated]\n\n'+
-      'AWAY TEAM FORM:\n[Last 5 matches with exact results and dates, goals average calculated]\n\n'+
-      'H2H HISTORY:\n[Last 3-5 head-to-head results, goals average, trends]\n\n'+
-      'INJURIES / ABSENCES:\n[Injury and suspension status of key players from both teams]\n\n'+
-      'BETTING OPTION EVALUATION:\n[Detailed analysis of the given market: what supports it, what goes against it, with specific numbers — 5-6 sentences]\n\n'+
-      'After a blank line, give the verdict and justify it in one sentence:\n'+
-      'VERDICT: RECOMMENDED — [one sentence reason]\n'+
-      'or: VERDICT: UNCERTAIN — [one sentence reason]\n'+
-      'or: VERDICT: NOT RECOMMENDED — [one sentence reason]\n\n'+
-      '=== (B) IF THE REQUEST CONTAINS ONLY A MATCH, NO BETTING OPTION ===\n'+
-      '(e.g. "Brazil - Norway"), prepare a full analysis and provide several specific tip suggestions, in EXACTLY this structure:\n\n'+
-      'MATCH CONTEXT:\n[Tournament, round, stakes — 1-2 concise sentences]\n\n'+
-      'HOME TEAM FORM:\n[Last 5 matches with exact results and dates, goals average calculated]\n\n'+
-      'AWAY TEAM FORM:\n[Last 5 matches with exact results and dates, goals average calculated]\n\n'+
-      'H2H HISTORY:\n[Last 3-5 head-to-head results, goals average, trends]\n\n'+
-      'INJURIES / ABSENCES:\n[Injury and suspension status of key players from both teams]\n\n'+
-      'TIP SUGGESTIONS:\n'+
-      'Give 4-5 specific betting suggestions in DECREASING ORDER OF CONFIDENCE. Each suggestion should be from a different market (e.g. goals, winner, handicap, BTTS). Exactly in this format:\n\n'+
-      '1. [Market and specific tip, e.g. Over 2.5 goals] — Confidence: HIGH\n'+
-      '   Reasoning: [2-3 sentences backed by specific numbers, goals average, statistics]\n\n'+
-      '2. [Market and specific tip] — Confidence: HIGH\n'+
-      '   Reasoning: [2-3 sentences]\n\n'+
-      '3. [Market and specific tip] — Confidence: MEDIUM\n'+
-      '   Reasoning: [2-3 sentences]\n\n'+
-      '4. [Market and specific tip] — Confidence: MEDIUM\n'+
-      '   Reasoning: [2-3 sentences]\n\n'+
-      '5. [Market and specific tip] — Confidence: LOW\n'+
-      '   Reasoning: [2-3 sentences — explain why it is riskier]\n\n'+
-      'Rules: do not use asterisk (*) or hashtag (#) formatting. Provide real, verified numbers. Correct, professional English only.'
+      'You are a professional football betting analyst for paying subscribers.\n\n'+
+      'STYLE: Write exclusively in correct, professional English. Be concise — only claims backed by numbers. Never reference other sources.\n\n'+
+      'IMPORTANT: If you cannot identify a football match, write: NOT UNDERSTOOD: [explanation]\n\n'+
+      'User request:\n"'+q+'"\n'+hiddenCtx+'\n\n'+
+      'Use web search for real data. Two cases:\n\n'+
+      '=== (A) SPECIFIC BETTING OPTION IN REQUEST ===\n'+
+      'Evaluate it in this exact structure:\n'+
+      'MATCH CONTEXT:\n[Tournament, round — 1-2 sentences]\n\n'+
+      'HOME TEAM FORM:\n[Last 5 matches with results/dates, goals average]\n\n'+
+      'AWAY TEAM FORM:\n[Last 5 matches with results/dates, goals average]\n\n'+
+      'H2H HISTORY:\n[Last 3-5 meetings, goals avg, trends]\n\n'+
+      'INJURIES / ABSENCES:\n[Key players both teams]\n\n'+
+      'BETTING OPTION EVALUATION:\n[Detailed analysis with numbers — 5-6 sentences]\n\n'+
+      'VERDICT: RECOMMENDED — [reason]\nor: VERDICT: UNCERTAIN — [reason]\nor: VERDICT: NOT RECOMMENDED — [reason]\n\n'+
+      '=== (B) MATCH ONLY, NO BETTING OPTION ===\n'+
+      'Full analysis + 4-5 tip suggestions:\n'+
+      'MATCH CONTEXT / HOME TEAM FORM / AWAY TEAM FORM / H2H HISTORY / INJURIES / TIP SUGGESTIONS\n'+
+      'Each tip: [Market] — Confidence: HIGH/MEDIUM/LOW\n   Reasoning: [2-3 sentences with numbers]\n\n'+
+      'Rules: no * or # formatting. Real verified numbers only. Professional English.'
     ) : (
       'Te egy profi labdarúgás-fogadási elemző vagy, aki fizetős előfizetők számára készít elemzéseket.\n\n'+
-      'STÍLUS ÉS NYELVEZET:\n'+
-      '- Kizárólag helyes, igényes magyar nyelven írj. Kerüld a hibás tükörfordításokat és a sportnyelvi zsargont (pl. ne írd: "félszívóban", "nyomás alatt lép pályára" helyett írj "fáradtan érkezik", "a kapus a bal kapufánál" stb.).\n'+
-      '- Légy tömör és konkrét. Kerüld az általánosságokat — csak számokkal alátámasztott állításokat tégy.\n'+
-      '- Soha ne utalj arra, hogy más forrásból, más rendszertől vagy más elemzéstől kaptál információt. Az elemzés a saját kutatásod eredménye.\n\n'+
-      'FONTOS: Ha nem tudsz labdarúgó meccset azonosítani a kérésből, vagy ha a kérés nem focival kapcsolatos, NE kezdj elemzésbe! Helyette írd pontosan ezt:\n'+
-      'NEM ÉRTEM: [rövid magyarázat, és javaslat a helyes formátumra, pl.: "Csapat1 - Csapat2" vagy "Csapat1 - Csapat2; Over 2.5"]\n\n'+
-      'A felhasználó kérése:\n"'+q+'"\n'+
-      hiddenCtx+'\n\n'+
-      'Használj web keresést a valós, aktuális adatokhoz (forma, sérülések, H2H). Két eset lehetséges:\n\n'+
+      'STÍLUS: Kizárólag helyes, igényes magyar nyelven írj. Légy tömör és konkrét. Csak számokkal alátámasztott állításokat tégy. Soha ne utalj más forrásra.\n\n'+
+      'FONTOS: Ha nem tudsz labdarúgó meccset azonosítani, írd pontosan: NEM ÉRTEM: [magyarázat]\n\n'+
+      'A felhasználó kérése:\n"'+q+'"\n'+hiddenCtx+'\n\n'+
+      'Használj web keresést a valós, aktuális adatokhoz. Két eset lehetséges:\n\n'+
       '=== (A) HA A KÉRÉS KONKRÉT FOGADÁSI OPCIÓT IS TARTALMAZ ===\n'+
-      '(pl. "Over 2.5", "hazai győzelem", "mindkét csapat szerez gólt"), akkor AZT az opciót értékeld mélyen, PONTOSAN ebben a struktúrában:\n\n'+
-      'MECCS KONTEXTUS:\n[Torna, forduló, tét — 1-2 tömör mondat]\n\n'+
-      'HAZAI CSAPAT FORMA:\n[Utolsó 5 meccs konkrét eredményekkel és dátummal, gólátlag kiszámítva]\n\n'+
-      'VENDÉG CSAPAT FORMA:\n[Utolsó 5 meccs konkrét eredményekkel és dátummal, gólátlag kiszámítva]\n\n'+
-      'H2H ELŐZMÉNYEK:\n[Utolsó 3-5 egymás elleni találkozó eredménye, gólátlag, trendek]\n\n'+
-      'SÉRÜLÉSEK / HIÁNYZÓK:\n[Mindkét csapat kulcsjátékosainak sérülési és eltiltási státusza]\n\n'+
-      'FOGADÁSI OPCIÓ ÉRTÉKELÉSE:\n[Az adott piac részletes elemzése: mi szól mellette, mi szól ellene, konkrét számokkal — 5-6 mondat]\n\n'+
-      'Egy üres sor után add meg a verdiktet és indokold meg egy mondatban:\n'+
-      'VERDIKT: AJANLOTT — [egy mondat az ok]\n'+
-      'vagy: VERDIKT: BIZONYTALAN — [egy mondat az ok]\n'+
-      'vagy: VERDIKT: NEM AJANLOTT — [egy mondat az ok]\n\n'+
-      '=== (B) HA A KÉRÉS CSAK EGY MECCSET TARTALMAZ, FOGADÁSI OPCIÓ NÉLKÜL ===\n'+
-      '(pl. "Brazília - Norvégia"), akkor készíts teljes elemzést és adj több konkrét tipp-javaslatot, PONTOSAN ebben a struktúrában:\n\n'+
-      'MECCS KONTEXTUS:\n[Torna, forduló, tét — 1-2 tömör mondat]\n\n'+
-      'HAZAI CSAPAT FORMA:\n[Utolsó 5 meccs konkrét eredményekkel és dátummal, gólátlag kiszámítva]\n\n'+
-      'VENDÉG CSAPAT FORMA:\n[Utolsó 5 meccs konkrét eredményekkel és dátummal, gólátlag kiszámítva]\n\n'+
-      'H2H ELŐZMÉNYEK:\n[Utolsó 3-5 egymás elleni találkozó eredménye, gólátlag, trendek]\n\n'+
-      'SÉRÜLÉSEK / HIÁNYZÓK:\n[Mindkét csapat kulcsjátékosainak sérülési és eltiltási státusza]\n\n'+
-      'TIPP JAVASLATOK:\n'+
-      'Adj 4-5 konkrét fogadási javaslatot, MEGBÍZHATÓSÁG SZERINT CSÖKKENŐ sorrendben. Minden javaslat legyen különböző piacról (pl. gólszám, győztes, hendikep, BTTS). Pontosan ilyen formában:\n\n'+
-      '1. [Piac és konkrét tipp, pl. Over 2.5 gól] — Megbízhatóság: MAGAS\n'+
-      '   Indoklás: [2-3 mondat, konkrét számokkal, gólátlaggal, statisztikával alátámasztva]\n\n'+
-      '2. [Piac és konkrét tipp] — Megbízhatóság: MAGAS\n'+
-      '   Indoklás: [2-3 mondat]\n\n'+
-      '3. [Piac és konkrét tipp] — Megbízhatóság: KÖZEPES\n'+
-      '   Indoklás: [2-3 mondat]\n\n'+
-      '4. [Piac és konkrét tipp] — Megbízhatóság: KÖZEPES\n'+
-      '   Indoklás: [2-3 mondat]\n\n'+
-      '5. [Piac és konkrét tipp] — Megbízhatóság: ALACSONY\n'+
-      '   Indoklás: [2-3 mondat — magyarázd el, miért kockázatosabb]\n\n'+
+      'PONTOSAN ebben a struktúrában:\n'+
+      'MECCS KONTEXTUS:\n[Torna, forduló — 1-2 mondat]\n\n'+
+      'HAZAI CSAPAT FORMA:\n[Utolsó 5 meccs eredményekkel és dátummal, gólátlag]\n\n'+
+      'VENDÉG CSAPAT FORMA:\n[Utolsó 5 meccs eredményekkel és dátummal, gólátlag]\n\n'+
+      'H2H ELŐZMÉNYEK:\n[Utolsó 3-5 találkozó, gólátlag, trendek]\n\n'+
+      'SÉRÜLÉSEK / HIÁNYZÓK:\n[Kulcsjátékosok mindkét csapatnál]\n\n'+
+      'FOGADÁSI OPCIÓ ÉRTÉKELÉSE:\n[Részletes elemzés konkrét számokkal — 5-6 mondat]\n\n'+
+      'VERDIKT: AJANLOTT — [ok]\nvagy: VERDIKT: BIZONYTALAN — [ok]\nvagy: VERDIKT: NEM AJANLOTT — [ok]\n\n'+
+      '=== (B) HA A KÉRÉS CSAK EGY MECCSET TARTALMAZ ===\n'+
+      'Teljes elemzés + 4-5 tipp-javaslat:\n'+
+      'MECCS KONTEXTUS / HAZAI CSAPAT FORMA / VENDÉG CSAPAT FORMA / H2H ELŐZMÉNYEK / SÉRÜLÉSEK / TIPP JAVASLATOK\n'+
+      'Minden javaslat: [Piac és tipp] — Megbízhatóság: MAGAS/KÖZEPES/ALACSONY\n   Indoklás: [2-3 mondat konkrét számokkal]\n\n'+
       'Szabályok: ne használj csillag (*) vagy hashtag (#) formázást. Adj valódi, ellenőrzött számokat. Kizárólag helyes, igényes magyar nyelvezet.'
     );
 
@@ -417,8 +366,8 @@ function rHdr(){
     '<div class="dot" style="background:#4ade80"></div>'+
     '<span style="font-size:11px;color:#4ade80;font-weight:600">Claude</span></div>':'';
   return '<div class="hdr">'+
-    '<div><img src="/logo-horizontal.png" alt="90perc.hu" style="height:32px;width:auto;display:block;margin-bottom:2px"/><div class="hsub" style="margin-top:4px">'+window.t('analyzer.nav_sub')+'</div></div>'+
-    '<div class="hright">'+badge+'<a href="https://t.me/+rMoqrue6DBFlZmVk" target="_blank" rel="noopener" style="color:#229ED9;text-decoration:none;font-size:13px;font-weight:700;margin-right:10px">📱 Telegram</a><a class="back" href="/">← '+window.t('nav.main')+('</a></div>')+('')+'
+    '<div><img src="/logo-horizontal.png" alt="90perc.hu" style="height:32px;width:auto;display:block;margin-bottom:2px"/><div class="hsub" style="margin-top:4px">AI meccs elemzés</div></div>'+
+    '<div class="hright">'+badge+'<a href="https://t.me/+rMoqrue6DBFlZmVk" target="_blank" rel="noopener" style="color:#229ED9;text-decoration:none;font-size:13px;font-weight:700;margin-right:10px">📱 '+window.t('nav.telegram')+'</a><a class="back" href="/">'+window.t('nav.main')+'</a></div>'+
     '</div>';
 }
 
@@ -426,7 +375,7 @@ function rOnboard(){
   var steps=[
     ['1',window.t('analyzer.step1')],
     ['2',window.t('analyzer.step2')],
-    ['3','API Keys → Create Key'],
+    ['3','API Keys menü → Create Key'],
     ['4',window.t('analyzer.step4')],
     ['5',window.t('analyzer.step5')],
     ['6',window.t('analyzer.step6')]
@@ -453,7 +402,7 @@ function rOnboard(){
     '<button class="btn bfull btn-p" style="margin-top:14px" onclick="saveKey()">'+
     (S.savingKey?window.t('analyzer.key_testing'):window.t('analyzer.key_test_btn'))+'</button>'+
     '<div style="margin-top:12px;font-size:11px;color:#4b5563;text-align:center;line-height:1.5">'+
-    'Csak a böngésződben tárolódik. Soha nem kerül a szerverre.</div>'+
+    'Csak a böngésződben tárolódik. '+window.t('analyzer.key_note')+'</div>'+
     '</div></div>';
 }
 
@@ -467,14 +416,14 @@ function rAnalyzer(){
     '<div class="card" style="border-color:#7c3aed33">'+
     '<label class="lbl">'+window.t('analyzer.match_label')+'</label>'+
     '<textarea id="qi" class="tarea" placeholder="'+window.t('analyzer.match_ph')+'" oninput="S.query=this.value">'+esc(S.query)+'</textarea>'+
-    '<div style="margin-top:10px"><div style="font-size:11px;color:#4b5563;margin-bottom:6px">Példák:</div>'+exBtns+'</div>'+
+    '<div style="margin-top:10px"><div style="font-size:11px;color:#4b5563;margin-bottom:6px">'+window.t('analyzer.examples_label')+'</div>'+exBtns+'</div>'+
     '</div>'+
     (!S.claudeKey?'<div class="card" style="border-color:#fbbf2433;color:#fbbf24;font-size:13px;text-align:center;margin-bottom:14px">'+
-    window.t('analyzer.no_api_key')+'</div>':'')+
+    'API kulcs hiányzik — add meg a '+window.t('analyzer.no_api_key')+'</div>':'')+
     '<button class="btn bfull '+(canGo?'btn-p':'btn-off')+'" onclick="analyze()">'+
     (S.loading?window.t('analyzer.analyzing'):window.t('analyzer.analyze_btn'))+'</button>'+
     '<div style="margin-top:8px;font-size:11px;color:#374151;text-align:center">'+
-    window.t('analyzer.cost_note')+'</div>';
+    'Egy elemzés kb. 40-50 Ft (~$0.10-0.15) '+window.t('analyzer.cost_note')+'</div>';
 
   if(S.result&&S.result.unclear){
     html+='<div class="card" style="margin-top:14px;border-color:#fbbf2433">'+
@@ -508,7 +457,7 @@ function rHistory(){
   }
   var html='<button class="btn btn-del bsm" style="margin-bottom:14px" '+
     'onclick="if(confirm(\'Törölni az összes előzményt?\')){S.history=[];lsRemove(\''+HS+'\');clearServerHistory();R()}">'+
-    window.t('analyzer.clear_history')+'</button>';
+    'Előzmények törlése</button>';
   for(var i=0;i<S.history.length;i++){
     var h=S.history[i];
     var isExp=S.expanded===i;
@@ -538,22 +487,22 @@ function rSettings(){
     '<span style="font-size:11px;color:'+(S.claudeKey?'#4ade80':'#4b5563')+';font-weight:600">'+
     (S.claudeKey?'Aktív':'Nincs beállítva')+'</span></div></div>'+
     (S.claudeKey?'<div class="kmask">'+mk(S.claudeKey)+'</div>':'')+
-    '<label class="lbl">'+(S.claudeKey?'Kulcs frissítése':'Kulcs megadása')+'</label>'+
+    '<label class="lbl">'+(S.claudeKey?window.t('analyzer.key_update'):window.t('analyzer.key_add'))+'</label>'+
     '<div class="pwrap"><input id="st-key" class="inp imono" type="password" placeholder="sk-ant-api03-..." oninput="S.keyIn=this.value;S.keyMsg=null">'+
     '<button class="ptgl" onclick="pwt(\'st-key\',this)">&#128065;</button></div>'+
     (S.keyMsg==='ok'?'<div style="margin-top:8px;font-size:12px;color:#4ade80">'+window.t('analyzer.key_saved')+'</div>':'')+
     (S.keyMsg==='error'?'<div style="margin-top:8px;font-size:12px;color:#f87171">Érvénytelen kulcs.</div>':'')+
     '<button class="btn bfull bsm btn-p" style="margin-top:12px" onclick="saveKey()">'+
     (S.savingKey?window.t('analyzer.key_testing'):window.t('analyzer.key_save_btn'))+'</button>'+
-    (S.claudeKey?'<button class="btn bfull btn-del bsm" style="margin-top:8px" onclick="delKey()">Kulcs törlése</button>':'')+
+    (S.claudeKey?'<button class="btn bfull btn-del bsm" style="margin-top:8px" onclick="delKey()">'+window.t('analyzer.key_del_btn')+'</button>':'')+
     '<div style="margin-top:12px;font-size:11px;color:#4b5563;text-align:center;line-height:1.5">'+
-    window.t('analyzer.key_note')+'</div></div>';
+    'Csak a böngésződben tárolódik. '+window.t('analyzer.key_note')+'</div></div>';
 }
 
 function rApp(){
   var tabs='<div class="tabs">'+
     '<button '+tabSt('analyzer')+' onclick="S.tab=\'analyzer\';R()">'+window.t('analyzer.tab_analyzer')+'</button>'+
-    '<button '+tabSt('history')+' onclick="S.tab=\'history\';R()">'+window.t('analyzer.tab_history')+'('+S.history.length+')</button>'+
+    '<button '+tabSt('history')+' onclick="S.tab=\'history\';R()">Előzmények ('+S.history.length+')</button>'+
     '<button '+tabSt('settings')+' onclick="S.tab=\'settings\';R()">'+window.t('analyzer.tab_settings')+'</button>'+
     '</div>';
   var content=S.tab==='analyzer'?rAnalyzer():S.tab==='history'?rHistory():rSettings();
