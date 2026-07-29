@@ -244,6 +244,7 @@ console.log(`History betöltve: ${history.length} tipp`);
 let latestTips = [];   // (megszűnt value tippek – üresen tartva a kompatibilitásért)
 let aiTips     = history.filter(t => t.type === "ai"    && (!t.result || t.result === "pending"));
 let comboTips  = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
+let freeTips   = history.filter(t => t.type === "free"  && (!t.result || t.result === "pending"));
 console.log(`Visszaállítva: ${aiTips.length} AI tipp + ${comboTips.length} kombi`);
 
 // ── Magyar idő ────────────────────────────────────────────
@@ -459,6 +460,13 @@ KÉT dolgot adj:
    - Lehetőleg KÜLÖNBÖZŐ meccsekről legyenek. Ha csak 1 meccs van elérhető, akkor csak 1 tippet adj.
    - Csak pozitív kimenetel: over gólok, hendikep győzelem, csapat győzelme. NE adj under tippet a singlekbe.
 
+3) "ingyenes_tipp": 1 db INGYENES tipp, különálló single – ez az előfizetők tippjeitől TELJESEN FÜGGETLEN.
+   - MÁS meccsről legyen, mint a "tippek" mezőben szereplők.
+   - MAGAS VALÓSZÍNŰSÉGŰ kimenetel, jellemzően 1.65-1.90 odds között (minimum 1.65 odds kötelező).
+   - Lehetőleg az aznapi legjobb fogadási lehetőség, amiről szinte biztos a kimenetel.
+   - Ugyanúgy adjon note-ot (1-2 mondat), mint a "tippek"-nél.
+   - Ha nincs jó meccs rá, legyen null.
+
 2) "kombi_labak": 4-6 BIZTONSÁGOS, alacsony kockázatú láb kombi szelvényekhez.
    - MINDEGYIK láb MÁS meccsről legyen – használj annyi különböző meccset, amennyi elérhető (legalább 2, hogy összeálljon egy kötés; ha van elég meccs, adj 4-6 lábat, hogy több, NEM átfedő kötés is kijöjjön).
    - Ezek külön-külön NEM elég értékesek single tippnek (alacsony odds, jellemzően 1.15-1.55), de kombinálva szép össz oddsot adnak.
@@ -470,7 +478,7 @@ KÖZÖS szabályok:
 - Rövid (1-2 mondat) magyar indoklás valós adatok alapján (csak a "tippek"-hez kell note).
 
 Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
-{"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"1X2","pick":"...","odds":1.85,"note":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28}]}`;
+{"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"1X2","pick":"...","odds":1.85,"note":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28}],"ingyenes_tipp":{"match":"...","sport":"soccer","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"1X2","pick":"...","odds":1.72,"note":"..."}}`;
 
   try {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -540,8 +548,20 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       match: l.match, sportLabel: l.sportLabel || "⚽",
       market: l.market, pick: l.pick, odds: parseFloat(l.odds) || 0, commence: l.commence || null
     })).filter(l => l.match && l.market && l.pick && l.odds > 1);
-    return { singles, comboLegs };
-  } catch (e) { console.error("AI tipp hiba:", e.message); return { singles: [], comboLegs: [] }; }
+    // Ingyenes tipp parse
+    const ftOdds = parseFloat(obj.ingyenes_tipp?.odds) || 0;
+    const ft = obj.ingyenes_tipp && obj.ingyenes_tipp.match && ftOdds >= 1.65 ? {
+      id: `free-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      type: "free", sport: obj.ingyenes_tipp.sport || "soccer",
+      sportLabel: obj.ingyenes_tipp.sportLabel || "⚽",
+      match: obj.ingyenes_tipp.match,
+      commence: realCommence(obj.ingyenes_tipp.match) || obj.ingyenes_tipp.commence || null,
+      market: obj.ingyenes_tipp.market, pick: obj.ingyenes_tipp.pick,
+      odds: obj.ingyenes_tipp.odds, note: obj.ingyenes_tipp.note || "",
+      approved: false, sent: false, addedAt: nowHu(), result: "pending"
+    } : null;
+    return { singles, comboLegs, freeTip: ft };
+  } catch (e) { console.error("AI tipp hiba:", e.message); return { singles: [], comboLegs: [], freeTip: null }; }
 }
 
 function comboHash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0; return h.toString(36); }
@@ -695,7 +715,7 @@ async function fetchAndProcess() {
   }
   console.log(`Ligák átnézve (ingyenes): ${scannedLeagues} · odds-hívás (fizetős, ~3 kredit/liga): ${oddsCalls} · feldolgozható meccs: ${matchList.length}`);
 
-  const { singles, comboLegs } = await fetchAiTips(matchList, [...tippedMatches]);
+  const { singles, comboLegs, freeTip: newFreeTip } = await fetchAiTips(matchList, [...tippedMatches]);
 
   // Backstop: a már ma tippelt meccsekre ne kerüljön újabb SINGLE (a prompt mellett is szűrünk)
   const newAiTips = singles.filter(t => !tippedMatches.has(t.match));
@@ -706,8 +726,18 @@ async function fetchAndProcess() {
   if (fresh.length) { history = [...fresh, ...history]; saveHistory(); }
   saveLastRun();
 
+  // Ingyenes tipp mentése (ha van és még nincs ma ilyen)
+  const todayKey = todayHU();
+  const hasFreeTodayAlready = history.some(t => t.type === "free" && t.addedAt && t.addedAt.startsWith(todayKey));
+  if (newFreeTip && !hasFreeTodayAlready && !existingIds.has(newFreeTip.id)) {
+    history = [newFreeTip, ...history];
+    saveHistory();
+    console.log(`Ingyenes tipp hozzáadva: ${newFreeTip.match} | ${newFreeTip.pick} @${newFreeTip.odds}`);
+  }
+
   // A főoldal MINDEN még le nem zárt (pending) AI tippet mutasson (a korábbi futásokét is).
-  aiTips = history.filter(t => t.type === "ai" && (!t.result || t.result === "pending"));
+  aiTips     = history.filter(t => t.type === "ai"    && (!t.result || t.result === "pending"));
+  freeTips   = history.filter(t => t.type === "free"  && (!t.result || t.result === "pending"));
 
   // Kombi tippek (külön, csak az izgalom kedvéért) – az AI biztonságos lábaiból.
   // Új single nélkül is jöhet friss kombi, de a KORÁBBIVAL azonos láb-halmazú NEM
@@ -1012,7 +1042,11 @@ async function checkResults() {
     }
   }
 
-  if (changed) { saveHistory(); console.log("Eredmények mentve ✓"); }
+  if (changed) {
+    saveHistory();
+    freeTips  = history.filter(t => t.type === "free"  && (!t.result || t.result === "pending"));
+    console.log("Eredmények mentve ✓");
+  }
   else console.log("Nincs új lezárt meccs.");
 }
 
@@ -1273,21 +1307,21 @@ function isAdminReq(req) {
 app.get("/api/tips", (req, res) => {
   const admin = isAdminReq(req);
   const freshUserTips = req.user ? (usersDb.findById(req.user.id) || req.user) : req.user;
+  // Ingyenes tipp: külön generált, type="free", jóváhagyás után mindenki látja
+  const approvedFreeTip = freeTips.filter(isApproved)[0] || null;
+
   if (!admin && !auth.hasAccess(freshUserTips)) {
-    // Ingyenes napi tipp: legjobb jóváhagyott single tipp odds >= 1.80-szal
-    const freeTip = req.user
-      ? (aiTips.filter(isApproved).find(t => parseFloat(t.odds) >= 1.80) || null)
-      : null;
     return res.status(req.user ? 402 : 401).json({
       error: req.user ? "Aktív előfizetés szükséges." : "Belépés szükséges a tippek megtekintéséhez.",
       needLogin: !req.user, needSubscription: !!req.user,
-      freeTip: freeTip ? { ...freeTip, isFree: true } : null,
+      freeTip: req.user ? approvedFreeTip : null,
       aiTips: [], comboTips: [],
     });
   }
   res.json({
     aiTips:    admin ? aiTips    : aiTips.filter(isApproved),
     comboTips: admin ? comboTips : comboTips.filter(isApproved),
+    freeTip:   approvedFreeTip,
     admin
   });
 });
@@ -1411,6 +1445,7 @@ app.patch("/api/history/:id/approve", (req, res) => {
   history   = history.map(set);
   aiTips    = aiTips.map(set);
   comboTips = comboTips.map(set);
+  freeTips  = freeTips.map(set);
   saveHistory();
   res.json({ ok: true });
 });
