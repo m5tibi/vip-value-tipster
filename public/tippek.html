@@ -226,7 +226,9 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
       <button class="btn-send" id="btn-send-tips" onclick="sendTips()" style="display:none">📤 Jóváhagyottak küldése</button>
       <button class="btn-refresh" id="btn-refresh" onclick="refresh()" style="display:none">🔄 Frissítés most</button>
     </div>
-    <div class="section-title" style="color:#b39ddb" data-i18n="tips.single_title">🤖 Single tippek</div>
+    <!-- Free tip section (admin sees pending, users see approved) -->
+  <div id="free-tip-section" style="margin-bottom:16px"></div>
+  <div class="section-title" style="color:#b39ddb" data-i18n="tips.single_title">🤖 Single tippek</div>
     <div class="section-sub" data-i18n="tips.single_sub">Valós web keresés alapján, forma és statisztika elemzéssel</div>
     <div id="ai-list"><div class="no-value">📭 Jelenleg nincs kiadott tipp.</div></div>
     <div id="combo-wrap" style="display:none">
@@ -296,7 +298,7 @@ if (typeof window.t !== "function") {
   window.setLang = function() {};
   window.toggleLang = function() {};
 }
-let aiTips = [], comboTips = [], history = [];
+let aiTips = [], comboTips = [], history = [], currentFreeTip = null;
 let msRemaining = 0;
 let dayCounter = 0;
 
@@ -598,6 +600,36 @@ function comboCardHTML(c, showResult) {
 
 function tipHTML(t, showResult) {
   return t.type==="combo" ? comboCardHTML(t, showResult) : aiTipHTML(t, showResult);
+}
+
+function renderFreeTipSection() {
+  const el = document.getElementById("free-tip-section");
+  if (!el) return;
+  const admin = isAdmin();
+  // Admin: show pending free tip too (for approval); users: only approved (handled via currentFreeTip)
+  const tip = admin
+    ? (aiTips.concat(history).find(t => t.type === "free" && (!t.result || t.result === "pending")) || currentFreeTip)
+    : currentFreeTip;
+  if (!tip) { el.innerHTML = ""; return; }
+
+  const approvedBadge = tip.approved !== false
+    ? `<span style="background:rgba(0,230,118,.15);color:#00e676;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">✅ JÓVÁHAGYVA</span>`
+    : `<span style="background:rgba(245,158,11,.15);color:#f59e0b;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">⏳ JÓVÁHAGYÁSRA VÁR</span>`;
+  const adminBtns = admin && tip.approved === false
+    ? `<div style="margin-top:10px">${adminTipControls(tip)}</div>`
+    : "";
+
+  el.innerHTML = `
+    <div style="margin-bottom:6px;font-size:11px;font-weight:700;color:#00e676;text-transform:uppercase;letter-spacing:.5px">🆓 Ingyenes napi tipp</div>
+    <div style="background:#071a10;border:2px solid #00e676;border-radius:12px;padding:18px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        ${approvedBadge}
+        <span style="color:#5d7a96;font-size:11px">${tip.addedAt||""}</span>
+      </div>
+      ${renderFreeTipCard(tip)}
+      ${adminBtns}
+    </div>
+    <div style="height:12px"></div>`;
 }
 
 function renderTips() {
@@ -933,6 +965,7 @@ async function loadTips() {
     const d = await r.json();
     aiTips    = Array.isArray(d.aiTips)?d.aiTips:[];
     comboTips = Array.isArray(d.comboTips)?d.comboTips:[];
+    currentFreeTip = d.freeTip || null;
     tipsEverLoaded = true;
     tipsRetryDelay = 3000;
     tipsErrLogged  = false;
@@ -956,6 +989,7 @@ async function loadHistory() {
     const r = await fetch("/api/history", { headers: isAdmin()?adminHeaders():{} });
     history = await r.json();
     renderHistory();
+    renderFreeTipSection();
   } catch(e) { console.error("loadHistory hiba:",e); }
 }
 
