@@ -265,6 +265,11 @@ function todayHU() {
   return p.slice(0, 3).join(" ");
 }
 
+function yesterdayHU() {
+  const p = new Date(Date.now() - 86400000).toLocaleString("hu-HU", { timeZone: "Europe/Budapest" }).split(" ");
+  return p.slice(0, 3).join(" ");
+}
+
 // ── Telegram ──────────────────────────────────────────────
 async function sendTelegram(text) {
   if (!TG_BOT_TOKEN || !TG_CHAT_ID) return;
@@ -362,6 +367,47 @@ function calcComboStats() {
   return { total: c.length, won, lost, pend, settled: settled.length,
     profitStr: settled.length ? (profit>=0?"+":"")+profit.toFixed(2) : "–",
     roiStr: roi!=="–" ? (profit>=0?"+":"")+roi+"%" : "–" };
+}
+
+function buildYesterdayStatsMsg() {
+  const yest = yesterdayHU();  // pl. "2026. 07. 28."
+  const tips = history.filter(t =>
+    t.type !== "combo" &&
+    SETTLED.includes(t.result) &&
+    t.settledAt &&
+    t.settledAt.startsWith(yest)
+  );
+  if (!tips.length) return null;
+
+  const won      = tips.filter(t => t.result === "won").length;
+  const lost     = tips.filter(t => t.result === "lost").length;
+  const push     = tips.filter(t => t.result === "push").length;
+  const halfWon  = tips.filter(t => t.result === "half_won").length;
+  const halfLost = tips.filter(t => t.result === "half_lost").length;
+  const decN     = won + lost + halfWon + halfLost;
+  const winRate  = decN ? (((won + halfWon * 0.5) / decN) * 100).toFixed(0) + "%" : "–";
+  const profit   = tips.reduce((s, t) => s + tipProfit(t), 0);
+  const profitStr = tips.length ? (profit >= 0 ? "+" : "") + profit.toFixed(2) : "–";
+  const roi       = tips.length ? ((profit / tips.length) * 100).toFixed(1) : "–";
+  const roiStr    = roi !== "–" ? (profit >= 0 ? "+" : "") + roi + "%" : "–";
+  const pushTotal = push + halfWon + halfLost;
+
+  // Tipp lista
+  const tipLines = tips.map(t => {
+    const icon = t.result === "won" ? "✅" : t.result === "lost" ? "❌" :
+                 t.result === "half_won" ? "½✅" : t.result === "half_lost" ? "½❌" : "↩️";
+    const pl = tipProfit(t);
+    const plStr = (pl >= 0 ? "+" : "") + pl.toFixed(2);
+    return `${icon} ${t.match} | ${t.pick} @${parseFloat(t.odds).toFixed(2)} → <b>${plStr} e.</b>`;
+  }).join("\n");
+
+  return `📊 <b>90perc.hu – Tegnapi eredmények</b>\n`+
+    `📅 ${yest}\n\n`+
+    `${tipLines}\n\n`+
+    `📉 <b>Összesítés</b>\n`+
+    `✅ Nyert: <b>${won}</b>  ❌ Vesztett: <b>${lost}</b>  ↩️ Visszajár: <b>${pushTotal}</b>\n`+
+    `Win %: <b>${winRate}</b> · Profit: <b>${profitStr} egység</b> · ROI: <b>${roiStr}</b>\n\n`+
+    `Teljes track record: https://90perc.hu/statisztika.html`;
 }
 
 function buildStatsMsg(title) {
@@ -1069,7 +1115,12 @@ setInterval(async () => {
   }
   if (hour === 0 && minute === 5 && _lastStatsDay !== dayKey) {
     _lastStatsDay = dayKey;
-    await sendTelegram(buildStatsMsg("90perc.hu – Napi statisztika"));
+    const yMsg = buildYesterdayStatsMsg();
+    if (yMsg) {
+      await sendTelegram(yMsg);
+    } else {
+      console.log("Nincs tegnapi lezárt tipp – statisztika nem ment ki.");
+    }
   }
 }, 60000);
 
