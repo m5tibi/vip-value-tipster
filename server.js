@@ -1223,9 +1223,14 @@ app.get("/api/tips", (req, res) => {
   const admin = isAdminReq(req);
   const freshUserTips = req.user ? (usersDb.findById(req.user.id) || req.user) : req.user;
   if (!admin && !auth.hasAccess(freshUserTips)) {
+    // Ingyenes napi tipp: legjobb jóváhagyott single tipp odds >= 1.80-szal
+    const freeTip = req.user
+      ? (aiTips.filter(isApproved).find(t => parseFloat(t.odds) >= 1.80) || null)
+      : null;
     return res.status(req.user ? 402 : 401).json({
       error: req.user ? "Aktív előfizetés szükséges." : "Belépés szükséges a tippek megtekintéséhez.",
       needLogin: !req.user, needSubscription: !!req.user,
+      freeTip: freeTip ? { ...freeTip, isFree: true } : null,
       aiTips: [], comboTips: [],
     });
   }
