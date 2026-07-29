@@ -69,12 +69,20 @@ var S={
   history:[], expanded:null
 };
 
-var EXAMPLES=[
-  'Brazilia - Norvegia',
-  'Belgium - Szenegal; mindket csapat szerez golt + Over 2.5',
-  'Brazilia - Argentina; hazai gyozelem',
-  'Real Madrid - Barcelona; Over 3.5 gol'
-];
+function getExamples(){
+  return window.getLang&&window.getLang()==='en' ? [
+    'Brazil - Norway',
+    'Belgium - Senegal; both teams to score + Over 2.5',
+    'Brazil - Argentina; home win',
+    'Real Madrid - Barcelona; Over 3.5 goals'
+  ] : [
+    'Brazília - Norvégia',
+    'Belgium - Szenegál; mindkét csapat szerez gólt + Over 2.5',
+    'Brazília - Argentína; hazai győzelem',
+    'Real Madrid - Barcelona; Over 3.5 gól'
+  ];
+}
+var EXAMPLES = getExamples();
 
 // ── Segédfüggvények ───────────────────────────────────────
 function esc(s){
@@ -366,7 +374,7 @@ function rHdr(){
     '<div class="dot" style="background:#4ade80"></div>'+
     '<span style="font-size:11px;color:#4ade80;font-weight:600">Claude</span></div>':'';
   return '<div class="hdr">'+
-    '<div><img src="/logo-horizontal.png" alt="90perc.hu" style="height:32px;width:auto;display:block;margin-bottom:2px"/><div class="hsub" style="margin-top:4px">AI meccs elemzés</div></div>'+
+    '<a href="/" style="text-decoration:none;color:inherit"><img src="/logo-horizontal.png" alt="90perc.hu" style="height:32px;width:auto;display:block"/><div class="hsub" style="margin-top:4px">'+window.t('analyzer.nav_sub')+'</div></a>'+
     '<div class="hright">'+badge+'<a href="https://t.me/+rMoqrue6DBFlZmVk" target="_blank" rel="noopener" style="color:#229ED9;text-decoration:none;font-size:13px;font-weight:700;margin-right:10px">📱 '+window.t('nav.telegram')+'</a><a class="back" href="/">'+window.t('nav.main')+'</a></div>'+
     '</div>';
 }
@@ -402,7 +410,7 @@ function rOnboard(){
     '<button class="btn bfull btn-p" style="margin-top:14px" onclick="saveKey()">'+
     (S.savingKey?window.t('analyzer.key_testing'):window.t('analyzer.key_test_btn'))+'</button>'+
     '<div style="margin-top:12px;font-size:11px;color:#4b5563;text-align:center;line-height:1.5">'+
-    'Csak a böngésződben tárolódik. '+window.t('analyzer.key_note')+'</div>'+
+    window.t('analyzer.key_note')+'</div>'+
     '</div></div>';
 }
 
@@ -423,7 +431,7 @@ function rAnalyzer(){
     '<button class="btn bfull '+(canGo?'btn-p':'btn-off')+'" onclick="analyze()">'+
     (S.loading?window.t('analyzer.analyzing'):window.t('analyzer.analyze_btn'))+'</button>'+
     '<div style="margin-top:8px;font-size:11px;color:#374151;text-align:center">'+
-    'Egy elemzés kb. 40-50 Ft (~$0.10-0.15) '+window.t('analyzer.cost_note')+'</div>';
+    window.t('analyzer.cost_note')+'</div>';
 
   if(S.result&&S.result.unclear){
     html+='<div class="card" style="margin-top:14px;border-color:#fbbf2433">'+
@@ -496,13 +504,13 @@ function rSettings(){
     (S.savingKey?window.t('analyzer.key_testing'):window.t('analyzer.key_save_btn'))+'</button>'+
     (S.claudeKey?'<button class="btn bfull btn-del bsm" style="margin-top:8px" onclick="delKey()">'+window.t('analyzer.key_del_btn')+'</button>':'')+
     '<div style="margin-top:12px;font-size:11px;color:#4b5563;text-align:center;line-height:1.5">'+
-    'Csak a böngésződben tárolódik. '+window.t('analyzer.key_note')+'</div></div>';
+    window.t('analyzer.key_note')+'</div></div>';
 }
 
 function rApp(){
   var tabs='<div class="tabs">'+
     '<button '+tabSt('analyzer')+' onclick="S.tab=\'analyzer\';R()">'+window.t('analyzer.tab_analyzer')+'</button>'+
-    '<button '+tabSt('history')+' onclick="S.tab=\'history\';R()">Előzmények ('+S.history.length+')</button>'+
+    '<button '+tabSt('history')+' onclick="S.tab=\'history\';R()">'+window.t('analyzer.tab_history')+'('+S.history.length+')</button>'+
     '<button '+tabSt('settings')+' onclick="S.tab=\'settings\';R()">'+window.t('analyzer.tab_settings')+'</button>'+
     '</div>';
   var content=S.tab==='analyzer'?rAnalyzer():S.tab==='history'?rHistory():rSettings();
