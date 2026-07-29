@@ -343,6 +343,7 @@ function applyAuthModal() {
   document.getElementById('auth-submit').textContent = reg ? window.t('tips.btn_submit_reg') : window.t('tips.btn_submit_login');
   document.getElementById('auth-pwd').setAttribute('autocomplete', reg ? 'new-password' : 'current-password');
   document.getElementById('auth-pwd').placeholder = reg ? window.t('tips.pwd_ph_reg') : window.t('tips.pwd_ph');
+  document.getElementById('auth-pwd').autocomplete = reg ? 'new-password' : 'current-password';
   document.getElementById('auth-switch-text').textContent = reg ? window.t('tips.has_account') : window.t('tips.no_account');
   document.getElementById('auth-switch-link').textContent = reg ? window.t('tips.login_link') : window.t('tips.reg_free');
   document.getElementById('auth-consent').style.display = reg ? '' : 'none';   // ÁSZF csak regisztrációnál
@@ -843,26 +844,57 @@ let tipsEverLoaded = false;
 let tipsRetryDelay = 3000;
 let tipsErrLogged  = false;
 // Zárolt nézet: nincs belépve (vagy nincs előfizetés) → felhívás a tippek helyett
-function renderLocked(needSubscription) {
+function renderFreeTipCard(t) {
+  const o = parseFloat(t.odds).toFixed(2);
+  return `<div style="background:#071a10;border:2px solid #00e676;border-radius:12px;padding:20px;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="background:rgba(0,230,118,.15);color:#00e676;font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px">${window.t('tips.free_badge')}</span>
+      <span style="color:#5d7a96;font-size:12px">${t.addedAt?t.addedAt.slice(0,10):''}</span>
+    </div>
+    <div style="font-weight:700;color:#fff;font-size:15px;margin-bottom:4px">${t.match||''}</div>
+    <div style="color:#80cbc4;font-size:12px;margin-bottom:8px">${t.market||''}</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <span style="font-weight:700;color:#00e676;font-size:16px">${t.pick||''}</span>
+      <span style="background:#0d1b2a;border:1px solid #1a2f4a;border-radius:6px;padding:3px 10px;color:#f59e0b;font-weight:700;font-size:14px">@${o}</span>
+    </div>
+    ${t.note?`<div style="color:#78909c;font-size:13px;line-height:1.6;border-top:1px solid #1e3a2f;padding-top:10px">${t.note}</div>`:''}
+  </div>`;
+}
+
+function renderLocked(needSubscription, freeTip) {
   const wrap = document.getElementById("combo-wrap");
   if (wrap) wrap.style.display = "none";
   const lu = document.getElementById("last-update");
   if (lu) lu.textContent = "";
-  document.getElementById("ai-list").innerHTML = needSubscription
-    ? `<div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:12px;padding:28px;text-align:center">
-         <div style="font-size:32px;margin-bottom:8px">🔒</div>
-         <div style="font-weight:700;color:#fff;font-size:16px;margin-bottom:6px">${window.t('tips.paywall_title')}</div>
-         <div style="color:#78909c;font-size:13px;margin-bottom:18px">${window.t('tips.paywall_body2')}</div>
-         <a href="/elofizetes.html" style="display:inline-block;background:#00e676;color:#060e1b;font-weight:700;font-size:15px;padding:12px 28px;border-radius:9px;text-decoration:none;box-shadow:0 0 20px rgba(0,230,118,.25)">${window.t('tips.paywall_btn')}</a>
-         <div style="margin-top:10px;font-size:11px;color:#37474f">${window.t('tips.cancellable')}</div>
-       </div>`
-    : `<div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:12px;padding:24px;text-align:center">
+
+  if (!needSubscription) {
+    document.getElementById("ai-list").innerHTML =
+      `<div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:12px;padding:24px;text-align:center">
          <div style="font-size:32px;margin-bottom:8px">🔒</div>
          <div style="font-weight:700;color:#00e676;font-size:16px;margin-bottom:6px">${window.t('tips.login_cta_title')}</div>
          <div style="color:#78909c;font-size:13px;margin-bottom:14px">${window.t('tips.login_cta_body')}</div>
          <button class="btn-send" style="padding:11px 22px;font-size:14px" onclick="openAuthModal('register')">${window.t('tips.reg_cta')}</button>
          <div style="margin-top:10px;font-size:12px;color:#546e7a">${window.t('tips.has_account')} <a href="#" onclick="event.preventDefault();openAuthModal('login')" style="color:#00e676;font-weight:700;text-decoration:none">${window.t('tips.login_link')}</a></div>
        </div>`;
+    return;
+  }
+
+  // Előfizető nélküli, de belépett user → ingyenes tipp + paywall
+  const freePart = freeTip
+    ? `<div style="margin-bottom:6px;font-size:11px;font-weight:700;color:#00e676;text-transform:uppercase;letter-spacing:.5px">${window.t('tips.free_badge')}</div>
+       ${renderFreeTipCard(freeTip)}`
+    : `<div style="color:#5d7a96;font-size:13px;text-align:center;padding:16px 0">${window.t('tips.free_tip_none')}</div>`;
+
+  const paywallPart =
+    `<div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:12px;padding:24px;text-align:center">
+       <div style="font-size:28px;margin-bottom:8px">🔒</div>
+       <div style="font-weight:700;color:#fff;font-size:15px;margin-bottom:6px">${window.t('tips.free_tip_paywall')}</div>
+       <div style="color:#78909c;font-size:13px;margin-bottom:16px">${window.t('tips.free_tip_paywall_body')}</div>
+       <a href="/elofizetes.html" style="display:inline-block;background:#00e676;color:#060e1b;font-weight:700;font-size:15px;padding:12px 28px;border-radius:9px;text-decoration:none;box-shadow:0 0 20px rgba(0,230,118,.25)">${window.t('tips.paywall_btn')}</a>
+       <div style="margin-top:10px;font-size:11px;color:#37474f">${window.t('tips.cancellable')}</div>
+     </div>`;
+
+  document.getElementById("ai-list").innerHTML = freePart + '<div style="margin:16px 0"></div>' + paywallPart;
 }
 
 async function loadTips() {
@@ -872,7 +904,8 @@ async function loadTips() {
     if (r.status === 401 || r.status === 402) {
       aiTips = []; comboTips = [];
       tipsEverLoaded = true;
-      renderLocked(r.status === 402);
+      const errData = await r.json().catch(() => ({}));
+      renderLocked(r.status === 402, errData.freeTip || null);
       return;
     }
     if (!r.ok) throw new Error("HTTP "+r.status);
