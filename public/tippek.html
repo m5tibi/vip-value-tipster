@@ -846,10 +846,31 @@ let tipsErrLogged  = false;
 // Zárolt nézet: nincs belépve (vagy nincs előfizetés) → felhívás a tippek helyett
 function renderFreeTipCard(t) {
   const o = parseFloat(t.odds).toFixed(2);
+  const lang = window.getLang ? window.getLang() : 'hu';
+  const locale = lang === 'en' ? 'en-GB' : 'hu-HU';
+  // Dátum és kezdési idő formázása
+  let dateStr = '';
+  let timeStr = '';
+  if (t.commence) {
+    try {
+      const d = new Date(t.commence);
+      if (!isNaN(d.getTime())) {
+        dateStr = d.toLocaleDateString(locale, { timeZone:'Europe/Budapest', month:'short', day:'numeric' });
+        timeStr = d.toLocaleTimeString(locale, { timeZone:'Europe/Budapest', hour:'2-digit', minute:'2-digit' });
+      } else {
+        // HU locale string – pl. "2026. 7. 28. 20:45:00"
+        const m = String(t.commence).match(/(\d{1,2}):(\d{2})/);
+        if (m) timeStr = m[1].padStart(2,'0') + ':' + m[2];
+        dateStr = t.addedAt ? t.addedAt.slice(0,10) : '';
+      }
+    } catch(e) {}
+  } else if (t.addedAt) {
+    dateStr = t.addedAt.slice(0,10);
+  }
   return `<div style="background:#071a10;border:2px solid #00e676;border-radius:12px;padding:20px;margin-bottom:12px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <span style="background:rgba(0,230,118,.15);color:#00e676;font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px">${window.t('tips.free_badge')}</span>
-      <span style="color:#5d7a96;font-size:12px">${t.addedAt?t.addedAt.slice(0,10):''}</span>
+      <span style="color:#5d7a96;font-size:12px">${dateStr}${timeStr?' · 🕐 '+timeStr:''}</span>
     </div>
     <div style="font-weight:700;color:#fff;font-size:15px;margin-bottom:4px">${t.match||''}</div>
     <div style="color:#80cbc4;font-size:12px;margin-bottom:8px">${t.market||''}</div>
