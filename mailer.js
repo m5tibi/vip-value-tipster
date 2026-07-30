@@ -165,9 +165,22 @@ async function sendNewTips(to, tips, combos) {
   ).join("");
   return send({
     to,
-    subject: `⚽ ${tips.length} új tipp érkezett – 90perc.hu`,
-    text: tips.map(t => `${t.match}: ${t.pick} @ ${t.odds}`).join("\n"),
-    html: shell(`${tips.length} új tipp érkezett`, `
+    subject: (() => {
+      const parts = [];
+      if (tips.length) parts.push(`${tips.length} single`);
+      if (combos.length) parts.push(`${combos.length} kombi`);
+      return `⚽ Új tippek: ${parts.join(" + ")} – 90perc.hu`;
+    })(),
+    text: [
+      ...tips.map(t => `${t.match}: ${t.pick} @ ${t.odds}`),
+      ...combos.map(c => `🎰 Kombi: ${c.legs.map(l=>l.pick).join(" + ")} @ ${c.odds}`)
+    ].join("\n"),
+    html: shell((() => {
+      const parts = [];
+      if (tips.length) parts.push(`${tips.length} single tipp`);
+      if (combos.length) parts.push(`${combos.length} kombi tipp`);
+      return `Új tippek: ${parts.join(" + ")}`;
+    })(), `
       <table style="width:100%;border-collapse:collapse;margin:10px 0">
         <thead>
           <tr style="color:#546e7a;font-size:11px;text-transform:uppercase">
