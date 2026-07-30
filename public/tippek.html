@@ -661,8 +661,10 @@ function tipProfit(t) {
 function tipProfitAny(t) {
   if (t.type === "combo") {
     if (!["won","lost","push"].includes(t.result)) return 0;
-    const payout = typeof t.comboPayout==="number" ? t.comboPayout : (t.result==="won"?parseFloat(t.odds):t.result==="push"?1:0);
-    return payout - 1;
+    const payout = (typeof t.comboPayout === "number" && t.comboPayout > 0)
+      ? t.comboPayout
+      : (t.result === "won" ? (parseFloat(t.odds) || 0) : t.result === "push" ? 1 : 0);
+    return +(payout - 1).toFixed(2);
   }
   return tipProfit(t);
 }
@@ -699,9 +701,14 @@ function renderHistory() {
     cStats.style.display = "none";
   }
 
-  // Csak foci AI tippek: a value tippeket és a nem-foci sportágakat kihagyjuk.
+  // Összes jóváhagyott tipp (singles + kombik, value nélkül)
   const isFoci = t => /soccer|foci|⚽/i.test((t.sport||"")+" "+(t.sportLabel||""));
-  const H = history.filter(t => t.type !== "value" && (t.type === "combo" || isFoci(t)));
+  const isApprovedH = t => t.approved !== false;
+  const H = history.filter(t =>
+    isApprovedH(t) &&
+    t.type !== "value" &&
+    (t.type === "combo" || isFoci(t))
+  );
 
   const won      = H.filter(t=>t.result==="won").length;
   const lost     = H.filter(t=>t.result==="lost").length;
@@ -711,7 +718,7 @@ function renderHistory() {
   const decN   = won+lost+halfWon+halfLost;
   const wr     = decN?(((won+halfWon*0.5)/decN)*100).toFixed(0)+"%":"–";
   const settled = H.filter(t=>["won","lost","push","half_won","half_lost"].includes(t.result));
-  const profit  = settled.reduce((a,t)=>a+tipProfit(t),0);
+  const profit  = settled.reduce((a,t)=>a+tipProfitAny(t),0);
   const roi    = settled.length?((profit/settled.length)*100).toFixed(1):"–";
   const roiCol = profit>0?"#69f0ae":profit<0?"#ef9a9a":"#90a4ae";
 
