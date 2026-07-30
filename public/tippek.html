@@ -696,13 +696,16 @@ function renderHistory() {
   const roiCol = profit>0?"#69f0ae":profit<0?"#ef9a9a":"#90a4ae";
 
   const pendCombos = combos.filter(t=>!t.result||t.result==="pending").length;
+  const wonCombos  = combos.filter(t=>t.result==="won").length;
+  const lostCombos = combos.filter(t=>t.result==="lost").length;
+  const pushCombos = combos.filter(t=>t.result==="push").length;
   const pend   = H.filter(t=>!t.result||t.result==="pending").length + pendCombos;
   // Alap számok a helyi adatból (azonnal látható)
-  document.getElementById("h-total").textContent  = H.length;
+  document.getElementById("h-total").textContent  = H.length + combos.length;
   document.getElementById("h-pend").textContent   = pend;
-  document.getElementById("h-won").textContent    = won;
-  document.getElementById("h-lost").textContent   = lost;
-  document.getElementById("h-push").textContent   = push + halfWon + halfLost;
+  document.getElementById("h-won").textContent    = won + wonCombos;
+  document.getElementById("h-lost").textContent   = lost + lostCombos;
+  document.getElementById("h-push").textContent   = push + halfWon + halfLost + pushCombos;
 
   // Profit/ROI/WinRate: /api/public-stats-ból (egységes forrás)
   fetch("/api/public-stats").then(r=>r.json()).then(d => {
