@@ -695,30 +695,45 @@ function renderHistory() {
   const roiCol = profit>0?"#69f0ae":profit<0?"#ef9a9a":"#90a4ae";
 
   const pend   = H.filter(t=>!t.result||t.result==="pending").length;
+  // Alap számok a helyi adatból (azonnal látható)
   document.getElementById("h-total").textContent  = H.length;
   document.getElementById("h-pend").textContent   = pend;
   document.getElementById("h-won").textContent    = won;
   document.getElementById("h-lost").textContent   = lost;
   document.getElementById("h-push").textContent   = push + halfWon + halfLost;
-  document.getElementById("h-wr").textContent     = wr;
-  document.getElementById("h-profit").textContent = settled.length?(profit>=0?"+":"")+profit.toFixed(2):"–";
-  document.getElementById("h-profit").style.color = roiCol;
-  document.getElementById("h-roi").textContent    = roi!=="–"?(profit>=0?"+":"")+roi+"%":"–";
-  document.getElementById("h-roi").style.color    = roiCol;
 
-  // Élő statisztika csík frissítése
-  const lsBar = document.getElementById("live-stats-bar");
-  if (lsBar) {
-    lsBar.style.display = "flex";
-    const lsWr  = document.getElementById("ls-wr");
-    const lsPr  = document.getElementById("ls-profit");
-    const lsRoi = document.getElementById("ls-roi");
-    const lsSt  = document.getElementById("ls-settled");
-    if (lsWr)  { lsWr.textContent = wr; lsWr.style.color = profit >= 0 ? "#00e676" : "#ef9a9a"; }
-    if (lsPr)  { lsPr.textContent = (profit >= 0 ? "+" : "") + profit.toFixed(2); lsPr.style.color = profit >= 0 ? "#f59e0b" : "#ef9a9a"; }
-    if (lsRoi) { lsRoi.textContent = roi !== "–" ? (profit >= 0 ? "+" : "") + roi + "%" : "–"; lsRoi.style.color = profit >= 0 ? "#00e676" : "#ef9a9a"; }
-    if (lsSt)  { lsSt.textContent = settled.length + " " + window.t("tips.settled_basis"); }
-  }
+  // Profit/ROI/WinRate: /api/public-stats-ból (egységes forrás)
+  fetch("/api/public-stats").then(r=>r.json()).then(d => {
+    const p   = d.profit ?? profit;
+    const r2  = d.roi ?? roi;
+    const wr2 = d.winRate != null ? d.winRate + "%" : wr;
+    const col = p >= 0 ? "#69f0ae" : "#ef9a9a";
+    document.getElementById("h-wr").textContent     = wr2;
+    document.getElementById("h-profit").textContent = (p >= 0 ? "+" : "") + parseFloat(p).toFixed(2);
+    document.getElementById("h-profit").style.color = col;
+    document.getElementById("h-roi").textContent    = r2 != null ? (p >= 0 ? "+" : "") + r2 + "%" : "–";
+    document.getElementById("h-roi").style.color    = col;
+    const lsBar = document.getElementById("live-stats-bar");
+    if (lsBar) {
+      lsBar.style.display = "flex";
+      const lsWr  = document.getElementById("ls-wr");
+      const lsPr  = document.getElementById("ls-profit");
+      const lsRoi = document.getElementById("ls-roi");
+      const lsSt  = document.getElementById("ls-settled");
+      if (lsWr)  { lsWr.textContent = wr2; lsWr.style.color = p >= 0 ? "#00e676" : "#ef9a9a"; }
+      if (lsPr)  { lsPr.textContent = (p >= 0 ? "+" : "") + parseFloat(p).toFixed(2); lsPr.style.color = p >= 0 ? "#f59e0b" : "#ef9a9a"; }
+      if (lsRoi) { lsRoi.textContent = r2 != null ? (p >= 0 ? "+" : "") + r2 + "%" : "–"; lsRoi.style.color = p >= 0 ? "#00e676" : "#ef9a9a"; }
+      if (lsSt)  { lsSt.textContent = (d.settled ?? settled.length) + " " + window.t("tips.settled_basis"); }
+    }
+  }).catch(() => {
+    // Fallback: helyi számítás
+    const col = profit >= 0 ? "#69f0ae" : "#ef9a9a";
+    document.getElementById("h-wr").textContent     = wr;
+    document.getElementById("h-profit").textContent = settled.length ? (profit >= 0 ? "+" : "") + profit.toFixed(2) : "–";
+    document.getElementById("h-profit").style.color = col;
+    document.getElementById("h-roi").textContent    = roi !== "–" ? (profit >= 0 ? "+" : "") + roi + "%" : "–";
+    document.getElementById("h-roi").style.color    = col;
+  });
 
   const el = document.getElementById("history-list");
 
