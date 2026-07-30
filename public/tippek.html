@@ -527,6 +527,10 @@ function monthLabel(monthKey) {
   return y+". "+name;                          // "2026. július"
 }
 
+function yearOf(monthKey) {
+  return (monthKey.split(" ")[0] || "").replace(".", "");  // "2026. 07." → "2026"
+}
+
 function todayKey() {
   const s = new Date().toLocaleString("hu-HU",{timeZone:"Europe/Budapest"});
   const p = s.split(" ");
@@ -804,6 +808,39 @@ function renderHistory() {
     </div>`;
   }
 
+  // Egy év: hónapokra bontva, összecsukva (alapból zárva).
+  function makeYearSection(yearStr, monthKeys, doneByDay) {
+    const id = "ys-"+(dayCounter++);
+    const yearTips = [];
+    monthKeys.forEach(mk => {
+      Object.keys(doneByDay).filter(d => monthKeyOf(d) === mk)
+        .forEach(d => yearTips.push(...doneByDay[d]));
+    });
+    const yWon  = yearTips.filter(t=>t.result==="won").length;
+    const yLost = yearTips.filter(t=>t.result==="lost").length;
+    const ySt   = subStats(yearTips);
+    const pCol  = ySt.profit>0?"#69f0ae":ySt.profit<0?"#ef9a9a":"#90a4ae";
+    const pChip = ySt.settled
+      ? ` · <b style="color:${pCol}">${ySt.profit>=0?"+":""}${ySt.profit.toFixed(2)}e</b>`
+      : "";
+    const inner = monthKeys.sort((a,b)=>b.localeCompare(a)).map(mk => {
+      const mTips = [];
+      Object.keys(doneByDay).filter(d => monthKeyOf(d) === mk)
+        .forEach(d => mTips.push(...doneByDay[d]));
+      return makeMonthSection(mk, mTips);
+    }).join("");
+    return `<div style="margin-bottom:6px">
+      <div onclick="toggleDay('${id}')" style="background:#0a1520;border:1px solid #1a2f4a;border-radius:8px;padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:700;color:#dce8f5;font-size:14px">📆 ${yearStr}</span>
+        <span style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:12px;color:#5d7a96">${yearTips.length} tipp · ✅${yWon} ❌${yLost}${pChip}</span>
+          <span class="day-arrow" id="arr-${id}">▼</span>
+        </span>
+      </div>
+      <div id="${id}" style="display:none;padding-left:8px;margin-top:4px">${inner}</div>
+    </div>`;
+  }
+
   // Egy tipplista (single VAGY kombi) nap/hónap szerinti rendszerezett HTML-je.
   function groupedHtml(tipsArr, kind) {
     const pending = tipsArr.filter(t=>!t.result||t.result==="pending");
@@ -823,22 +860,22 @@ function renderHistory() {
     }
     if (done.length) {
       html += `<div class="section-header" style="background:#0d1b2a;color:#80cbc4;margin-top:8px">📋 ${window.t("tips.closed")} ${kind} ${window.t("tips.tips_word")}</div>`;
-      const currentMonth = monthKeyOf(todayKey());
+      // Év → hónap → nap hierarchia, minden szint alapból csukva
       const monthsToDays = {};
       Object.keys(doneByDay).forEach(day => {
         const mk = monthKeyOf(day);
         if (!monthsToDays[mk]) monthsToDays[mk] = [];
         monthsToDays[mk].push(day);
       });
-      (monthsToDays[currentMonth] || []).sort((a,b)=>b.localeCompare(a)).forEach(day => {
-        html += makeDaySection(day, doneByDay[day], false);
+      const yearToMonths = {};
+      Object.keys(monthsToDays).forEach(mk => {
+        const yk = yearOf(mk);
+        if (!yearToMonths[yk]) yearToMonths[yk] = [];
+        yearToMonths[yk].push(mk);
       });
-      Object.keys(monthsToDays).filter(mk => mk !== currentMonth)
-        .sort((a,b)=>b.localeCompare(a)).forEach(mk => {
-          const monthTips = [];
-          monthsToDays[mk].forEach(day => monthTips.push(...doneByDay[day]));
-          html += makeMonthSection(mk, monthTips);
-        });
+      Object.keys(yearToMonths).sort((a,b)=>b.localeCompare(a)).forEach(yk => {
+        html += makeYearSection(yk, yearToMonths[yk], doneByDay);
+      });
     }
     return html;
   }
