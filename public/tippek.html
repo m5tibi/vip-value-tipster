@@ -695,7 +695,8 @@ function renderHistory() {
   const roi    = settled.length?((profit/settled.length)*100).toFixed(1):"–";
   const roiCol = profit>0?"#69f0ae":profit<0?"#ef9a9a":"#90a4ae";
 
-  const pend   = H.filter(t=>!t.result||t.result==="pending").length;
+  const pendCombos = combos.filter(t=>!t.result||t.result==="pending").length;
+  const pend   = H.filter(t=>!t.result||t.result==="pending").length + pendCombos;
   // Alap számok a helyi adatból (azonnal látható)
   document.getElementById("h-total").textContent  = H.length;
   document.getElementById("h-pend").textContent   = pend;
