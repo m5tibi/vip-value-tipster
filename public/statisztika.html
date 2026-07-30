@@ -372,13 +372,17 @@ function setPeriod(period, btn) {
   const titleNode = chartTitleEl.childNodes[0];
   if (period === 'all') {
     titleNode.textContent = window.t('stat.chart_title');
+    // All-time: szerver oldali stats (single forrás)
+    fetch('/api/public-stats').then(r=>r.json()).then(d => {
+      updateScoreboard({ settled: d.settled, winRate: d.winRate, profit: d.profit, roi: d.roi });
+    }).catch(() => updateScoreboard(calcStats(getPeriodTips())));
   } else {
     const [year, month] = period.split('-');
     titleNode.textContent = `${year} ${monthName(parseInt(month, 10) - 1)} – ${window.t('stat.chart_title')}`;
+    updateScoreboard(calcStats(getPeriodTips()));
   }
 
   const periodTips = getPeriodTips();
-  updateScoreboard(calcStats(periodTips));
   drawChart(periodTips.slice().reverse());
   renderTable(periodTips);
 }
@@ -484,8 +488,12 @@ function drawChart(tips) {
 
 async function loadData() {
   try {
-    const histRes = await fetch('/api/history');
+    const [histRes, pubRes] = await Promise.all([
+      fetch('/api/history'),
+      fetch('/api/public-stats')
+    ]);
     const hist    = await histRes.json();
+    const pubStats = await pubRes.json().catch(() => null);
 
     allTips = (Array.isArray(hist) ? hist : [])
       .filter(t => t.type !== 'value' && t.approved !== false)
@@ -493,8 +501,17 @@ async function loadData() {
 
     buildPeriodPicker(allTips);
 
-    const stats = calcStats(allTips);
-    updateScoreboard(stats);
+    // All-time scoreboard: szerver oldali számítás (single forrás)
+    if (pubStats) {
+      updateScoreboard({
+        settled:  pubStats.settled,
+        winRate:  pubStats.winRate,
+        profit:   pubStats.profit,
+        roi:      pubStats.roi
+      });
+    } else {
+      updateScoreboard(calcStats(allTips));
+    }
     drawChart(allTips.slice().reverse());
     renderTable(allTips);
   } catch(e) {
