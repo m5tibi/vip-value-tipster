@@ -668,18 +668,19 @@ function subStats(tips) {
 }
 
 function renderHistory() {
-  // ── Kombi szekció (a stats a fő összesítőben van, itt csak a lista) ──
-  const combos = history.filter(t => t.type === "combo");
+  // ── Kombi szekció: csak jóváhagyott kombik az előzményekben ──────────
+  const isApprovedH = t => t.approved !== false;
+  const isFoci = t => /soccer|foci|⚽/i.test((t.sport||"")+" "+(t.sportLabel||""));
+  const combos = history.filter(t => t.type === "combo" && isApprovedH(t));
   const cStats = document.getElementById("combo-stats");
   cStats.style.display = combos.length ? "" : "none";
 
-  // Összes jóváhagyott tipp (singles + kombik, value nélkül)
-  const isFoci = t => /soccer|foci|⚽/i.test((t.sport||"")+" "+(t.sportLabel||""));
-  const isApprovedH = t => t.approved !== false;
+  // Singles és free tippek (kombik NE kerüljenek bele – azok külön jelennek meg)
   const H = history.filter(t =>
     isApprovedH(t) &&
     t.type !== "value" &&
-    (t.type === "combo" || isFoci(t))
+    t.type !== "combo" &&
+    isFoci(t)
   );
 
   const won      = H.filter(t=>t.result==="won").length;
