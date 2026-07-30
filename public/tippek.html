@@ -701,7 +701,7 @@ function renderHistory() {
 
   // Csak foci AI tippek: a value tippeket és a nem-foci sportágakat kihagyjuk.
   const isFoci = t => /soccer|foci|⚽/i.test((t.sport||"")+" "+(t.sportLabel||""));
-  const H = history.filter(t => t.type !== "value" && t.type !== "combo" && isFoci(t));
+  const H = history.filter(t => t.type !== "value" && (t.type === "combo" || isFoci(t)));
 
   const won      = H.filter(t=>t.result==="won").length;
   const lost     = H.filter(t=>t.result==="lost").length;
