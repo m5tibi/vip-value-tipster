@@ -251,10 +251,10 @@ function monthName(i) { return (window.getLang&&window.getLang()==='en'?EN_MONTH
 
 function tipProfit(t) {
   if (t.type === 'combo') {
-    // Kombi: comboPayout - 1 egység tét; ha nincs payout, a teljes odds alapján
-    const payout = t.comboPayout != null ? t.comboPayout
-                 : (t.result === 'won' ? (parseFloat(t.odds) || 0) : t.result === 'push' ? 1 : 0);
-    if (!['won','lost','push','half_won','half_lost'].includes(t.result)) return 0;
+    if (!['won','lost','push'].includes(t.result)) return 0;
+    const payout = (typeof t.comboPayout === 'number' && t.comboPayout > 0)
+      ? t.comboPayout
+      : (t.result === 'won' ? (parseFloat(t.odds) || 0) : t.result === 'push' ? 1 : 0);
     return +(payout - 1).toFixed(2);
   }
   const o = parseFloat(t.odds) || 1;
@@ -488,7 +488,7 @@ async function loadData() {
     const hist    = await histRes.json();
 
     allTips = (Array.isArray(hist) ? hist : [])
-      .filter(t => t.type !== 'value')
+      .filter(t => t.type !== 'value' && t.approved !== false)
       .sort((a,b) => (b.addedAt||b.commence||'').localeCompare(a.addedAt||a.commence||''));
 
     buildPeriodPicker(allTips);
