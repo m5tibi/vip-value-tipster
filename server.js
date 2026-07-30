@@ -308,6 +308,11 @@ function settleQuarter(x, line) {
 
 const SETTLED = ["won", "lost", "push", "half_won", "half_lost"];
 // Egy lezárt tipp profitja egységben (1 = teljes tét).
+// Bármilyen tipp profitja egységben (single és kombi egyaránt)
+function anyProfit(t) {
+  return t.type === "combo" ? comboProfit(t) : tipProfit(t);
+}
+
 function tipProfit(t) {
   const o = parseFloat(t.odds) || 0;
   switch (t.result) {
@@ -330,7 +335,9 @@ function isFootballAi(t) {
 
 // ── Statisztika számítás ──────────────────────────────────
 function calcStats() {
-  const tips     = history.filter(isFootballAi);
+  const singles = history.filter(isFootballAi);
+  const combos  = history.filter(t => t.type === "combo" && isApproved(t));
+  const tips    = [...singles, ...combos];
   const won      = tips.filter(t => t.result === "won").length;
   const lost     = tips.filter(t => t.result === "lost").length;
   const push     = tips.filter(t => t.result === "push").length;
@@ -338,7 +345,7 @@ function calcStats() {
   const halfLost = tips.filter(t => t.result === "half_lost").length;
   const pend     = tips.filter(t => !t.result || t.result === "pending").length;
   const settled  = tips.filter(t => SETTLED.includes(t.result));
-  const profit   = settled.reduce((s,t) => s + tipProfit(t), 0);
+  const profit   = settled.reduce((s,t) => s + anyProfit(t), 0);
   // Win% – a fél eredmények fél súllyal, a visszajárók (push) kihagyva
   const decidedW = won + halfWon * 0.5;
   const decidedN = won + lost + halfWon + halfLost;
@@ -373,7 +380,8 @@ function calcComboStats() {
 function buildYesterdayStatsMsg() {
   const yest = yesterdayHU();  // pl. "2026. 07. 28."
   const tips = history.filter(t =>
-    t.type !== "combo" &&
+    t.type !== "value" &&
+    isApproved(t) &&
     SETTLED.includes(t.result) &&
     t.settledAt &&
     t.settledAt.startsWith(yest)
@@ -387,7 +395,7 @@ function buildYesterdayStatsMsg() {
   const halfLost = tips.filter(t => t.result === "half_lost").length;
   const decN     = won + lost + halfWon + halfLost;
   const winRate  = decN ? (((won + halfWon * 0.5) / decN) * 100).toFixed(0) + "%" : "–";
-  const profit   = tips.reduce((s, t) => s + tipProfit(t), 0);
+  const profit   = tips.reduce((s, t) => s + anyProfit(t), 0);
   const profitStr = tips.length ? (profit >= 0 ? "+" : "") + profit.toFixed(2) : "–";
   const roi       = tips.length ? ((profit / tips.length) * 100).toFixed(1) : "–";
   const roiStr    = roi !== "–" ? (profit >= 0 ? "+" : "") + roi + "%" : "–";
@@ -397,9 +405,10 @@ function buildYesterdayStatsMsg() {
   const tipLines = tips.map(t => {
     const icon = t.result === "won" ? "✅" : t.result === "lost" ? "❌" :
                  t.result === "half_won" ? "½✅" : t.result === "half_lost" ? "½❌" : "↩️";
-    const pl = tipProfit(t);
+    const pl = anyProfit(t);
     const plStr = (pl >= 0 ? "+" : "") + pl.toFixed(2);
-    return `${icon} ${t.match} | ${t.pick} @${parseFloat(t.odds).toFixed(2)} → <b>${plStr} e.</b>`;
+    const label = t.type === "combo" ? `🎰 Kombi (${(t.legs||[]).length} láb)` : `${t.match} | ${t.pick} @${parseFloat(t.odds).toFixed(2)}`;
+    return `${icon} ${label} → <b>${plStr} e.</b>`;
   }).join("\n");
 
   return `📊 <b>90perc.hu – Tegnapi eredmények</b>\n`+
@@ -1114,7 +1123,7 @@ setInterval(async () => {
   if (hour === 8 && minute === 0 && new Date().getDay() === 1) {
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const weekTips = history.filter(t =>
-      t.type !== "combo" && t.result && t.result !== "pending" &&
+      t.type !== "value" && t.result && t.result !== "pending" &&
       t.settledAt && new Date(t.settledAt) >= weekAgo
     );
     if (weekTips.length) {
@@ -1358,8 +1367,9 @@ app.get("/api/status", (req, res) => {
 app.get("/api/public-stats", (req, res) => {
   const isFociSrv = t => /soccer|foci|⚽/i.test((t.sport || "") + " " + (t.sportLabel || ""));
   const H = history.filter(t =>
-    t.type !== "combo" && t.type !== "value" &&
-    isApproved(t) && isFociSrv(t) &&
+    t.type !== "value" &&
+    isApproved(t) &&
+    (t.type === "combo" || isFociSrv(t)) &&
     ["won","lost","push","half_won","half_lost"].includes(t.result)
   );
   const won      = H.filter(t => t.result === "won").length;
@@ -1370,14 +1380,7 @@ app.get("/api/public-stats", (req, res) => {
   const settled  = H.length;
   const decN     = won + lost + halfWon + halfLost;
   const winRate  = decN ? (((won + halfWon * 0.5) / decN) * 100).toFixed(1) : null;
-  const profit   = H.reduce((sum, t) => {
-    const o = parseFloat(t.odds) || 1;
-    if (t.result === "won")       return sum + (o - 1);
-    if (t.result === "lost")      return sum - 1;
-    if (t.result === "half_won")  return sum + (o - 1) / 2;
-    if (t.result === "half_lost") return sum - 0.5;
-    return sum;  // push
-  }, 0);
+  const profit   = H.reduce((sum, t) => sum + anyProfit(t), 0);
   const roi = settled ? ((profit / settled) * 100).toFixed(1) : null;
   res.json({ settled, won, lost, push, halfWon, halfLost, winRate, profit: parseFloat(profit.toFixed(2)), roi });
 });
@@ -1750,7 +1753,7 @@ async function handleBotUpdate(update) {
   // /tippek
   if (text === "/tippek") {
     const approved = history.filter(t =>
-      isApproved(t) && t.result === "pending" && t.type !== "combo"
+      isApproved(t) && t.result === "pending" && t.type !== "value"
     );
     if (!approved.length) {
       await tgSend(chatId, "⚽ Ma még nincsenek jóváhagyott tippek. Nézz vissza később!");
