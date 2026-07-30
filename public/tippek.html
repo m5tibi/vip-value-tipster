@@ -261,16 +261,8 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
       <div class="stat-card"><div class="stat-label" data-i18n="tips.stat_profit">Profit (e.)</div><div class="stat-value" id="h-profit">–</div></div>
       <div class="stat-card"><div class="stat-label">ROI</div><div class="stat-value" id="h-roi">–</div></div>
     </div>
-    <div id="combo-stats" style="display:none;background:#0d1b2a;border:1px solid #5d4037;border-radius:10px;padding:12px;margin-bottom:12px">
-      <div style="font-weight:700;color:#ffcc80;font-size:14px;margin-bottom:8px" data-i18n="tips.combo_title">🎰 Kombi tippek</div>
-      <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:#cfd8dc">
-        <span>✅ <b id="c-won">0</b></span>
-        <span>❌ <b id="c-lost">0</b></span>
-        <span>⏳ <b id="c-pend">0</b></span>
-        <span>Profit: <b id="c-profit">–</b></span>
-        <span>ROI: <b id="c-roi">–</b></span>
-      </div>
-      <div id="combo-history" style="margin-top:10px"></div>
+    <div id="combo-stats" style="display:none">
+      <div id="combo-history"></div>
     </div>
     <div id="history-list"><div class="empty" data-i18n="tips.no_history">Még nincsenek rögzített tippek.</div></div>
   </div>
@@ -676,30 +668,10 @@ function subStats(tips) {
 }
 
 function renderHistory() {
-  // ── Kombi statisztika (külön a singlektől) ──
+  // ── Kombi szekció (a stats a fő összesítőben van, itt csak a lista) ──
   const combos = history.filter(t => t.type === "combo");
   const cStats = document.getElementById("combo-stats");
-  if (combos.length) {
-    cStats.style.display = "";
-    const cWon  = combos.filter(t=>t.result==="won").length;
-    const cLost = combos.filter(t=>t.result==="lost").length;
-    const cPend = combos.filter(t=>!t.result||t.result==="pending").length;
-    const cSet  = combos.filter(t=>["won","lost","push"].includes(t.result));
-    const cProfit = cSet.reduce((a,t)=>{
-      const payout = typeof t.comboPayout==="number" ? t.comboPayout : (t.result==="won"?parseFloat(t.odds):t.result==="push"?1:0);
-      return a + (payout - 1);
-    },0);
-    const cRoi = cSet.length ? (cProfit/cSet.length*100).toFixed(1) : null;
-    const cCol = cProfit>0?"#69f0ae":cProfit<0?"#ef9a9a":"#90a4ae";
-    document.getElementById("c-won").textContent  = cWon;
-    document.getElementById("c-lost").textContent = cLost;
-    document.getElementById("c-pend").textContent = cPend;
-    const cp=document.getElementById("c-profit"); cp.textContent=cSet.length?(cProfit>=0?"+":"")+cProfit.toFixed(2):"–"; cp.style.color=cCol;
-    const cr=document.getElementById("c-roi");    cr.textContent=cRoi!=null?(cProfit>=0?"+":"")+cRoi+"%":"–"; cr.style.color=cCol;
-    // (A kombi-lista nap/hónap szerint rendszerezve alább, a section-builderek után töltődik.)
-  } else {
-    cStats.style.display = "none";
-  }
+  cStats.style.display = combos.length ? "" : "none";
 
   // Összes jóváhagyott tipp (singles + kombik, value nélkül)
   const isFoci = t => /soccer|foci|⚽/i.test((t.sport||"")+" "+(t.sportLabel||""));
