@@ -903,7 +903,7 @@ function settleMarket(market, pick, homeTeam, awayTeam, homeScore, awayScore) {
 
 // ── Eredményjelölés ───────────────────────────────────────
 async function checkResults() {
-  const pendingSingles = history.filter(t => t.type === "ai"    && (t.result === "pending" || !t.manual));
+  const pendingSingles = history.filter(t => (t.type === "ai" || t.type === "free") && (t.result === "pending" || !t.manual));
   // Kombik: a nyitottak ÉS azok, amelyek már lezártak, de van még kitöltetlen lábuk
   // (korai vesztes esetén a hátralévő lábakat a későbbi futások töltik ki).
   const combosToCheck = history.filter(t => t.type === "combo" &&
