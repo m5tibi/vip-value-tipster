@@ -453,7 +453,7 @@ async function fetchAiTips(matchList, alreadyTipped = []) {
   ).join("\n");
 
   const skipNote = alreadyTipped.length
-    ? `\nEZEKRE A MECCSEKRE MÁR VAN TIPP – NE szerepeljen sem SINGLE tippként, sem KOMBI LÁBKÉNT: ${alreadyTipped.join("; ")}\n`
+    ? `\nEZEKRE A MECCSEKRE MÁR VAN TIPP (fizetős single) – NE szerepeljen sem SINGLE tippként, sem KOMBI LÁBKÉNT (az ingyenes tippre ez NEM vonatkozik, az lehet bármelyik meccs): ${alreadyTipped.join("; ")}\n`
     : "";
 
   const prompt = `Te egy profi labdarúgás-fogadási elemző vagy. Használj web keresést az aktuális formához, sérülésekhez és keretinformációkhoz az alábbi közelgő foci meccsekre (a következő ~36 óra).
@@ -474,7 +474,8 @@ KÉT dolgot adj:
    - MAGAS VALÓSZÍNŰSÉGŰ kimenetel, jellemzően 1.65-1.90 odds között (minimum 1.65 odds kötelező).
    - Lehetőleg az aznapi legjobb fogadási lehetőség, amiről szinte biztos a kimenetel.
    - Ugyanúgy adjon note-ot (1-2 mondat), mint a "tippek"-nél.
-   - Ha nincs jó meccs rá, legyen null.
+   - Szinte mindig adj meg egyet – a matchListből legyen a legbiztosabb kimenetel.
+   - Ha TÉNYLEG nincs 1.65 feletti, magas valószínűségű kimenetel, csak akkor legyen null.
 
 2) "kombi_labak": 4-6 BIZTONSÁGOS, alacsony kockázatú láb kombi szelvényekhez.
    - MINDEGYIK láb MÁS meccsről legyen – használj annyi különböző meccset, amennyi elérhető (legalább 2, hogy összeálljon egy kötés; ha van elég meccs, adj 4-6 lábat, hogy több, NEM átfedő kötés is kijöjjön).
@@ -668,7 +669,7 @@ async function fetchAndProcess() {
       const games = await r.json();
       for (const game of games) {
         const hoursUntil = (new Date(game.commence_time) - now) / 3600000;
-        if (hoursUntil < 0 || hoursUntil > WINDOW_HOURS) continue;
+        if (hoursUntil < 1.5 || hoursUntil > WINDOW_HOURS) continue;  // min. 1.5 óra a kezdésig
         // (Nincs meccs-kihagyás: a teljes lista kell a kombi lábakhoz is; a single
         //  duplikátumot a prompt + a válasz utólagos szűrése kezeli.)
 
@@ -742,6 +743,10 @@ async function fetchAndProcess() {
     history = [newFreeTip, ...history];
     saveHistory();
     console.log(`Ingyenes tipp hozzáadva: ${newFreeTip.match} | ${newFreeTip.pick} @${newFreeTip.odds}`);
+  } else if (!newFreeTip) {
+    console.log("Ingyenes tipp: az AI nem javasolt (null visszatérés vagy odds < 1.65)");
+  } else if (hasFreeTodayAlready) {
+    console.log("Ingyenes tipp: ma már van, nem duplikálunk");
   }
 
   // A főoldal MINDEN még le nem zárt (pending) AI tippet mutasson (a korábbi futásokét is).
@@ -1458,28 +1463,48 @@ app.post("/api/tips/send", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const singlesToSend = history.filter(t => t.type === "ai"    && isApproved(t) && !t.sent && (!t.result || t.result === "pending"));
   const combosToSend  = history.filter(t => t.type === "combo" && isApproved(t) && !t.sent && (!t.result || t.result === "pending"));
-  if (!singlesToSend.length && !combosToSend.length) {
+  const freesToSend   = history.filter(t => t.type === "free"  && isApproved(t) && !t.sent && (!t.result || t.result === "pending"));
+  if (!singlesToSend.length && !combosToSend.length && !freesToSend.length) {
     return res.json({ ok: true, sent: 0, message: "Nincs kiküldendő (jóváhagyott, még el nem küldött) tipp." });
   }
-  const sentIds = new Set([...singlesToSend, ...combosToSend].map(t => t.id));
+  const sentIds = new Set([...singlesToSend, ...combosToSend, ...freesToSend].map(t => t.id));
   const mark = t => sentIds.has(t.id) ? { ...t, sent: true } : t;
-  history = history.map(mark); aiTips = aiTips.map(mark); comboTips = comboTips.map(mark);
+  history   = history.map(mark);
+  aiTips    = aiTips.map(mark);
+  comboTips = comboTips.map(mark);
+  freeTips  = freeTips.map(mark);
   saveHistory();
-  const total = singlesToSend.length + combosToSend.length;
-  console.log(`Tippek kiküldve: ${total} (csak e-mail, Telegram nélkül)`);
+  const total = singlesToSend.length + combosToSend.length + freesToSend.length;
 
-  // E-mail értesítő az összes aktív előfizetőnek
+  // Telegram: csak a free tippekről küld értesítést (nyilvános csatorna)
+  if (freesToSend.length) {
+    for (const ft of freesToSend) {
+      const o = parseFloat(ft.odds).toFixed(2);
+      const msg =
+        `🆓 <b>Ingyenes napi tipp – 90perc.hu</b>\n\n` +
+        `⚽ <b>${ft.match}</b>\n` +
+        `📊 Piac: ${ft.market}\n` +
+        `✅ Tipp: <b>${ft.pick}</b> @ <b>${o}</b>\n` +
+        (ft.commence ? `🕐 Kezdés: ${ft.commence}\n` : "") +
+        (ft.note ? `\n💡 ${ft.note}\n` : "") +
+        `\n🔗 Részletek: https://90perc.hu/tippek.html`;
+      await sendTelegram(msg).catch(e => console.error("Telegram free tip hiba:", e.message));
+    }
+    console.log(`Telegram: ${freesToSend.length} ingyenes tipp elküldve`);
+  }
+
+  // E-mail értesítő az összes aktív előfizetőnek (paid + free tippek)
   const recipients = usersDb.all().filter(u =>
     !u.isAdmin && u.emailVerified !== false &&
     (u.plan === "pro" || !auth.PAID_MODE)
   );
-  console.log(`Tip e-mail küldése ${recipients.length} felhasználónak...`);
+  console.log(`Tip e-mail küldése ${recipients.length} felhasználónak (${total} tipp)...`);
   for (const u of recipients) {
     mailer.sendNewTips(u.email, singlesToSend, combosToSend)
       .catch(e => console.error(`Tip email hiba (${u.email}):`, e.message));
   }
 
-  res.json({ ok: true, sent: total });
+  res.json({ ok: true, sent: total, telegram: freesToSend.length });
 });
 
 app.post("/api/check-results", async (req, res) => {
