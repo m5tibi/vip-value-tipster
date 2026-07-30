@@ -591,7 +591,9 @@ function comboCardHTML(c, showResult) {
 }
 
 function tipHTML(t, showResult) {
-  return t.type==="combo" ? comboCardHTML(t, showResult) : aiTipHTML(t, showResult);
+  if (t.type === "combo") return comboCardHTML(t, showResult);
+  if (t.type === "free")  return renderFreeTipCard(t);
+  return aiTipHTML(t, showResult);
 }
 
 function renderFreeTipSection() {
@@ -815,7 +817,8 @@ function renderHistory() {
     if (pending.length) {
       html += `<div class="section-header" style="background:#0d2a3a;color:#90caf9">⏳ Folyamatban lévő ${kind} tippek</div>`;
       Object.keys(pendingByDay).sort((a,b)=>b.localeCompare(a)).forEach(day => {
-        html += makeDaySection(day, pendingByDay[day], true);
+        const isRecent = day === TODAY || day === YESTERDAY;
+        html += makeDaySection(day, pendingByDay[day], isRecent);
       });
     }
     if (done.length) {
@@ -840,8 +843,23 @@ function renderHistory() {
     return html;
   }
 
+  // Free tipp: ha van jóváhagyott és folyamatban lévő, mutassuk kiemelve az előzményekben
+  // (mindenki láthatja, nem csak előfizetők)
+  const freePending = H.filter(t => t.type === "free" && (!t.result || t.result === "pending"));
+  const HnoFree = H.filter(t => t.type !== "free");
+  const hasFreePending = freePending.length > 0 || (currentFreeTip && (!currentFreeTip.result || currentFreeTip.result === "pending"));
+
+  let freeSection = "";
+  if (hasFreePending) {
+    const ft = freePending[0] || currentFreeTip;
+    freeSection = `
+      <div class="section-header" style="background:#071a10;color:#00e676;margin-bottom:4px">🆓 Ingyenes napi tipp – folyamatban</div>
+      ${renderFreeTipCard(ft)}
+      <div style="height:8px"></div>`;
+  }
+
   dayCounter = 0;
-  el.innerHTML = H.length ? groupedHtml(H, "single") : '<div class="empty">Még nincsenek rögzített foci tippek.</div>';
+  el.innerHTML = freeSection + (HnoFree.length ? groupedHtml(HnoFree, "single") : (hasFreePending ? "" : '<div class="empty">Még nincsenek rögzített foci tippek.</div>'));
   const comboHist = document.getElementById("combo-history");
   if (comboHist) comboHist.innerHTML = combos.length ? groupedHtml(combos, "kombi") : "";
 }
