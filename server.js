@@ -1335,7 +1335,7 @@ app.get("/api/tips", (req, res) => {
   res.json({
     aiTips:    admin ? aiTips    : aiTips.filter(isApproved),
     comboTips: admin ? comboTips : comboTips.filter(isApproved),
-    freeTips:  approvedFreeTips,
+    freeTips:  admin ? freeTips : approvedFreeTips,  // admin: mindet látja (jóváhagyatlanokat is)
     admin
   });
 });
