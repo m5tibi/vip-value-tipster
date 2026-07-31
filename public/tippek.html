@@ -292,7 +292,7 @@ if (typeof window.t !== "function") {
   window.setLang = function() {};
   window.toggleLang = function() {};
 }
-let aiTips = [], comboTips = [], history = [], currentFreeTip = null;
+let aiTips = [], comboTips = [], history = [], currentFreeTips = [];
 let msRemaining = 0;
 let dayCounter = 0;
 
@@ -608,28 +608,28 @@ function renderFreeTipSection() {
   const admin = isAdmin();
   // Admin: show pending free tip too (for approval); users: only approved (handled via currentFreeTip)
   const tip = admin
-    ? (aiTips.concat(history).find(t => t.type === "free" && (!t.result || t.result === "pending")) || currentFreeTip)
-    : currentFreeTip;
-  if (!tip) { el.innerHTML = ""; return; }
+    ? aiTips.concat(history).filter(t => t.type === "free" && (!t.result || t.result === "pending"))
+    : currentFreeTips;
+  if (!tips || !tips.length) { el.innerHTML = ""; return; }
 
-  const approvedBadge = tip.approved !== false
-    ? `<span style="background:rgba(0,230,118,.15);color:#00e676;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">✅ JÓVÁHAGYVA</span>`
-    : `<span style="background:rgba(245,158,11,.15);color:#f59e0b;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">⏳ JÓVÁHAGYÁSRA VÁR</span>`;
-  const adminBtns = admin && tip.approved === false
-    ? `<div style="margin-top:10px">${adminTipControls(tip)}</div>`
-    : "";
-
-  el.innerHTML = `
-    <div style="margin-bottom:6px;font-size:11px;font-weight:700;color:#00e676;text-transform:uppercase;letter-spacing:.5px">🆓 Ingyenes napi tipp</div>
-    <div style="background:#071a10;border:2px solid #00e676;border-radius:12px;padding:18px">
+  el.innerHTML = tips.map(tip => {
+    const approvedBadge = tip.approved !== false
+      ? `<span style="background:rgba(0,230,118,.15);color:#00e676;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">✅ JÓVÁHAGYVA</span>`
+      : `<span style="background:rgba(245,158,11,.15);color:#f59e0b;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">⏳ JÓVÁHAGYÁSRA VÁR</span>`;
+    const adminBtns = admin && tip.approved === false
+      ? `<div style="margin-top:10px">${adminTipControls(tip)}</div>`
+      : "";
+    return `<div style="background:#071a10;border:2px solid #00e676;border-radius:12px;padding:18px;margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         ${approvedBadge}
         <span style="color:#5d7a96;font-size:11px">${tip.addedAt||""}</span>
       </div>
       ${renderFreeTipCard(tip)}
       ${adminBtns}
-    </div>
-    <div style="height:12px"></div>`;
+    </div>`;
+  }).join("") + `<div style="height:4px"></div>`;
+  // Section header outside the map
+  el.innerHTML = `<div style="margin-bottom:6px;font-size:11px;font-weight:700;color:#00e676;text-transform:uppercase;letter-spacing:.5px">🆓 Ingyenes napi tipp${tips.length>1?" ("+tips.length+")":""}</div>` + el.innerHTML;
 }
 
 function renderTips() {
@@ -886,14 +886,15 @@ function renderHistory() {
   // (mindenki láthatja, nem csak előfizetők)
   const freePending = H.filter(t => t.type === "free" && (!t.result || t.result === "pending"));
   const HnoFree = H.filter(t => t.type !== "free");
-  const hasFreePending = freePending.length > 0 || (currentFreeTip && (!currentFreeTip.result || currentFreeTip.result === "pending"));
+  const hasFreePending = freePending.length > 0 || currentFreeTips.some(ft => !ft.result || ft.result === "pending");
 
   let freeSection = "";
   if (hasFreePending) {
-    const ft = freePending[0] || currentFreeTip;
+    const allFreePending = freePending.length ? freePending : currentFreeTips.filter(ft => !ft.result || ft.result === "pending");
+    const ft = allFreePending[0];
     freeSection = `
       <div class="section-header" style="background:#071a10;color:#00e676;margin-bottom:4px">🆓 Ingyenes napi tipp – folyamatban</div>
-      ${renderFreeTipCard(ft)}
+      ${allFreePending.map(f => renderFreeTipCard(f)).join('<div style="height:6px"></div>')}
       <div style="height:8px"></div>`;
   }
 
@@ -980,7 +981,7 @@ function renderFreeTipCard(t) {
   </div>`;
 }
 
-function renderLocked(needSubscription, freeTip) {
+function renderLocked(needSubscription, freeTips) {
   const wrap = document.getElementById("combo-wrap");
   if (wrap) wrap.style.display = "none";
   const lu = document.getElementById("last-update");
@@ -999,9 +1000,8 @@ function renderLocked(needSubscription, freeTip) {
   }
 
   // Előfizető nélküli, de belépett user → ingyenes tipp + paywall
-  const freePart = freeTip
-    ? `<div style="margin-bottom:6px;font-size:11px;font-weight:700;color:#00e676;text-transform:uppercase;letter-spacing:.5px">${window.t('tips.free_badge')}</div>
-       ${renderFreeTipCard(freeTip)}`
+  const freePart = freeTips && freeTips.length
+    ? freeTips.map(ft => `<div style="margin-bottom:6px;font-size:11px;font-weight:700;color:#00e676;text-transform:uppercase;letter-spacing:.5px">${window.t('tips.free_badge')}</div>${renderFreeTipCard(ft)}`).join('<div style="height:8px"></div>')
     : `<div style="color:#5d7a96;font-size:13px;text-align:center;padding:16px 0">${window.t('tips.free_tip_none')}</div>`;
 
   const paywallPart =
@@ -1024,14 +1024,14 @@ async function loadTips() {
       aiTips = []; comboTips = [];
       tipsEverLoaded = true;
       const errData = await r.json().catch(() => ({}));
-      renderLocked(r.status === 402, errData.freeTip || null);
+      renderLocked(r.status === 402, Array.isArray(errData.freeTips) ? errData.freeTips : (errData.freeTip ? [errData.freeTip] : []));
       return;
     }
     if (!r.ok) throw new Error("HTTP "+r.status);
     const d = await r.json();
     aiTips    = Array.isArray(d.aiTips)?d.aiTips:[];
     comboTips = Array.isArray(d.comboTips)?d.comboTips:[];
-    currentFreeTip = d.freeTip || null;
+    currentFreeTips = Array.isArray(d.freeTips) ? d.freeTips : (d.freeTip ? [d.freeTip] : []);
     tipsEverLoaded = true;
     tipsRetryDelay = 3000;
     tipsErrLogged  = false;
