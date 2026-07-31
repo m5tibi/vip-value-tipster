@@ -1321,21 +1321,21 @@ function isAdminReq(req) {
 app.get("/api/tips", (req, res) => {
   const admin = isAdminReq(req);
   const freshUserTips = req.user ? (usersDb.findById(req.user.id) || req.user) : req.user;
-  // Ingyenes tipp: külön generált, type="free", jóváhagyás után mindenki látja
-  const approvedFreeTip = freeTips.filter(isApproved)[0] || null;
+  // Ingyenes tippek: összes jóváhagyott, függőben lévő free tipp
+  const approvedFreeTips = freeTips.filter(isApproved);
 
   if (!admin && !auth.hasAccess(freshUserTips)) {
     return res.status(req.user ? 402 : 401).json({
       error: req.user ? "Aktív előfizetés szükséges." : "Belépés szükséges a tippek megtekintéséhez.",
       needLogin: !req.user, needSubscription: !!req.user,
-      freeTip: req.user ? approvedFreeTip : null,
+      freeTips: req.user ? approvedFreeTips : [],
       aiTips: [], comboTips: [],
     });
   }
   res.json({
     aiTips:    admin ? aiTips    : aiTips.filter(isApproved),
     comboTips: admin ? comboTips : comboTips.filter(isApproved),
-    freeTip:   approvedFreeTip,
+    freeTips:  approvedFreeTips,
     admin
   });
 });
@@ -1500,7 +1500,7 @@ app.post("/api/tips/send", async (req, res) => {
   );
   console.log(`Tip e-mail küldése ${recipients.length} felhasználónak (${total} tipp)...`);
   for (const u of recipients) {
-    mailer.sendNewTips(u.email, singlesToSend, combosToSend)
+    mailer.sendNewTips(u.email, singlesToSend, combosToSend, freesToSend)
       .catch(e => console.error(`Tip email hiba (${u.email}):`, e.message));
   }
 
