@@ -146,8 +146,20 @@ async function sendPlanCancelled(to) {
 }
 
 // ── Új tippek értesítő ────────────────────────────────────────
-async function sendNewTips(to, tips, combos) {
-  if (!tips.length && !combos.length) return;
+async function sendNewTips(to, tips, combos, freeTips = []) {
+  if (!tips.length && !combos.length && !freeTips.length) return;
+  const freeRows = freeTips.map(t =>
+    `<tr>
+      <td colspan="4" style="padding:10px 6px;border-bottom:1px solid #1e3a2f;background:#071a10">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="background:rgba(0,230,118,.15);color:#00e676;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">🆓 INGYENES</span>
+          <span style="color:#e0e0e0;font-weight:600">${t.match}</span>
+        </div>
+        <div style="color:#80cbc4;font-size:12px">${t.market} · <b style="color:#e0e0e0">${t.pick}</b> <span style="color:#f59e0b;font-weight:700">@ ${t.odds}</span></div>
+        ${t.note ? `<div style="color:#78909c;font-size:12px;margin-top:4px">${t.note}</div>` : ""}
+      </td>
+    </tr>`
+  ).join("");
   const tipRows = tips.map(t =>
     `<tr>
       <td style="padding:8px 6px;border-bottom:1px solid #1e3a2f;color:#e0e0e0;font-weight:600">${t.match}</td>
@@ -167,16 +179,19 @@ async function sendNewTips(to, tips, combos) {
     to,
     subject: (() => {
       const parts = [];
+      if (freeTips.length) parts.push(`${freeTips.length} ingyenes`);
       if (tips.length) parts.push(`${tips.length} single`);
       if (combos.length) parts.push(`${combos.length} kombi`);
       return `⚽ Új tippek: ${parts.join(" + ")} – 90perc.hu`;
     })(),
     text: [
+      ...freeTips.map(t => `🆓 INGYENES: ${t.match}: ${t.pick} @ ${t.odds}`),
       ...tips.map(t => `${t.match}: ${t.pick} @ ${t.odds}`),
       ...combos.map(c => `🎰 Kombi: ${c.legs.map(l=>l.pick).join(" + ")} @ ${c.odds}`)
     ].join("\n"),
     html: shell((() => {
       const parts = [];
+      if (freeTips.length) parts.push(`${freeTips.length} ingyenes tipp`);
       if (tips.length) parts.push(`${tips.length} single tipp`);
       if (combos.length) parts.push(`${combos.length} kombi tipp`);
       return `Új tippek: ${parts.join(" + ")}`;
@@ -190,7 +205,7 @@ async function sendNewTips(to, tips, combos) {
             <th style="padding:6px;text-align:left;border-bottom:1px solid #1e3a2f">Odds</th>
           </tr>
         </thead>
-        <tbody>${tipRows}${comboRows}</tbody>
+        <tbody>${freeRows}${tipRows}${comboRows}</tbody>
       </table>
       ${button("https://90perc.hu/tippek.html", "⚽ Megnézem az összes tippet")}
       <p style="color:#546e7a;font-size:11px;margin:10px 0 0">A tippek kizárólag tájékoztató jellegűek. A fogadás pénzügyi veszteséggel járhat.</p>
