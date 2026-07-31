@@ -416,7 +416,7 @@ function buildYesterdayStatsMsg() {
     `${tipLines}\n\n`+
     `📉 <b>Összesítés</b>\n`+
     `✅ Nyert: <b>${won}</b>  ❌ Vesztett: <b>${lost}</b>  ↩️ Visszajár: <b>${pushTotal}</b>\n`+
-    `Win %: <b>${winRate}</b> · Profit: <b>${profitStr} egység</b> · ROI: <b>${roiStr}</b>\n\n`+
+    `Win %: <b>${winRate}</b> · Profit: <b>${profitStr} egység</b>\n\n`+
     `Teljes track record: https://90perc.hu/statisztika.html`;
 }
 
