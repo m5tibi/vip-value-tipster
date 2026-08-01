@@ -496,7 +496,7 @@ async function loadData() {
     const pubStats = await pubRes.json().catch(() => null);
 
     allTips = (Array.isArray(hist) ? hist : [])
-      .filter(t => t.type !== 'value' && t.approved !== false)
+      .filter(t => t.type !== 'value' && t.type !== 'free' && t.approved !== false)
       .sort((a,b) => (b.addedAt||b.commence||'').localeCompare(a.addedAt||a.commence||''));
 
     buildPeriodPicker(allTips);
