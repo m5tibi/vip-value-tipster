@@ -685,6 +685,7 @@ function renderHistory() {
   const H = history.filter(t =>
     isApprovedH(t) &&
     t.type !== "value" &&
+    t.type !== "free" &&   // free tippek külön jelennek meg, nem az összesítőben
     t.type !== "combo" &&
     isFoci(t)
   );
