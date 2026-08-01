@@ -381,7 +381,6 @@ function buildYesterdayStatsMsg() {
   const yest = yesterdayHU();  // pl. "2026. 07. 28."
   const tips = history.filter(t =>
     t.type !== "value" &&
-    t.type !== "free" &&
     isApproved(t) &&
     SETTLED.includes(t.result) &&
     t.settledAt &&
@@ -1374,7 +1373,6 @@ app.get("/api/public-stats", (req, res) => {
   const isFociSrv = t => /soccer|foci|⚽/i.test((t.sport || "") + " " + (t.sportLabel || ""));
   const H = history.filter(t =>
     t.type !== "value" &&
-    t.type !== "free" &&   // free tippek külön termék, nem kerülnek az összesítőbe
     isApproved(t) &&
     (t.type === "combo" || isFociSrv(t)) &&
     ["won","lost","push","half_won","half_lost"].includes(t.result)
