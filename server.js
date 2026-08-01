@@ -335,9 +335,9 @@ function isFootballAi(t) {
 
 // ── Statisztika számítás ──────────────────────────────────
 function calcStats() {
-  const singles = history.filter(isFootballAi);
+  const singles = history.filter(isFootballAi);  // type="ai" only
   const combos  = history.filter(t => t.type === "combo" && isApproved(t));
-  const tips    = [...singles, ...combos];
+  const tips    = [...singles, ...combos];  // free tippek NEM kerülnek bele
   const won      = tips.filter(t => t.result === "won").length;
   const lost     = tips.filter(t => t.result === "lost").length;
   const push     = tips.filter(t => t.result === "push").length;
@@ -381,6 +381,7 @@ function buildYesterdayStatsMsg() {
   const yest = yesterdayHU();  // pl. "2026. 07. 28."
   const tips = history.filter(t =>
     t.type !== "value" &&
+    t.type !== "free" &&
     isApproved(t) &&
     SETTLED.includes(t.result) &&
     t.settledAt &&
@@ -1373,6 +1374,7 @@ app.get("/api/public-stats", (req, res) => {
   const isFociSrv = t => /soccer|foci|⚽/i.test((t.sport || "") + " " + (t.sportLabel || ""));
   const H = history.filter(t =>
     t.type !== "value" &&
+    t.type !== "free" &&   // free tippek külön termék, nem kerülnek az összesítőbe
     isApproved(t) &&
     (t.type === "combo" || isFociSrv(t)) &&
     ["won","lost","push","half_won","half_lost"].includes(t.result)
