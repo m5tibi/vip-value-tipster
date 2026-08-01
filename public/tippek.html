@@ -685,7 +685,6 @@ function renderHistory() {
   const H = history.filter(t =>
     isApprovedH(t) &&
     t.type !== "value" &&
-    t.type !== "free" &&   // free tippek külön jelennek meg, nem az összesítőben
     t.type !== "combo" &&
     isFoci(t)
   );
@@ -897,8 +896,11 @@ function renderHistory() {
       <div style="height:8px"></div>`;
   }
 
+  // A history listában H-t mutatjuk (free tippeket is), de a pending free tippek
+  // már kiemelve vannak fentebb (freeSection) – a napi szekcióban csak a done-ok látszanak
+  const HforList = H.filter(t => t.type !== "free" || (t.result && t.result !== "pending"));
   dayCounter = 0;
-  el.innerHTML = freeSection + (HnoFree.length ? groupedHtml(HnoFree, "single") : (hasFreePending ? "" : '<div class="empty">Még nincsenek rögzített foci tippek.</div>'));
+  el.innerHTML = freeSection + (HforList.length ? groupedHtml(HforList, "single") : (hasFreePending ? "" : '<div class="empty">Még nincsenek rögzített foci tippek.</div>'));
   const comboHist = document.getElementById("combo-history");
   if (comboHist) comboHist.innerHTML = combos.length ? groupedHtml(combos, "kombi") : "";
 }
