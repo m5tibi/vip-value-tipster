@@ -468,7 +468,7 @@ async function fetchAiTips(matchList, alreadyTipped = []) {
   ).join("\n");
 
   const skipNote = alreadyTipped.length
-    ? `\nEZEKRE A MECCSEKRE MÁR VAN TIPP (fizetős single) – NE szerepeljen sem SINGLE tippként, sem KOMBI LÁBKÉNT (az ingyenes tippre ez NEM vonatkozik, az lehet bármelyik meccs): ${alreadyTipped.join("; ")}\n`
+    ? `\nEZEKRE A MECCSEKRE MÁR VAN AKTÍV TIPP (single VAGY ingyenes tipp) – NE szerepeljen SEMMILYEN tippként (sem single, sem kombi láb, sem ingyenes tipp): ${alreadyTipped.join("; ")}\n`
     : "";
 
   const prompt = `Te egy profi labdarúgás-fogadási elemző vagy. Használj web keresést az aktuális formához, sérülésekhez és keretinformációkhoz az alábbi közelgő foci meccsekre (a következő ~36 óra).
@@ -657,8 +657,11 @@ async function fetchAndProcess() {
 
   // Minden MÉG LE NEM ZÁRT (pending) single tipp meccse – dátumtól függetlenül.
   // Így egy előre (pl. tegnap) felvett, még el nem kezdődött meccsre nem ad újabb tippet.
+  // Már tippelt meccsek: ai singles ÉS pending free tippek – ezekre ne adjon se single, se kombi, se new free tippet
   const tippedMatches = new Set(
-    history.filter(t => t.type === "ai" && (!t.result || t.result === "pending")).map(t => t.match)
+    history
+      .filter(t => (t.type === "ai" || t.type === "free") && (!t.result || t.result === "pending"))
+      .map(t => t.match)
   );
 
   const matchList = [];
@@ -754,7 +757,7 @@ async function fetchAndProcess() {
   // Ingyenes tipp mentése (ha van és még nincs ma ilyen)
   const todayKey = todayHU();
   const hasFreeTodayAlready = history.some(t => t.type === "free" && t.addedAt && t.addedAt.startsWith(todayKey));
-  if (newFreeTip && !hasFreeTodayAlready && !existingIds.has(newFreeTip.id)) {
+  if (newFreeTip && !tippedMatches.has(newFreeTip.match) && !hasFreeTodayAlready && !existingIds.has(newFreeTip.id)) {
     history = [newFreeTip, ...history];
     saveHistory();
     console.log(`Ingyenes tipp hozzáadva: ${newFreeTip.match} | ${newFreeTip.pick} @${newFreeTip.odds}`);
@@ -1520,29 +1523,34 @@ app.post("/api/tips/send", async (req, res) => {
   }
 
   // Fizetős Telegram csatorna: paid singles + kombik
-  if (TG_PAID_CHAT_ID && (singlesToSend.length || combosToSend.length)) {
-    const lines = [
+  if (TG_PAID_CHAT_ID && (singlesToSend.length || combosToSend.length || freesToSend.length)) {
+    const freeLines = freesToSend.map(t =>
+      `⚽ <b>${t.match}</b>\n` +
+      `📊 ${t.market} · <b>${t.pick}</b> @ <b>${parseFloat(t.odds).toFixed(2)}</b>` +
+      (t.commence ? `\n🕐 Kick-off: ${t.commence}` : "")
+    );
+    const paidLines = [
       ...singlesToSend.map(t =>
         `⚽ <b>${t.match}</b>\n` +
         `📊 ${t.market} · <b>${t.pick}</b> @ <b>${parseFloat(t.odds).toFixed(2)}</b>` +
-        (t.commence ? `\n🕐 Kick-off: ${t.commence}` : "") +
-        (t.note ? `\n\n💡 ${t.note}` : "")
+        (t.commence ? `\n🕐 Kick-off: ${t.commence}` : "")
       ),
       ...combosToSend.map(c =>
         `🎰 <b>Combo tip</b> @ <b>${parseFloat(c.odds).toFixed(2)}</b>\n` +
         (c.legs||[]).map((l,i) => `${i+1}. ${l.match}: <b>${l.pick}</b> @${parseFloat(l.odds).toFixed(2)}`).join("\n")
       )
     ];
+    const allLines = [...freeLines, ...paidLines];
     const parts = [];
-    if (singlesToSend.length) parts.push(`${singlesToSend.length} single${singlesToSend.length>1?"s":""}`);
+    const totalSingles = freesToSend.length + singlesToSend.length;
+    if (totalSingles) parts.push(`${totalSingles} single${totalSingles>1?'s':''}`);
     if (combosToSend.length) parts.push(`${combosToSend.length} combo${combosToSend.length>1?"s":""}`);
     const msg =
       `💎 <b>Today's Tips – 90.exe</b>\n` +
       `📌 ${parts.join(" + ")}\n\n` +
-      lines.join("\n\n─────────────\n\n") +
-      ``;
+      allLines.join("\n\n─────────────\n\n");
     await sendTelegramPaid(msg).catch(e => console.error("Telegram paid hiba:", e.message));
-    console.log(`Fizetős Telegram csatorna: ${singlesToSend.length} single + ${combosToSend.length} kombi elküldve`);
+    console.log(`Fizetős Telegram csatorna: ${freesToSend.length} free + ${singlesToSend.length} single + ${combosToSend.length} kombi elküldve`);
   }
 
   res.json({ ok: true, sent: total, telegram: freesToSend.length });
