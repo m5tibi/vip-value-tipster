@@ -771,4 +771,18 @@
 
   document.addEventListener('DOMContentLoaded', applyDOM);
 
+  // Telegram publikus link dinamikus betöltése /api/config-ból
+  function loadTgLinks() {
+    fetch('/api/config')
+      .then(r => r.json())
+      .then(d => {
+        if (!d.tgPublicLink) return;
+        document.querySelectorAll('a.tg-channel-link').forEach(a => {
+          a.href = d.tgPublicLink;
+        });
+      })
+      .catch(() => {});
+  }
+  document.addEventListener('DOMContentLoaded', loadTgLinks);
+
 })();
