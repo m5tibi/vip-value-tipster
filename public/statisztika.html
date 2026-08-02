@@ -337,7 +337,7 @@ function renderTable(tips) {
     const rc = RESULT_CLASS[t.result] || 'pending';
     return `<tr>
       <td class="td-date">${formatDate(t.addedAt || t.commence)}</td>
-      <td class="td-match">${t.type==='combo'?`<span style="color:var(--gold);font-size:11px;font-weight:700">🎰 Kombi (${(t.legs||[]).length} láb)</span>`:t.match||'–'}</td>
+      <td class="td-match">${t.type==='combo'?`<span style="color:var(--gold);font-size:11px;font-weight:700">🎰 Kombi (${(t.legs||[]).length} láb)</span>`:t.type==='free'?`<span style="background:rgba(0,230,118,.15);color:#00e676;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;margin-right:6px">🆓</span>${t.match||'–'}`:t.match||'–'}</td>
       <td class="td-pick">${t.type==='combo'?`<span style="color:var(--muted);font-size:11px">${(t.legs||[]).map(l=>l.pick).join(' + ')}</span>`:`<span style="color:var(--muted);font-size:11px">${t.market||''}</span><br/>${t.pick||''}`}</td>
       <td class="td-odds">${parseFloat(t.odds).toFixed(2)}</td>
       <td><span class="badge ${rc}">${RESULT_LABELS()[t.result] || '–'}</span></td>
