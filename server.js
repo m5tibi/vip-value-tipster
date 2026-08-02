@@ -658,11 +658,17 @@ async function fetchAndProcess() {
 
   // Minden MÉG LE NEM ZÁRT (pending) single tipp meccse – dátumtól függetlenül.
   // Így egy előre (pl. tegnap) felvett, még el nem kezdődött meccsre nem ad újabb tippet.
-  // Már tippelt meccsek: ai singles ÉS pending free tippek – ezekre ne adjon se single, se kombi, se new free tippet
+  // Már tippelt meccsek single/free szempontból
   const tippedMatches = new Set(
     history
       .filter(t => (t.type === "ai" || t.type === "free") && (!t.result || t.result === "pending"))
       .map(t => t.match)
+  );
+  // Kombi lábakban már szereplő meccsek (csak kombikból zárjuk ki)
+  const tippedComboLegs = new Set(
+    history
+      .filter(t => t.type === "combo" && (!t.result || t.result === "pending"))
+      .flatMap(t => (t.legs || []).map(l => l.match))
   );
 
   const matchList = [];
@@ -777,7 +783,7 @@ async function fetchAndProcess() {
   // duplikálódik (a dedup a lábakat nézi, nem az azonosítót).
   const existingKeys = new Set(history.filter(t => t.type === "combo").map(comboKey));
   // Backstop: ha egy kombi láb meccse már single tippként szerepel (ma, pending), kiszűrjük
-  const filteredComboLegs = comboLegs.filter(l => !tippedMatches.has(l.match));
+  const filteredComboLegs = comboLegs.filter(l => !tippedMatches.has(l.match) && !tippedComboLegs.has(l.match));
   const freshCombos = buildCombos(filteredComboLegs, matchList).filter(c => !existingKeys.has(comboKey(c)));
   if (freshCombos.length) { history = [...freshCombos, ...history]; saveHistory(); }
   comboTips = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
