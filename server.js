@@ -286,6 +286,20 @@ async function sendTelegram(text) {
   } catch (e) { console.error("Telegram hiba:", e.message); }
 }
 
+async function sendTelegramPaid(text) {
+  if (!TG_BOT_TOKEN || !TG_PAID_CHAT_ID) return;
+  try {
+    const r    = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: TG_PAID_CHAT_ID, text, parse_mode: "HTML" })
+    });
+    const data = await r.json();
+    if (!data.ok) console.error("Telegram (paid) hiba:", JSON.stringify(data));
+    else console.log("Telegram paid: üzenet elküldve ✓");
+  } catch (e) { console.error("Telegram paid hiba:", e.message); }
+}
+
 // ── Ázsiai kiértékelés ────────────────────────────────────
 // Egész/fél vonal: won/lost/push. Negyedes vonal (x.25 / x.75): a tét két fél
 // fogadásra bomlik a két szomszédos vonalon → won / half_won / push / half_lost / lost.
@@ -1502,6 +1516,32 @@ app.post("/api/tips/send", async (req, res) => {
   for (const u of recipients) {
     mailer.sendNewTips(u.email, singlesToSend, combosToSend, freesToSend)
       .catch(e => console.error(`Tip email hiba (${u.email}):`, e.message));
+  }
+
+  // Fizetős Telegram csatorna: paid singles + kombik
+  if (TG_PAID_CHAT_ID && (singlesToSend.length || combosToSend.length)) {
+    const lines = [
+      ...singlesToSend.map(t =>
+        `⚽ <b>${t.match}</b>\n` +
+        `📊 ${t.market} · <b>${t.pick}</b> @ <b>${parseFloat(t.odds).toFixed(2)}</b>` +
+        (t.commence ? `\n🕐 Kick-off: ${t.commence}` : "") +
+        (t.note ? `\n\n💡 ${t.note}` : "")
+      ),
+      ...combosToSend.map(c =>
+        `🎰 <b>Combo tip</b> @ <b>${parseFloat(c.odds).toFixed(2)}</b>\n` +
+        (c.legs||[]).map((l,i) => `${i+1}. ${l.match}: <b>${l.pick}</b> @${parseFloat(l.odds).toFixed(2)}`).join("\n")
+      )
+    ];
+    const parts = [];
+    if (singlesToSend.length) parts.push(`${singlesToSend.length} single${singlesToSend.length>1?"s":""}`);
+    if (combosToSend.length) parts.push(`${combosToSend.length} combo${combosToSend.length>1?"s":""}`);
+    const msg =
+      `💎 <b>Today's Tips – 90.exe</b>\n` +
+      `📌 ${parts.join(" + ")}\n\n` +
+      lines.join("\n\n─────────────\n\n") +
+      ``;
+    await sendTelegramPaid(msg).catch(e => console.error("Telegram paid hiba:", e.message));
+    console.log(`Fizetős Telegram csatorna: ${singlesToSend.length} single + ${combosToSend.length} kombi elküldve`);
   }
 
   res.json({ ok: true, sent: total, telegram: freesToSend.length });
