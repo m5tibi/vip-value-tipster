@@ -136,7 +136,7 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
     <div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:12px;padding:22px;width:min(380px,100%)">
       <div id="auth-title" style="font-weight:700;color:#00e676;font-size:17px;margin-bottom:4px" data-i18n="tips.auth_title_login">Belépés</div>
       <div id="auth-sub" style="color:#78909c;font-size:12px;margin-bottom:14px" data-i18n="tips.auth_sub_login">Lépj be a napi tippek megtekintéséhez.</div>
-      <form id="auth-form" onsubmit="event.preventDefault();authSubmit()" autocomplete="on">
+      <form id="auth-form" onsubmit="event.preventDefault();authSubmit()" autocomplete="on" action="javascript:void(0)">
       <input id="auth-email" type="email" name="email" data-i18n-placeholder="tips.email_ph" placeholder="E-mail cím" autocomplete="email"
              style="width:100%;box-sizing:border-box;padding:11px;border-radius:8px;border:1px solid #1e3a2f;background:#07111d;color:#e0e0e0;font-size:14px;margin-bottom:8px">
       <input id="auth-pwd" type="password" name="password" data-i18n-placeholder="tips.pwd_ph" placeholder="Jelszó" autocomplete="current-password"
@@ -179,9 +179,9 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
     <button class="tab" onclick="switchTab('history')" data-i18n="tips.tab_history">📁 Előzmények</button>
     <a href="/" style="text-decoration:none;padding:7px 18px;background:#0d1b2a;color:#546e7a;border:1px solid #1e3a2f;border-radius:8px;font-weight:700;font-size:14px" data-i18n="nav.main">← Főoldal</a>
     <a href="/statisztika.html" style="text-decoration:none;padding:7px 18px;background:#0d1b2a;color:#80cbc4;border:1px solid #1e3a2f;border-radius:8px;font-weight:700;font-size:14px">📊 Track Record</a>
+    <a href="https://t.me/+rMoqrue6DBFlZmVk" target="_blank" rel="noopener" style="text-decoration:none;padding:7px 18px;background:#0d2233;color:#229ED9;border:1px solid #1a3a55;border-radius:8px;font-weight:700;font-size:14px">📱 Telegram</a>
     <a href="/analyzer.html" style="text-decoration:none;padding:7px 18px;background:#0d1b2a;color:#80cbc4;border:1px solid #1e3a2f;border-radius:8px;font-weight:700;font-size:14px" data-i18n="tips.nav_analyzer">⚡ Elemző</a>
     <a href="/elofizetes.html" style="text-decoration:none;padding:7px 18px;background:#1b3a20;color:#00e676;border:1px solid #2e7d32;border-radius:8px;font-weight:700;font-size:14px">⭐ Pro</a>
-    <a href="https://t.me/+rMoqrue6DBFlZmVk" target="_blank" rel="noopener" style="text-decoration:none;padding:7px 18px;background:#0d2233;color:#229ED9;border:1px solid #1a3a55;border-radius:8px;font-weight:700;font-size:14px">📱 Telegram</a>
     <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
       <span id="user-email" style="display:none;color:#78909c;font-size:12px"></span>
       <button class="lang-toggle" onclick="toggleLang()">🇬🇧 EN</button>
@@ -271,9 +271,8 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
 
   <footer style="margin-top:28px;padding-top:16px;border-top:1px solid #1e3a2f;text-align:center;color:#546e7a;font-size:12px;line-height:1.8">
     <div style="margin-bottom:6px">
-      <a href="/" style="color:#80cbc4;text-decoration:none" data-i18n="nav.main">Főoldal</a> ·
+      <a href="/" style="color:#80cbc4;text-decoration:none" data-i18n="nav.main">Főoldal</a> · <a href="https://t.me/+rMoqrue6DBFlZmVk" target="_blank" rel="noopener" style="color:#229ED9;text-decoration:none">📱 <span data-i18n="nav.telegram_ch">Telegram csatorna</span></a> ·
       <a href="/analyzer.html" style="color:#80cbc4;text-decoration:none" data-i18n="nav.analyzer">Elemző</a> ·
-      <a href="https://t.me/+rMoqrue6DBFlZmVk" target="_blank" rel="noopener" style="color:#229ED9;text-decoration:none">📱 <span data-i18n="nav.telegram_ch">Telegram csatorna</span></a> ·
       <a href="/aszf.html" style="color:#80cbc4;text-decoration:none" data-i18n="footer.tos">ÁSZF</a> ·
       <a href="/adatvedelem.html" style="color:#80cbc4;text-decoration:none" data-i18n="footer.privacy">Adatkezelési tájékoztató</a>
     </div>
@@ -370,6 +369,13 @@ async function authSubmit() {
     });
     const d = await r.json().catch(()=>({}));
     if (!r.ok) return showErr(d.error || ('Hiba (HTTP ' + r.status + ')'));
+    // Böngésző jelszómentés kérése (PasswordCredential API)
+    if (window.PasswordCredential && !reg) {
+      try {
+        const cred = new window.PasswordCredential({ id: email, password: pwd });
+        await navigator.credentials.store(cred);
+      } catch(e) { /* nem támogatott böngészőben csendben tér vissza */ }
+    }
     closeAuthModal();
     await refreshMe();
     await loadTips();
