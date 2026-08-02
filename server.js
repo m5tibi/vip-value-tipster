@@ -132,7 +132,8 @@ const ADMIN_PWD     = process.env.ADMIN_PASSWORD;
 const ODDS_API_KEY  = process.env.ODDS_API_KEY;
 const TG_BOT_TOKEN    = process.env.TG_BOT_TOKEN;
 const TG_CHAT_ID      = process.env.TG_CHAT_ID;       // publikus csatorna
-const TG_PAID_CHAT_ID = process.env.TG_PAID_CHAT_ID;  // 90.exe fizetős csatorna
+const TG_PAID_CHAT_ID  = process.env.TG_PAID_CHAT_ID;  // 90.exe fizetős csatorna
+const TG_PUBLIC_LINK   = process.env.TG_PUBLIC_LINK || "";  // pl. https://t.me/+xxx (publikus csatorna linkje)
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const FOOTBALLDATA_TOKEN = process.env.FOOTBALLDATA_TOKEN;   // opcionális: 90 perces eredményhez (football-data.org)
 const DATA_FILE     = "/data/history.json";
@@ -1386,6 +1387,12 @@ app.get("/api/status", (req, res) => {
   res.json({ aiTipsCount: aiTips.length, lastUpdate: history[0]?.addedAt || null, nextFetchMs: minsUntilNext * 60 * 1000, isWeekend, fetchHours });
 });
 
+
+app.get("/api/config", (req, res) => {
+  res.json({
+    tgPublicLink: TG_PUBLIC_LINK || null,
+  });
+});
 
 app.get("/api/public-stats", (req, res) => {
   const isFociSrv = t => /soccer|foci|⚽/i.test((t.sport || "") + " " + (t.sportLabel || ""));
