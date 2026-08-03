@@ -143,6 +143,9 @@
     td{padding:8px 6px}
     .td-match{font-size:12px}
     thead th:nth-child(1),td:nth-child(1){display:none}
+    .period-wrap{padding:0 12px;margin:16px auto 0}
+    .period-bar{gap:6px}
+    .period-btn{font-size:11px;padding:5px 10px;border-radius:6px}
   }
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:#5d7a96;cursor:pointer;transition:all .15s}button.lang-toggle:hover{border-color:#00e676;color:#00e676}
@@ -271,11 +274,19 @@ function formatDate(d) {
 
 function getYearMonth(dateStr) {
   if (!dateStr) return null;
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return null;
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}`;
+  const s = String(dateStr);
+  // ISO: "2026-07-30T..."
+  const iso = s.match(/^(\d{4})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}`;
+  // HU locale: "2026. 7. 30. 11:27:25" vagy "2026. 07. 30."
+  const hu = s.match(/^(\d{4})\.\s*(\d{1,2})\./);
+  if (hu) return `${hu[1]}-${String(hu[2]).padStart(2,'0')}`;
+  // Fallback: new Date() (Chrome/Firefox-on működik)
+  try {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  } catch(e) {}
+  return null;
 }
 
 function getPeriodTips() {
