@@ -747,7 +747,7 @@ async function fetchAndProcess() {
         }
 
         const allOdds = [...h2hOdds, ...totalsOdds, ...spreadsOdds];
-        if (allOdds.length) matchList.push({ sport: meta.label, match: `${game.home_team} vs ${game.away_team}`, commence: huTime(game.commence_time), odds: allOdds });
+        if (allOdds.length) { const me = { sport: meta.label, match: `${game.home_team} vs ${game.away_team}`, commence: huTime(game.commence_time), odds: allOdds }; matchList.push(me); lastMatchList.push(me); }
       }
     } catch {}
   }
