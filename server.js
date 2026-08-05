@@ -655,6 +655,7 @@ const isApproved = t => t.approved !== false;
 // ── Fő frissítő ───────────────────────────────────────────
 async function fetchAndProcess() {
   const now   = new Date();
+  lastMatchList = [];  // reset cache
   console.log(`Elemzés indul: ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}`);
 
   // Minden MÉG LE NEM ZÁRT (pending) single tipp meccse – dátumtól függetlenül.
@@ -674,6 +675,7 @@ async function fetchAndProcess() {
 
   const matchList = [];
   let scannedLeagues = 0, oddsCalls = 0;
+  lastMatchList = [];  // reset
   for (const [sportKey, meta] of Object.entries(SPORT_MAP)) {
     try {
       // 1) INGYENES esemény-lekérdezés (/events = 0 kredit): van-e meccs a köv. 24 órában?
@@ -1398,6 +1400,23 @@ app.get("/api/status", (req, res) => {
 app.get("/api/config", (req, res) => {
   res.json({
     tgPublicLink: TG_PUBLIC_LINK || null,
+  });
+});
+
+// Match list endpoint a mondomatutit.hu számára
+// Visszaadja a legutóbb lekért meccslistát és a már tippelt meccseket
+let lastMatchList = [];  // globális cache
+
+app.get("/api/match-list", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const tippedMatches = [
+    ...history.filter(t => (t.type === "ai" || t.type === "free") && (!t.result || t.result === "pending")).map(t => t.match),
+    ...history.filter(t => t.type === "combo" && (!t.result || t.result === "pending")).flatMap(t => (t.legs || []).map(l => l.match))
+  ];
+  res.json({
+    matches: lastMatchList,
+    tippedMatches: [...new Set(tippedMatches)],
+    generatedAt: new Date().toISOString()
   });
 });
 
