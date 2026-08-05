@@ -204,6 +204,7 @@ const SPORT_MAP = {
   "soccer_norway_eliteserien":           { sport: "soccer", label: "⚽ Norvég Eliteserien" },
   "soccer_sweden_allsvenskan":           { sport: "soccer", label: "⚽ Svéd Allsvenskan" },
   "soccer_poland_ekstraklasa":           { sport: "soccer", label: "⚽ Lengyel Ekstraklasa" },
+  "soccer_scotland_premiership":          { sport: "soccer", label: "⚽ Skót Premiership" },
   // Amerika / Ázsia / Óceánia
   "soccer_brazil_campeonato":            { sport: "soccer", label: "⚽ Brazil Serie A" },
   "soccer_argentina_primera_division":   { sport: "soccer", label: "⚽ Argentin Primera" },
