@@ -794,6 +794,8 @@ async function fetchAndProcess() {
   // Státusz-értesítés Telegramra (a tippek TARTALMA NEM megy ki – az csak jóváhagyás után,
   // a "📤 Jóváhagyottak küldése" gombbal). Ez csak egy heads-up, hogy lefutott a lekérdezés.
   const total = fresh.length + freshCombos.length;
+  // lastMatchList mentése lemezre
+  try { fs.writeFileSync(DATA_DIR + "/last_match_list.json", JSON.stringify(lastMatchList)); } catch(e) {}
   console.log(`Frissítve – ${fresh.length} új AI tipp, ${freshCombos.length} új kombi (jóváhagyásra várnak)`);
 }
 
@@ -1406,6 +1408,12 @@ app.get("/api/config", (req, res) => {
 // Match list endpoint a mondomatutit.hu számára
 // Visszaadja a legutóbb lekért meccslistát és a már tippelt meccseket
 let lastMatchList = [];  // globális cache
+// Betöltés lemezről ha van
+try {
+  const saved = JSON.parse(fs.readFileSync(DATA_DIR + "/last_match_list.json", "utf8"));
+  if (Array.isArray(saved)) lastMatchList = saved;
+  console.log(`lastMatchList betöltve: ${lastMatchList.length} meccs`);
+} catch(e) { /* első indulás, nincs még fájl */ }
 
 app.get("/api/match-list", (req, res) => {
   if (!requireAdmin(req, res)) return;
