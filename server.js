@@ -1413,9 +1413,16 @@ app.get("/api/match-list", (req, res) => {
     ...history.filter(t => (t.type === "ai" || t.type === "free") && (!t.result || t.result === "pending")).map(t => t.match),
     ...history.filter(t => t.type === "combo" && (!t.result || t.result === "pending")).flatMap(t => (t.legs || []).map(l => l.match))
   ];
+  // Tippelt pick-ek: "meccs | piac | pick" formátumban
+  const tippedPicks = history
+    .filter(t => (t.type === "ai" || t.type === "free") && (!t.result || t.result === "pending"))
+    .map(t => `${t.match} | ${t.market || "1X2"} | ${t.pick}`)
+    .filter(Boolean);
+
   res.json({
     matches: lastMatchList,
     tippedMatches: [...new Set(tippedMatches)],
+    tippedPicks: [...new Set(tippedPicks)],
     generatedAt: new Date().toISOString()
   });
 });
