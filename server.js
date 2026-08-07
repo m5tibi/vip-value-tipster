@@ -961,8 +961,9 @@ async function checkResults() {
   // Csak azokat a sportokat kérdezzük le, amelyekhez ténylegesen van pending tipp → kredit takarékosság
   const allPending = [...pendingSingles, ...combosToCheck.flatMap(c => c.legs || [])];
   const neededSports = new Set(allPending.map(t => t.sportKey).filter(Boolean));
-  // Ha nincs sportKey a tippeknél, fallback: összes sport
-  const sportsToCheck = neededSports.size > 0 ? [...neededSports] : Object.keys(SPORT_MAP);
+  // Ha bármely kombi lábnak nincs sportKey-je, fallback: összes sport (J-League stb. sem marad ki)
+  const hasLegsMissingSport = combosToCheck.some(c => (c.legs || []).some(l => !l.sportKey));
+  const sportsToCheck = (neededSports.size === 0 || hasLegsMissingSport) ? Object.keys(SPORT_MAP) : [...neededSports];
   console.log(`  Odds API lekérés: ${sportsToCheck.length} sport (${sportsToCheck.join(", ")})`);
   const completed = {};
   for (const sportKey of sportsToCheck) {
