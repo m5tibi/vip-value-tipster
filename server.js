@@ -972,7 +972,14 @@ async function checkResults() {
       if (!r.ok) continue;
       const games = await r.json();
       for (const game of games) {
-        if (!game.completed || !game.scores) continue;
+        // Ha completed=false de van scores és 1+ óránál régebbi frissítés → lezártnak vesszük
+        const hasScores = Array.isArray(game.scores) && game.scores.length > 0;
+        let isCompleted = game.completed;
+        if (!isCompleted && hasScores && game.last_update) {
+          const ageH = (Date.now() - new Date(game.last_update).getTime()) / 3600000;
+          if (ageH >= 1) isCompleted = true;
+        }
+        if (!isCompleted || !hasScores) continue;
         const matchName = `${game.home_team} vs ${game.away_team}`;
         let homeScore = parseInt(game.scores.find(s => s.name === game.home_team)?.score || 0);
         let awayScore = parseInt(game.scores.find(s => s.name === game.away_team)?.score || 0);
