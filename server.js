@@ -972,12 +972,12 @@ async function checkResults() {
       if (!r.ok) continue;
       const games = await r.json();
       for (const game of games) {
-        // Ha completed=false de van scores és 1+ óránál régebbi frissítés → lezártnak vesszük
+        // Ha completed=false de van scores és a meccs legalább 2 órája kezdődött → lezártnak vesszük
         const hasScores = Array.isArray(game.scores) && game.scores.length > 0;
         let isCompleted = game.completed;
-        if (!isCompleted && hasScores && game.last_update) {
-          const ageH = (Date.now() - new Date(game.last_update).getTime()) / 3600000;
-          if (ageH >= 1) isCompleted = true;
+        if (!isCompleted && hasScores && game.commence_time) {
+          const sinceKickoff = (Date.now() - new Date(game.commence_time).getTime()) / 3600000;
+          if (sinceKickoff >= 2) isCompleted = true;
         }
         if (!isCompleted || !hasScores) continue;
         const matchName = `${game.home_team} vs ${game.away_team}`;
