@@ -599,7 +599,17 @@ function comboCardHTML(c, showResult) {
     ${payoutLine}
     ${showResult?`<div class="tip-actions">${resBadge(c.result)}</div>`:""}
     ${adminTipControls(c)}
+    ${isAdmin() ? comboResultBtns(c) : ""}
   </div>`;
+}
+
+function comboResultBtns(c) {
+  if (!isAdmin()) return "";
+  const won = `<button class="btn-won" onclick="setComboResult('${c.id}','won')">✅ Nyert</button>`;
+  const lost = `<button class="btn-lost" onclick="setComboResult('${c.id}','lost')">❌ Vesztett</button>`;
+  const push = `<button class="btn-push" onclick="setComboResult('${c.id}','push')">↩️ Visszajár</button>`;
+  const label = (!c.result || c.result === "pending") ? '<span style="font-size:11px;color:#90a4ae">Eredmény:</span>' : '<span style="font-size:10px;color:#546e7a">Javítás:</span>';
+  return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #4e342e">${label}${won}${lost}${push}</div>`;
 }
 
 function tipHTML(t, showResult) {
@@ -1069,6 +1079,24 @@ async function loadHistory() {
     renderHistory();
     renderFreeTipSection();
   } catch(e) { console.error("loadHistory hiba:",e); }
+}
+
+async function setComboResult(id, result) {
+  const payout = result === "won" ? prompt("Kifizetési szorzó (pl. 4.29):", "") : null;
+  const body = { result };
+  if (payout) body.comboPayout = parseFloat(payout);
+  const r = await fetch(`/api/history/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...adminHeaders() },
+    body: JSON.stringify(body)
+  });
+  if (r.ok) {
+    showStatus(`Kombi eredmény beállítva: ${result}`);
+    await loadHistory();
+    renderTips();
+  } else {
+    showStatus("Hiba!", true);
+  }
 }
 
 async function setResult(id, result) {
