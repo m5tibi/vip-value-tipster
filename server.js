@@ -395,14 +395,18 @@ function calcComboStats() {
 }
 
 function buildYesterdayStatsMsg() {
-  const yest = yesterdayHU();  // pl. "2026. 07. 28."
-  const tips = history.filter(t =>
-    t.type !== "value" &&
-    isApproved(t) &&
-    SETTLED.includes(t.result) &&
-    t.settledAt &&
-    t.settledAt.startsWith(yest)
-  );
+  const yest = yesterdayHU();  // pl. "2026. 08. 08."
+  // Tegnapi tippek: commence dátum alapján (pl. "08.08 20:30" → "08.08")
+  const yestMD = yest.split(". ").slice(1).map(s=>s.replace(".","").padStart(2,"0")).join(".");
+  // "2026. 08. 08." → "08.08"
+  const tips = history.filter(t => {
+    if (t.type === "value" || !isApproved(t) || !SETTLED.includes(t.result)) return false;
+    // commence alapján: "08.08 20:30" → "08.08"
+    const commenceDate = (t.commence || "").split(" ")[0];
+    if (commenceDate === yestMD) return true;
+    // fallback: settledAt alapján
+    return t.settledAt && t.settledAt.startsWith(yest);
+  });
   if (!tips.length) return null;
 
   const won      = tips.filter(t => t.result === "won").length;
@@ -1199,7 +1203,7 @@ setInterval(async () => {
     console.log("Napnyitó automatikus eredmény-ellenőrzés...");
     await checkResults();
   }
-  if (hour === 0 && minute === 5 && _lastStatsDay !== dayKey) {
+  if (hour === 6 && minute === 5 && _lastStatsDay !== dayKey) {
     _lastStatsDay = dayKey;
     const yMsg = buildYesterdayStatsMsg();
     if (yMsg) {
