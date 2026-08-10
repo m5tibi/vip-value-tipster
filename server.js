@@ -495,8 +495,8 @@ KÉT dolgot adj:
    - MAGAS VALÓSZÍNŰSÉGŰ kimenetel, jellemzően 1.65-1.90 odds között (minimum 1.65 odds kötelező).
    - Lehetőleg az aznapi legjobb fogadási lehetőség, amiről szinte biztos a kimenetel.
    - Ugyanúgy adjon note-ot (1-2 mondat), mint a "tippek"-nél.
-   - Szinte mindig adj meg egyet – a matchListből legyen a legbiztosabb kimenetel.
-   - Ha TÉNYLEG nincs 1.65 feletti, magas valószínűségű kimenetel, csak akkor legyen null.
+   - KÖTELEZŐ ha legalább 2 single tipp vagy 1 kombi is van a válaszban – ilyenkor MINDIG adj meg egyet!
+   - Csak akkor lehet null, ha egyáltalán nincs 1.65 feletti, magas valószínűségű kimenetel a matchListben.
 
 2) "kombi_labak": 4-6 BIZTONSÁGOS, alacsony kockázatú láb kombi szelvényekhez.
    - MINDEGYIK láb MÁS meccsről legyen – használj annyi különböző meccset, amennyi elérhető (legalább 2, hogy összeálljon egy kötés; ha van elég meccs, adj 4-6 lábat, hogy több, NEM átfedő kötés is kijöjjön).
