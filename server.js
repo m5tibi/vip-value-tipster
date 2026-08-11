@@ -205,9 +205,11 @@ const SPORT_MAP = {
   "soccer_sweden_allsvenskan":           { sport: "soccer", label: "⚽ Svéd Allsvenskan" },
   "soccer_poland_ekstraklasa":           { sport: "soccer", label: "⚽ Lengyel Ekstraklasa" },
   "soccer_scotland_premiership":          { sport: "soccer", label: "⚽ Skót Premiership" },
-  "soccer_uefa_champs_league_qualifying":  { sport: "soccer", label: "⚽ BL-selejtező" },
-  "soccer_uefa_europa_league_qualifying":  { sport: "soccer", label: "⚽ EL-selejtező" },
-  "soccer_uefa_europa_conference_league_qualifying": { sport: "soccer", label: "⚽ KL-selejtező" },
+  "soccer_uefa_champs_league_qualification": { sport: "soccer", label: "⚽ BL-selejtező" },
+  "soccer_korea_kleague1":                 { sport: "soccer", label: "⚽ Koreai K League" },
+  "soccer_saudi_arabia_pro_league":        { sport: "soccer", label: "⚽ Szaúdi Pro Liga" },
+  "soccer_chile_campeonato":               { sport: "soccer", label: "⚽ Chilei Primera" },
+
   // Amerika / Ázsia / Óceánia
   "soccer_brazil_campeonato":            { sport: "soccer", label: "⚽ Brazil Serie A" },
   "soccer_argentina_primera_division":   { sport: "soccer", label: "⚽ Argentin Primera" },
