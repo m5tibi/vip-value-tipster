@@ -976,12 +976,19 @@ async function checkResults() {
       if (!r.ok) continue;
       const games = await r.json();
       for (const game of games) {
-        // Ha completed=false de van scores és a meccs legalább 2 órája kezdődött → lezártnak vesszük
+        // Ha completed=false de van scores:
+        // - ha last_update >= 30 perce nem változott → végleges
+        // - ha nincs last_update, kickoff + 3 óra küszöb
         const hasScores = Array.isArray(game.scores) && game.scores.length > 0;
         let isCompleted = game.completed;
-        if (!isCompleted && hasScores && game.commence_time) {
-          const sinceKickoff = (Date.now() - new Date(game.commence_time).getTime()) / 3600000;
-          if (sinceKickoff >= 2) isCompleted = true;
+        if (!isCompleted && hasScores) {
+          if (game.last_update) {
+            const sinceUpdate = (Date.now() - new Date(game.last_update).getTime()) / 60000;
+            if (sinceUpdate >= 30) isCompleted = true;
+          } else if (game.commence_time) {
+            const sinceKickoff = (Date.now() - new Date(game.commence_time).getTime()) / 3600000;
+            if (sinceKickoff >= 3) isCompleted = true;
+          }
         }
         if (!isCompleted || !hasScores) continue;
         const matchName = `${game.home_team} vs ${game.away_team}`;
