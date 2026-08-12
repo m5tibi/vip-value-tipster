@@ -753,13 +753,15 @@ function renderHistory() {
     const r2  = d.roi ?? roi;
     const wr2 = d.winRate != null ? d.winRate + "%" : wr;
     const col = p >= 0 ? "#69f0ae" : "#ef9a9a";
-    document.getElementById("h-wr").textContent     = wr2;
-    document.getElementById("h-profit").textContent = (p >= 0 ? "+" : "") + parseFloat(p).toFixed(2);
-    document.getElementById("h-profit").style.color = col;
-    document.getElementById("h-roi").textContent    = r2 != null ? (p >= 0 ? "+" : "") + r2 + "%" : "–";
-    document.getElementById("h-roi").style.color    = col;
+    if (isAdmin()) {
+      document.getElementById("h-wr").textContent     = wr2;
+      document.getElementById("h-profit").textContent = (p >= 0 ? "+" : "") + parseFloat(p).toFixed(2);
+      document.getElementById("h-profit").style.color = col;
+      document.getElementById("h-roi").textContent    = r2 != null ? (p >= 0 ? "+" : "") + r2 + "%" : "–";
+      document.getElementById("h-roi").style.color    = col;
+    }
     const lsBar = document.getElementById("live-stats-bar");
-    if (lsBar) {
+    if (lsBar && isAdmin()) {
       lsBar.style.display = "flex";
       const lsWr  = document.getElementById("ls-wr");
       const lsPr  = document.getElementById("ls-profit");
@@ -771,6 +773,7 @@ function renderHistory() {
       if (lsSt)  { lsSt.textContent = (d.settled ?? settled.length) + " " + window.t("tips.settled_basis"); }
     }
   }).catch(() => {
+    if (!isAdmin()) return;
     // Fallback: helyi számítás
     const col = profit >= 0 ? "#69f0ae" : "#ef9a9a";
     document.getElementById("h-wr").textContent     = wr;
