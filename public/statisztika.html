@@ -310,8 +310,14 @@ function calcStats(tips) {
 function updateScoreboard(stats) {
   const adminPass = localStorage.getItem("vbt_admin");
   const sc = document.getElementById("scoreboard");
-  if (!adminPass) { if (sc) sc.style.display = "none"; return; }
+  const ch = document.getElementById("chart-section");
+  if (!adminPass) {
+    if (sc) sc.style.display = "none";
+    if (ch) ch.style.display = "none";
+    return;
+  }
   if (sc) sc.style.display = "";
+  if (ch) ch.style.display = "";
   const sEl = id => document.getElementById(id);
   sEl('s-settled').textContent = stats.settled ?? '–';
   if (stats.winRate != null) {
@@ -416,6 +422,7 @@ function buildPeriodPicker(tips) {
 }
 
 function drawChart(tips) {
+  if (!localStorage.getItem("vbt_admin")) return;
   const canvas = document.getElementById('profit-chart');
   const ctx    = canvas.getContext('2d');
   const dpr    = window.devicePixelRatio || 1;
