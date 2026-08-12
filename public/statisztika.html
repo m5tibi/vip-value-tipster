@@ -308,6 +308,10 @@ function calcStats(tips) {
 }
 
 function updateScoreboard(stats) {
+  const adminPass = localStorage.getItem("vbt_admin");
+  const sc = document.getElementById("scoreboard");
+  if (!adminPass) { if (sc) sc.style.display = "none"; return; }
+  if (sc) sc.style.display = "";
   const sEl = id => document.getElementById(id);
   sEl('s-settled').textContent = stats.settled ?? '–';
   if (stats.winRate != null) {
