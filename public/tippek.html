@@ -118,7 +118,7 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
     <div style="font-size:11px;color:#37474f" data-i18n="tips.cancellable">Bármikor lemondható · Biztonságos Stripe fizetés</div>
   </div>
 
-  <div id="live-stats-bar" class="admin-only-stat" style="display:none" style="max-width:100%;overflow-x:hidden" style="display:none;background:#0a1f14;border:1px solid #1e3a2f;border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:center">
+  <div id="live-stats-bar" class="admin-only-stat" style="display:none;max-width:100%;overflow-x:hidden;background:#0a1f14;border:1px solid #1e3a2f;border-radius:10px;padding:10px 16px;margin-bottom:14px;flex-wrap:wrap;align-items:center;justify-content:center">
     <span style="font-size:11px;color:#546e7a;letter-spacing:1px;text-transform:uppercase">Track record</span>
     <span style="color:#546e7a">·</span>
     <span style="font-size:13px;color:#80cbc4">Win: <b id="ls-wr" style="color:#00e676">–</b></span>
@@ -824,7 +824,7 @@ function renderHistory() {
     const pChip = st.settled
       ? ` · <b style="color:${pCol}">${st.profit>=0?"+":""}${st.profit.toFixed(2)}e</b> · ROI <b style="color:${pCol}">${st.profit>=0?"+":""}${st.roi.toFixed(1)}%</b>`
       : "";
-    const meta  = tips.length+" tipp · ✅"+mWon+" ❌"+mLost+pChip;
+    const meta  = isAdmin() ? (tips.length+" tipp · ✅"+mWon+" ❌"+mLost+pChip) : (tips.length+" tipp");
     const inner = Object.keys(byDay).sort((a,b)=>b.localeCompare(a))
       .map(day=>makeDaySection(day, byDay[day], false)).join("");
     return `
