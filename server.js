@@ -487,31 +487,36 @@ async function fetchAiTips(matchList, alreadyTipped = []) {
 Mai meccsek (valós bookmaker oddsokkal):
 ${matchText}
 ${skipNote}
-KÉT dolgot adj:
+HÁROM dolgot adj:
 
 1) "tippek": 2-3 ERŐS single tipp (csak a legjobbak, ne erőltesd a számot).
-   - MECCSENKÉNT LEGFELJEBB 1 single tipp – a legerősebb piacot válaszd az adott meccsre. Ne adj több tippet ugyanarra a meccsre!
-   - CSAK legalább ${MIN_SINGLE_ODDS} oddsú single tippet adj – az ennél alacsonyabb oddsú kimenetet NE tedd single tippnek (a nagyon alacsony oddsúak a kombi lábak közé valók).
-   - Lehetőleg KÜLÖNBÖZŐ meccsekről legyenek. Ha csak 1 meccs van elérhető, akkor csak 1 tippet adj.
-   - Csak pozitív kimenetel: over gólok, hendikep győzelem, csapat győzelme. NE adj under tippet a singlekbe.
+   - MECCSENKÉNT LEGFELJEBB 1 single tipp – a legerősebb piacot válaszd az adott meccsre.
+   - CSAK legalább ${MIN_SINGLE_ODDS} oddsú single tippet adj.
+   - Lehetőleg KÜLÖNBÖZŐ meccsekről legyenek.
+   - Csak pozitív kimenetel: over gólok, hendikep győzelem, csapat győzelme. NE adj under tippet.
+   - HENDIKEP LIMIT: maximum -1 (pl. -0.5, -0.75, -1 elfogadható; -1.25, -1.5, -1.75 NEM).
+   - Ha nincs 2-3 valóban meggyőző tipp, adj kevesebbet – inkább 1 erős mint 3 közepes!
 
-3) "ingyenes_tipp": 1 db INGYENES tipp, különálló single – ez az előfizetők tippjeitől TELJESEN FÜGGETLEN.
+3) "ingyenes_tipp": 1 db INGYENES tipp, különálló single.
    - MÁS meccsről legyen, mint a "tippek" mezőben szereplők.
-   - MAGAS VALÓSZÍNŰSÉGŰ kimenetel, jellemzően 1.65-1.90 odds között (minimum 1.65 odds kötelező).
-   - Lehetőleg az aznapi legjobb fogadási lehetőség, amiről szinte biztos a kimenetel.
-   - Ugyanúgy adjon note-ot (1-2 mondat), mint a "tippek"-nél.
-   - KÖTELEZŐ ha legalább 2 single tipp vagy 1 kombi is van a válaszban – ilyenkor MINDIG adj meg egyet!
-   - Csak akkor lehet null, ha egyáltalán nincs 1.65 feletti, magas valószínűségű kimenetel a matchListben.
+   - 1.65-1.90 odds között (minimum 1.65 kötelező).
+   - KÖTELEZŐ ha legalább 2 single tipp van a válaszban.
+   - Csak akkor null, ha nincs 1.65-1.90 közötti meggyőző kimenetel.
+   - Ne mondjon ellent a "tippek" vagy "kombi_labak" mezőknek!
 
-2) "kombi_labak": 4-6 BIZTONSÁGOS, alacsony kockázatú láb kombi szelvényekhez.
-   - MINDEGYIK láb MÁS meccsről legyen – használj annyi különböző meccset, amennyi elérhető (legalább 2, hogy összeálljon egy kötés; ha van elég meccs, adj 4-6 lábat, hogy több, NEM átfedő kötés is kijöjjön).
-   - Ezek külön-külön NEM elég értékesek single tippnek (alacsony odds, jellemzően 1.15-1.55), de kombinálva szép össz oddsot adnak.
-   - Magas valószínűségű kimenetelek: erős favorit győzelme, Over 1.5, Under 4.5, hendikep -1 / -1.5 nagy favoritnál stb.
+2) "kombi_labak": 2-4 BIZTONSÁGOS láb kombi szelvényekhez.
+   - MINDEGYIK láb MÁS meccsről legyen.
+   - Csak akkor adj kombilábakat, ha legalább 2-3 NAGYON BIZTONSÁGOS láb van (85%+ valószínűség).
+   - Ha nincs elég meggyőző láb, adj üres tömböt: "kombi_labak": []
+   - Jellemző odds: 1.15-1.45 (max 1.50). Ennél magasabb odds NEM kerülhet kombi lábba.
+   - TILOS: -1.5 vagy annál agresszívabb hendikep kombi lábban.
+   - Magas valószínűségű kimenetelek: erős favorit győzelme, Over 1.5, hendikep -0.5/-1 CSAK ha az erőkülönbség egyértelműen nagy.
 
 KÖZÖS szabályok:
-- Az "odds" mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd (a megfelelő piac/kimenet oddsát).
-- A "market" és "pick" pontosan egyezzen egy valós piaccal/kimenettel; a csapatnév a fent megadott formában szerepeljen.
+- Az "odds" mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd.
+- A "market" és "pick" pontosan egyezzen egy valós piaccal/kimenettel.
 - Rövid (1-2 mondat) magyar indoklás valós adatok alapján (csak a "tippek"-hez kell note).
+- Inkább kevesebb, de erős tipp mint sok közepes!
 
 Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
 {"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"1X2","pick":"...","odds":1.85,"note":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28}],"ingyenes_tipp":{"match":"...","sport":"soccer","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"1X2","pick":"...","odds":1.72,"note":"..."}}`;
