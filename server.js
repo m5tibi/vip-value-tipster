@@ -628,10 +628,12 @@ function buildCombos(legs, matchList = []) {
     });
     return m ? m.commence : null;
   };
+  const MAX_COMBO_LEG_ODDS = 1.50;
   const byMatch = {};
   for (const l of legs) {
     if (!l.match || !l.odds) continue;
-    if (!byMatch[l.match] || l.odds < byMatch[l.match].odds) byMatch[l.match] = l;   // meccsenként a legbiztosabb
+    if (parseFloat(l.odds) > MAX_COMBO_LEG_ODDS) continue;  // max odds szűrő
+    if (!byMatch[l.match] || l.odds < byMatch[l.match].odds) byMatch[l.match] = l;
   }
   const pool = Object.values(byMatch).sort((a, b) => a.odds - b.odds);   // legbiztosabb elöl
 
