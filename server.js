@@ -221,7 +221,7 @@ const SPORT_MAP = {
 
 const EXCLUDED_BM = ["betfair_ex_eu", "betfair_ex_uk", "matchbook", "betfair_sb_uk", "smarkets"];
 const WINDOW_HOURS = 36;   // meddig előre nézzen a tippekhez/kombikhoz (több meccs → kombi is összeáll)
-const MIN_SINGLE_ODDS = 1.50;   // single tippnél minimum odds (a kombi lábakra NEM vonatkozik)
+const MIN_SINGLE_ODDS = 1.70;   // single tippnél minimum odds (a kombi lábakra NEM vonatkozik)
 
 let history    = loadHistory();
 console.log(`History betöltve: ${history.length} tipp`);
@@ -489,28 +489,25 @@ ${matchText}
 ${skipNote}
 HÁROM dolgot adj:
 
-1) "tippek": 2-3 ERŐS single tipp (csak a legjobbak, ne erőltesd a számot).
-   - MECCSENKÉNT LEGFELJEBB 1 single tipp – a legerősebb piacot válaszd az adott meccsre.
+1) "tippek": 1-3 ERŐS single tipp (csak a legjobbak, ne erőltesd a számot).
    - CSAK legalább ${MIN_SINGLE_ODDS} oddsú single tippet adj.
-   - Lehetőleg KÜLÖNBÖZŐ meccsekről legyenek.
-   - Csak pozitív kimenetel: over gólok, hendikep győzelem, csapat győzelme. NE adj under tippet.
-   - HENDIKEP LIMIT: maximum -1 (pl. -0.5, -0.75, -1 elfogadható; -1.25, -1.5, -1.75 NEM).
+   - HENDIKEP LIMIT: maximum -1 (pl. -0.5, -0.75, -1 ok; -1.25, -1.5, -1.75 TILOS).
    - Ha nincs 2-3 valóban meggyőző tipp, adj kevesebbet – inkább 1 erős mint 3 közepes!
+   - Lehetőleg KÜLÖNBÖZŐ meccsekről.
+   - Csak pozitív kimenetel: over gólok, hendikep győzelem, csapat győzelme. NE adj under tippet.
 
 3) "ingyenes_tipp": 1 db INGYENES tipp, különálló single.
-   - MÁS meccsről legyen, mint a "tippek" mezőben szereplők.
-   - 1.65-1.90 odds között (minimum 1.65 kötelező).
+   - MÁS meccsről legyen mint a "tippek" mezőben szereplők.
+   - 1.65-1.90 odds között.
    - KÖTELEZŐ ha legalább 2 single tipp van a válaszban.
-   - Csak akkor null, ha nincs 1.65-1.90 közötti meggyőző kimenetel.
    - Ne mondjon ellent a "tippek" vagy "kombi_labak" mezőknek!
 
 2) "kombi_labak": 2-4 BIZTONSÁGOS láb kombi szelvényekhez.
-   - MINDEGYIK láb MÁS meccsről legyen.
-   - Csak akkor adj kombilábakat, ha legalább 2-3 NAGYON BIZTONSÁGOS láb van (85%+ valószínűség).
+   - CSAK akkor adj kombilábakat, ha legalább 2-3 NAGYON BIZTONSÁGOS láb van (85%+ valószínűség).
    - Ha nincs elég meggyőző láb, adj üres tömböt: "kombi_labak": []
-   - Jellemző odds: 1.15-1.45 (max 1.50). Ennél magasabb odds NEM kerülhet kombi lábba.
+   - Max 2 láb per kombi – NE adj 3 lábas kombit!
+   - Jellemző odds: 1.15-1.45 (max 1.45). Ennél magasabb TILOS kombi lábba.
    - TILOS: -1.5 vagy annál agresszívabb hendikep kombi lábban.
-   - Magas valószínűségű kimenetelek: erős favorit győzelme, Over 1.5, hendikep -0.5/-1 CSAK ha az erőkülönbség egyértelműen nagy.
 
 KÖZÖS szabályok:
 - Az "odds" mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd.
@@ -591,7 +588,7 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
     })).filter(l => l.match && l.market && l.pick && l.odds > 1);
     // Ingyenes tipp parse
     const ftOdds = parseFloat(obj.ingyenes_tipp?.odds) || 0;
-    const ft = obj.ingyenes_tipp && obj.ingyenes_tipp.match && ftOdds >= 1.65 ? {
+    const ft = obj.ingyenes_tipp && obj.ingyenes_tipp.match && ftOdds >= 1.65 && ftOdds <= 1.90 ? {
       id: `free-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: "free", sport: obj.ingyenes_tipp.sport || "soccer",
       sportLabel: obj.ingyenes_tipp.sportLabel || "⚽",
@@ -628,7 +625,7 @@ function buildCombos(legs, matchList = []) {
     });
     return m ? m.commence : null;
   };
-  const MAX_COMBO_LEG_ODDS = 1.50;
+  const MAX_COMBO_LEG_ODDS = 1.45;
   const byMatch = {};
   for (const l of legs) {
     if (!l.match || !l.odds) continue;
