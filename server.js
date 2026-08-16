@@ -209,6 +209,11 @@ const SPORT_MAP = {
   "soccer_korea_kleague1":                 { sport: "soccer", label: "⚽ Koreai K League" },
   "soccer_saudi_arabia_pro_league":        { sport: "soccer", label: "⚽ Szaúdi Pro Liga" },
   "soccer_chile_campeonato":               { sport: "soccer", label: "⚽ Chilei Primera" },
+  "soccer_brazil_serie_b":                 { sport: "soccer", label: "⚽ Brazil Série B" },
+  "soccer_finland_veikkausliiga":          { sport: "soccer", label: "⚽ Finn Veikkausliiga" },
+  "soccer_sweden_superettan":              { sport: "soccer", label: "⚽ Svéd Superettan" },
+  "soccer_germany_liga3":                  { sport: "soccer", label: "⚽ Német 3. Liga" },
+  "soccer_concacaf_leagues_cup":           { sport: "soccer", label: "⚽ Leagues Cup" },
 
   // Amerika / Ázsia / Óceánia
   "soccer_brazil_campeonato":            { sport: "soccer", label: "⚽ Brazil Serie A" },
@@ -492,28 +497,37 @@ HÁROM dolgot adj:
 1) "tippek": 1-3 ERŐS single tipp (csak a legjobbak, ne erőltesd a számot).
    - CSAK legalább ${MIN_SINGLE_ODDS} oddsú single tippet adj.
    - HENDIKEP LIMIT: maximum -1 (pl. -0.5, -0.75, -1 ok; -1.25, -1.5, -1.75 TILOS).
-   - Ha nincs 2-3 valóban meggyőző tipp, adj kevesebbet – inkább 1 erős mint 3 közepes!
-   - Lehetőleg KÜLÖNBÖZŐ meccsekről.
-   - Csak pozitív kimenetel: over gólok, hendikep győzelem, csapat győzelme. NE adj under tippet.
+   - PIAC PRIORITÁS: Részesítsd előnyben az Over (gól) és GG/BTTS piacokat a 1X2-vel szemben! Az Over 1.5, Over 2.5, Over 3 és mindkét csapat betalál piacok sok esetben biztonságosabbak és értékesebbek mint a győztes.
+   - 1X2-t csak akkor válassz, ha egyértelmű erőkülönbség van és jó az odds.
+   - Lehetőleg KÜLÖNBÖZŐ meccsekről. NE adj under tippet!
+   - Ha nincs 2-3 meggyőző tipp, adj kevesebbet – inkább 1 erős mint 3 közepes!
 
 3) "ingyenes_tipp": 1 db INGYENES tipp, különálló single.
-   - MÁS meccsről legyen mint a "tippek" mezőben szereplők.
+   - MÁS meccsről mint a "tippek" mezőben szereplők.
    - 1.65-1.90 odds között.
    - KÖTELEZŐ ha legalább 2 single tipp van a válaszban.
    - Ne mondjon ellent a "tippek" vagy "kombi_labak" mezőknek!
 
 2) "kombi_labak": 2-4 BIZTONSÁGOS láb kombi szelvényekhez.
-   - CSAK akkor adj kombilábakat, ha legalább 2-3 NAGYON BIZTONSÁGOS láb van (85%+ valószínűség).
-   - Ha nincs elég meggyőző láb, adj üres tömböt: "kombi_labak": []
-   - Max 2 láb per kombi – NE adj 3 lábas kombit!
-   - Jellemző odds: 1.15-1.45 (max 1.45). Ennél magasabb TILOS kombi lábba.
+   - CSAK akkor adj kombilábakat, ha legalább 2 NAGYON BIZTONSÁGOS láb van (85%+ valószínűség).
+   - Ha nincs elég meggyőző láb: "kombi_labak": []
+   - Max 2 láb per kombi! Jellemző odds: 1.15-1.45 (max 1.45).
    - TILOS: -1.5 vagy annál agresszívabb hendikep kombi lábban.
+
+WEB KERESÉSI INSTRUKCIÓK (KÖTELEZŐ minden meccsre!):
+Minden egyes meccs előtt keresd meg az alábbi információkat:
+- Az utolsó 5 mérkőzés eredményei MINDKÉT csapatra
+- Sérülés- és eltiltáslista
+- H2H (egymás elleni meccsek) – utolsó 3-5 találkozó
+- Hazai/idegenbeli forma külön
+- Gól átlagok (hazai/idegenbeli) – Over tippekhez különösen fontos!
+- BTTS arány ha GG tippet fontolsz
+Az indoklásban HIVATKOZZ konkrét adatokra: pl. "az utolsó 6 hazai meccsből 5-ben Over 2.5 volt"
 
 KÖZÖS szabályok:
 - Az "odds" mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd.
-- A "market" és "pick" pontosan egyezzen egy valós piaccal/kimenettel.
-- Rövid (1-2 mondat) magyar indoklás valós adatok alapján (csak a "tippek"-hez kell note).
-- Inkább kevesebb, de erős tipp mint sok közepes!
+- Rövid (2-3 mondat) magyar indoklás, KONKRÉT statisztikákra hivatkozva.
+- Inkább kevesebb, de erős és jól indokolt tipp!
 
 Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
 {"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"1X2","pick":"...","odds":1.85,"note":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28}],"ingyenes_tipp":{"match":"...","sport":"soccer","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"1X2","pick":"...","odds":1.72,"note":"..."}}`;
