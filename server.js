@@ -1506,10 +1506,21 @@ app.post("/api/refresh", async (req, res) => {
 
 app.patch("/api/history/:id", (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const { result } = req.body;
+  const { result, note, comboPayout } = req.body;
+  const patch = {};
+  if (note !== undefined) {
+    patch.note = note;
+    const upd = t => t.id === req.params.id ? { ...t, ...patch } : t;
+    history = history.map(upd); latestTips = latestTips.map(upd);
+    aiTips = aiTips.map(upd); comboTips = comboTips.map(upd);
+    saveHistory();
+    console.log(`Note szerkesztve: ${req.params.id}`);
+    return res.json({ ok: true });
+  }
   const validResults = ["won","lost","push","half_won","half_lost","pending"];
   if (!validResults.includes(result)) return res.status(400).json({ error: "Érvénytelen eredmény" });
-  const patch = { result, manual: true };       // kézi jelölést az auto-újraértékelés nem írja felül
+  patch.result = result; patch.manual = true;
+  if (comboPayout) patch.comboPayout = comboPayout;
   const upd = t => t.id === req.params.id ? { ...t, ...patch } : t;
   history    = history.map(upd);
   latestTips = latestTips.map(upd);
