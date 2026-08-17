@@ -1019,9 +1019,10 @@ function renderFreeTipCard(t) {
     ${t.note?`<div class="tip-note" style="color:#78909c;font-size:13px;line-height:1.6;border-top:1px solid #1e3a2f;padding-top:10px">${t.note}</div>`:''}
     ${isAdmin() ? `<div style="margin-top:8px"><button class="btn-push" style="font-size:11px;padding:4px 10px" onclick="editNote('${t.id}',this)">✏️ Szerkesztés</button></div>` : ''}
     ${t.result && t.result !== 'pending' ? `
-    <div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e3a2f;display:flex;align-items:center;gap:10px">
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e3a2f;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       ${resBadge(t.result)}
       <span style="color:${tipProfit(t)>=0?'#69f0ae':'#ef9a9a'};font-weight:700;font-size:13px">${tipProfit(t)>=0?'+':''}${tipProfit(t).toFixed(2)} egység</span>
+      ${isAdmin() ? `<span style="font-size:10px;color:#546e7a">Javítás:</span>${actionBtns(t)}` : ''}
     </div>` : ''}
   </div>`;
 }
