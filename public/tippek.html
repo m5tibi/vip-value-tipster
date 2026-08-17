@@ -1135,8 +1135,8 @@ async function editNote(id, btn) {
     body: JSON.stringify({ note: newNote })
   });
   if (r.ok) {
-    if (noteEl) noteEl.textContent = newNote;
     showStatus("✏️ Szöveg frissítve");
+    await loadTips();
     await loadHistory();
   } else {
     showStatus("Hiba a szerkesztésnél!", true);
