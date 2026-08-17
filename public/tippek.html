@@ -1022,6 +1022,9 @@ function renderFreeTipCard(t) {
       ${resBadge(t.result)}
       <span style="color:${tipProfit(t)>=0?'#69f0ae':'#ef9a9a'};font-weight:700;font-size:13px">${tipProfit(t)>=0?'+':''}${tipProfit(t).toFixed(2)} egység</span>
     </div>` : ''}
+    ${isAdmin() ? `<div style="margin-top:8px;display:flex;gap:6px">
+      <button class="btn-push" style="font-size:11px;padding:4px 10px" onclick="editNote('${t.id}',this)">✏️ Szerkesztés</button>
+    </div>` : ''}
   </div>`;
 }
 
