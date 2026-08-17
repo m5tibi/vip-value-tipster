@@ -570,6 +570,7 @@ function adminTipControls(t) {
   return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #2a3550">
     ${badge}${approveBtn}
     <button class="btn-del" style="font-size:11px;padding:4px 10px" onclick="deleteTip('${t.id}')">🗑️ Törlés</button>
+    <button class="btn-push" style="font-size:11px;padding:4px 10px" onclick="editNote('${t.id}',this)">✏️ Szerkesztés</button>
   </div>`;
 }
 
@@ -1117,6 +1118,27 @@ async function setComboResult(id, result) {
     renderTips();
   } else {
     showStatus("Hiba!", true);
+  }
+}
+
+
+async function editNote(id, btn) {
+  const card = btn.closest(".tip-card");
+  const noteEl = card ? card.querySelector(".tip-note") : null;
+  const currentNote = noteEl ? noteEl.textContent.trim() : "";
+  const newNote = prompt("Szerkeszd a tipp szövegét:", currentNote);
+  if (newNote === null) return;
+  const r = await fetch("/api/history/" + encodeURIComponent(id), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...adminHeaders() },
+    body: JSON.stringify({ note: newNote })
+  });
+  if (r.ok) {
+    if (noteEl) noteEl.textContent = newNote;
+    showStatus("✏️ Szöveg frissítve");
+    await loadHistory();
+  } else {
+    showStatus("Hiba a szerkesztésnél!", true);
   }
 }
 
