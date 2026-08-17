@@ -1221,10 +1221,11 @@ setInterval(async () => {
       }, 0);
       const roi = weekTips.length ? ((profit / weekTips.length) * 100).toFixed(1) : "0";
       const stats = { won, lost, push, halfWon, halfLost, profit, roi, winRate, settled: weekTips.length };
-      const recipients = usersDb.all().filter(u => !u.isAdmin && u.emailVerified !== false && (u.plan === "pro" || !auth.PAID_MODE));
-      console.log(`Heti összefoglaló e-mail: ${recipients.length} felhasználónak`);
-      for (const u of recipients) {
-        mailer.sendWeeklySummary(u.email, stats).catch(e => console.error(`Heti email hiba (${u.email}):`, e.message));
+      // Heti összefoglaló csak adminnak
+      const adminUser = usersDb.all().find(u => u.isAdmin);
+      if (adminUser) {
+        mailer.sendWeeklySummary(adminUser.email, stats).catch(e => console.error(`Heti email hiba:`, e.message));
+        console.log(`Heti összefoglaló elküldve az adminnak (${adminUser.email})`);
       }
     }
   }
