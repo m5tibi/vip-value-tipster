@@ -514,6 +514,11 @@ HÁROM dolgot adj:
    - Max 2 láb per kombi! Jellemző odds: 1.15-1.45 (max 1.45).
    - TILOS: -1.5 vagy annál agresszívabb hendikep kombi lábban.
 
+4) "extra_labak": MINDIG add meg ezt a mezőt! Keress 3-4 gólgazdag meccset extra szelvényhez.
+   - CSAK Over 2.5, Over 1.5, BTTS/GG piacok! Lábankénti odds: 1.50-2.20.
+   - Ha nincs 3 megfelelő meccs: "extra_labak": [] – de MINDIG szerepeljen a JSON-ban!
+   - 16 meccsből szinte mindig találni kell 3 gólgazdag meccset!
+
 WEB KERESÉSI INSTRUKCIÓK (KÖTELEZŐ minden meccsre!):
 Minden egyes meccs előtt keresd meg az alábbi információkat:
 - Az utolsó 5 mérkőzés eredményei MINDKÉT csapatra
