@@ -565,7 +565,7 @@ function adminTipControls(t) {
   const approved = t.approved !== false;
   const badge = approved
     ? `<span style="color:#69f0ae;font-size:11px;font-weight:700">✅ Jóváhagyva (publikus)</span>`
-    : `<span style="color:#ffb74d;font-size:11px;font-weight:700">${window.t("tips.pending_approval")}</span>`;
+    : `<span style="color:#ffb74d;font-size:11px;font-weight:700">${"⏳ Jóváhagyásra vár (rejtett)"}</span>`;
   const approveBtn = approved ? "" : `<button class="btn-won" style="font-size:11px;padding:4px 10px" onclick="approveTip('${t.id}')">✅ Jóváhagyás</button>`;
   return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #2a3550">
     ${badge}${approveBtn}
