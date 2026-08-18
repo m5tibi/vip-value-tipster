@@ -852,13 +852,13 @@ async function fetchAndProcess() {
     const extraId = "extra_" + Date.now();
     const extraTip = {
       id: extraId, type: "combo", approved: false,
-      label: "🎯 Extra szelvény",
-      legs: extraSlip.legs.map((l, i) => ({
+      legN: extraSlip.legs.length,
+      odds: extraSlip.totalOdds.toFixed(2),
+      legs: extraSlip.legs.map(l => ({
         match: l.match, odds: l.odds, pick: l.pick, market: l.market,
         commence: l.commence, result: "pending"
       })),
-      totalOdds: extraSlip.totalOdds,
-      note: "Extra Over/GG szelvény – magasabb kockázat, nagyobb potenciális nyeremény.",
+      note: "🎯 Extra Over/GG szelvény – magasabb kockázat, nagyobb potenciális nyeremény.",
       addedAt: new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" }),
       result: "pending", extraSlip: true
     };
