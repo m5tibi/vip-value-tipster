@@ -623,6 +623,26 @@ function comboKey(c) { return (c.legs || []).map(l => `${l.match}|${l.market}|${
 // Az AI biztonságos lábaiból NEM ÁTFEDŐ (diszjunkt) 2-3 lábas kötéseket állít össze:
 // két kombi SOSE osztozik lábon (különben korreláltak lennének – ha az egyik veszít,
 // a másik sem nyerhetne). Minden láb önállóan, a meccs eredménye alapján dől el.
+function buildExtraSlip(legs) {
+  // Extra szelvény: Over/GG/BTTS lábak, 1.50-2.20 odds között
+  const MIN_LEG = 1.50, MAX_LEG = 2.20, MIN_TOTAL = 4.50;
+  const validMarkets = ["over", "btts", "gg", "mindkét", "both", "gol-gol", "gól-gól"];
+  const filtered = legs.filter(l => {
+    const o = parseFloat(l.odds) || 0;
+    const pickLow = (l.pick || "").toLowerCase();
+    const marketLow = (l.market || "").toLowerCase();
+    const isOverGG = validMarkets.some(m => pickLow.includes(m) || marketLow.includes(m));
+    return isOverGG && o >= MIN_LEG && o <= MAX_LEG;
+  });
+  if (filtered.length < 3) return null;
+  // Max 4 láb, sort by odds desc (legjobb értékek először)
+  const selected = filtered.sort((a,b) => b.odds - a.odds).slice(0, 4);
+  const totalOdds = selected.reduce((acc, l) => acc * parseFloat(l.odds), 1);
+  if (totalOdds < MIN_TOTAL) return null;
+  return { legs: selected, totalOdds: Math.round(totalOdds * 100) / 100, type: "extra" };
+}
+
+
 function buildCombos(legs, matchList = []) {
   // A valós kezdési idő a meccslistából (odds API), nem az AI adatából – laza névpárosítással.
   const realCommence = name => {
@@ -815,6 +835,28 @@ async function fetchAndProcess() {
   // Backstop: ha egy kombi láb meccse már single tippként szerepel (ma, pending), kiszűrjük
   const filteredComboLegs = comboLegs.filter(l => !tippedMatches.has(l.match) && !tippedComboLegs.has(l.match));
   const freshCombos = buildCombos(filteredComboLegs, matchList).filter(c => !existingKeys.has(comboKey(c)));
+
+  // Extra Over/GG szelvény összeállítása
+  const allLegsForExtra = [...(obj.extra_labak || []), ...(obj.kombi_labak || [])];
+  const extraSlip = buildExtraSlip(allLegsForExtra);
+  if (extraSlip) {
+    const extraId = "extra_" + Date.now();
+    const extraTip = {
+      id: extraId, type: "combo", approved: false,
+      label: "🎯 Extra szelvény",
+      legs: extraSlip.legs.map((l, i) => ({
+        match: l.match, odds: l.odds, pick: l.pick, market: l.market,
+        commence: l.commence, result: "pending"
+      })),
+      totalOdds: extraSlip.totalOdds,
+      note: "Extra Over/GG szelvény – magasabb kockázat, nagyobb potenciális nyeremény.",
+      addedAt: new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" }),
+      result: "pending", extraSlip: true
+    };
+    comboTips.unshift(extraTip);
+    history.unshift(extraTip);
+    console.log("Extra szelvény: " + extraSlip.legs.length + " láb, össz odds " + extraSlip.totalOdds);
+  }
   if (freshCombos.length) { history = [...freshCombos, ...history]; saveHistory(); }
   comboTips = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
 
