@@ -856,11 +856,13 @@ async function fetchAndProcess() {
   const filteredComboLegs = comboLegs.filter(l => !tippedMatches.has(l.match) && !tippedComboLegs.has(l.match));
   const freshCombos = buildCombos(filteredComboLegs, matchList).filter(c => !existingKeys.has(comboKey(c)));
 
+  // Extra Over/GG szelvény – csak ha nincs már aktív
+  const hasActiveExtra = history.some(t => t.type === "combo" && t.extraSlip === true && (!t.result || t.result === "pending"));
   // Extra Over/GG szelvény összeállítása
   const allLegsForExtra = [...(extraLegs || []), ...(comboLegs || [])];
   console.log("Extra lábak száma:", allLegsForExtra.length, "| extraLegs:", (extraLegs||[]).length);
   console.log("Extra lábak részletei:", JSON.stringify(allLegsForExtra.map(l => ({pick: l.pick, market: l.market, odds: l.odds}))));
-  const extraSlip = buildExtraSlip(allLegsForExtra);
+  const extraSlip = hasActiveExtra ? null : buildExtraSlip(allLegsForExtra);
   console.log("Extra szelvény eredmény:", extraSlip ? "MEGVAN, odds: " + extraSlip.totalOdds : "NEM GENERÁLT");
   // Ha extra szelvény nem jött össze, a valid Over/GG lábakat single tippként mentjük
   if (!extraSlip) {
