@@ -722,7 +722,6 @@ const isApproved = t => t.approved !== false;
 // ── Fő frissítő ───────────────────────────────────────────
 async function fetchAndProcess() {
   const now   = new Date();
-  lastMatchList = [];  // reset cache
   console.log(`Elemzés indul: ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}`);
 
   // Minden MÉG LE NEM ZÁRT (pending) single tipp meccse – dátumtól függetlenül.
@@ -742,7 +741,7 @@ async function fetchAndProcess() {
 
   const matchList = [];
   let scannedLeagues = 0, oddsCalls = 0;
-  lastMatchList = [];  // reset
+  const newMatchList = [];  // lokális lista – csak a végén cseréljük le
   for (const [sportKey, meta] of Object.entries(SPORT_MAP)) {
     try {
       // 1) INGYENES esemény-lekérdezés (/events = 0 kredit): van-e meccs a köv. 24 órában?
@@ -814,7 +813,7 @@ async function fetchAndProcess() {
         }
 
         const allOdds = [...h2hOdds, ...totalsOdds, ...spreadsOdds];
-        if (allOdds.length) { const me = { sport: meta.label, match: `${game.home_team} vs ${game.away_team}`, commence: huTime(game.commence_time), odds: allOdds }; matchList.push(me); lastMatchList.push(me); }
+        if (allOdds.length) { const me = { sport: meta.label, match: `${game.home_team} vs ${game.away_team}`, commence: huTime(game.commence_time), odds: allOdds }; matchList.push(me); newMatchList.push(me); }
       }
     } catch {}
   }
@@ -915,6 +914,7 @@ async function fetchAndProcess() {
   // a "📤 Jóváhagyottak küldése" gombbal). Ez csak egy heads-up, hogy lefutott a lekérdezés.
   const total = fresh.length + freshCombos.length;
   // lastMatchList mentése lemezre
+  if (newMatchList.length > 0) lastMatchList = newMatchList;
   try { fs.writeFileSync(DATA_DIR + "/last_match_list.json", JSON.stringify(lastMatchList)); } catch(e) {}
   console.log(`Frissítve – ${fresh.length} új AI tipp, ${freshCombos.length} új kombi (jóváhagyásra várnak)`);
 }
