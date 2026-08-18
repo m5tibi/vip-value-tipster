@@ -632,7 +632,7 @@ function comboKey(c) { return (c.legs || []).map(l => `${l.match}|${l.market}|${
 // a másik sem nyerhetne). Minden láb önállóan, a meccs eredménye alapján dől el.
 function buildExtraSlip(legs) {
   // Extra szelvény: Over/GG/BTTS lábak, 1.50-2.20 odds között
-  const MIN_LEG = 1.50, MAX_LEG = 2.20, MIN_TOTAL = 4.50;
+  const MIN_LEG = 1.50, MAX_LEG = 2.20, MIN_TOTAL = 4.50, MAX_TOTAL = 10.00;
   const validMarkets = ["over", "btts", "gg", "mindkét", "both", "gol-gol", "gól-gól"];
   const filtered = legs.filter(l => {
     const o = parseFloat(l.odds) || 0;
@@ -645,7 +645,7 @@ function buildExtraSlip(legs) {
   // Max 4 láb, sort by odds desc (legjobb értékek először)
   const selected = filtered.sort((a,b) => b.odds - a.odds).slice(0, 4);
   const totalOdds = selected.reduce((acc, l) => acc * parseFloat(l.odds), 1);
-  if (totalOdds < MIN_TOTAL) return null;
+  if (totalOdds < MIN_TOTAL || totalOdds > MAX_TOTAL) return null;
   return { legs: selected, totalOdds: Math.round(totalOdds * 100) / 100, type: "extra" };
 }
 
