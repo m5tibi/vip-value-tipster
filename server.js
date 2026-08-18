@@ -517,6 +517,7 @@ HÁROM dolgot adj:
 4) "extra_labak": MINDIG add meg ezt a mezőt! Keress 3-4 gólgazdag meccset extra szelvényhez.
    - CSAK Over 2.5, Over 1.5, BTTS/GG piacok! Lábankénti odds: 1.50-2.20.
    - MINDEN lábban kötelező: "match", "pick", "odds", "market", "commence" mezők!
+   - FONTOS: a "pick" és "market" MINDIG egyezzen! Ha Over 2.5 a piac, akkor pick is "Over 2.5" legyen – ne Over 2.5 pick + Over 3 market!
    - Ha nincs 3 megfelelő meccs: "extra_labak": [] – de MINDIG szerepeljen a JSON-ban!
    - 16 meccsből szinte mindig találni kell 3 gólgazdag meccset!
 
