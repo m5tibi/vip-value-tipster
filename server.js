@@ -593,7 +593,8 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       type: "ai", sport: t.sport, sportLabel: t.sportLabel,
       match: t.match, commence: realCommence(t.match) || t.commence || null,
       market: t.market, pick: t.pick, odds: t.odds,
-      live: false, note: t.note,
+      live: false,
+      note: (t.note || "").replace(/^KIZÁRT[^.]*\.?\s*/i, "").replace(/^Az AI[^.]*kizárt[^.]*\.?\s*/i, "").trim(),
       approved: false, sent: false,
       addedAt: nowHu(), result: "pending"
     }));
@@ -630,6 +631,12 @@ function comboKey(c) { return (c.legs || []).map(l => `${l.match}|${l.market}|${
 // Az AI biztonságos lábaiból NEM ÁTFEDŐ (diszjunkt) 2-3 lábas kötéseket állít össze:
 // két kombi SOSE osztozik lábon (különben korreláltak lennének – ha az egyik veszít,
 // a másik sem nyerhetne). Minden láb önállóan, a meccs eredménye alapján dől el.
+
+function normMatch(s) {
+  return (s || "").replace(/-(?:RJ|SP|MG|RS|PR|SC|BA|PE|CE|GO|AM|DF|ES|MT|MS|PA|AL|MA|PB|PI|RN|RO|RR|SE|TO|AC|AP)\b/g, "")
+    .replace(/\s+/g, " ").trim().toLowerCase();
+}
+
 function buildExtraSlip(legs) {
   // Extra szelvény: Over/GG/BTTS lábak, 1.50-2.20 odds között
   const MIN_LEG = 1.50, MAX_LEG = 2.20, MIN_TOTAL = 4.50, MAX_TOTAL = 10.00;
@@ -642,9 +649,14 @@ function buildExtraSlip(legs) {
     return isOverGG && o >= MIN_LEG && o <= MAX_LEG;
   });
   if (filtered.length < 3) return null;
-  // Max 4 láb, sort by odds desc (legjobb értékek először)
-  const selected = filtered.sort((a,b) => b.odds - a.odds).slice(0, 4);
-  const totalOdds = selected.reduce((acc, l) => acc * parseFloat(l.odds), 1);
+  // Max 4 láb, sort by odds desc; ha 4 láb > MAX_TOTAL, próbáljuk 3-mal
+  const sorted = filtered.sort((a,b) => b.odds - a.odds);
+  let selected = sorted.slice(0, 4);
+  let totalOdds = selected.reduce((acc, l) => acc * parseFloat(l.odds), 1);
+  if (totalOdds > MAX_TOTAL) {
+    selected = sorted.slice(0, 3);
+    totalOdds = selected.reduce((acc, l) => acc * parseFloat(l.odds), 1);
+  }
   if (totalOdds < MIN_TOTAL || totalOdds > MAX_TOTAL) return null;
   return { legs: selected, totalOdds: Math.round(totalOdds * 100) / 100, type: "extra" };
 }
@@ -810,7 +822,8 @@ async function fetchAndProcess() {
   const { singles, comboLegs, freeTip: newFreeTip, extraLegs } = await fetchAiTips(matchList, [...tippedMatches]);
 
   // Backstop: a már ma tippelt meccsekre ne kerüljön újabb SINGLE (a prompt mellett is szűrünk)
-  const newAiTips = singles.filter(t => !tippedMatches.has(t.match));
+  const tippedNorm = new Set([...tippedMatches].map(normMatch));
+  const newAiTips = singles.filter(t => !tippedMatches.has(t.match) && !tippedNorm.has(normMatch(t.match)));
 
   // Új single tippek hozzáadása a history-hoz (a meglévők megtartásával)
   const existingIds = new Set(history.map(t => t.id));
@@ -849,6 +862,33 @@ async function fetchAndProcess() {
   console.log("Extra lábak részletei:", JSON.stringify(allLegsForExtra.map(l => ({pick: l.pick, market: l.market, odds: l.odds}))));
   const extraSlip = buildExtraSlip(allLegsForExtra);
   console.log("Extra szelvény eredmény:", extraSlip ? "MEGVAN, odds: " + extraSlip.totalOdds : "NEM GENERÁLT");
+  // Ha extra szelvény nem jött össze, a valid Over/GG lábakat single tippként mentjük
+  if (!extraSlip) {
+    const validMarkets = ["over", "btts", "gg", "mindkét", "both"];
+    const extraSingles = allLegsForExtra.filter(l => {
+      const o = parseFloat(l.odds) || 0;
+      const p = (l.pick || "").toLowerCase();
+      const m = (l.market || "").toLowerCase();
+      return o >= MIN_SINGLE_ODDS && validMarkets.some(vm => p.includes(vm) || m.includes(vm))
+        && l.match && !tippedMatches.has(l.match) && !tippedNorm.has(normMatch(l.match));
+    });
+    if (extraSingles.length > 0) {
+      console.log("Extra lábak singleként mentve: " + extraSingles.length + " db");
+      for (const l of extraSingles.slice(0, 2)) {
+        const t = {
+          id: "extra-s-" + Date.now() + "-" + Math.random().toString(36).slice(2,5),
+          type: "ai", match: l.match, market: l.market, pick: l.pick,
+          odds: parseFloat(l.odds), sportLabel: "⚽",
+          note: "Over/GG tipp – extra szelvény lábából.", sport: "soccer",
+          commence: l.commence, live: false, approved: false, sent: false,
+          addedAt: nowHu(), result: "pending"
+        };
+        singles.push(t);
+        newAiTips.push(t);
+        tippedMatches.add(l.match);
+      }
+    }
+  }
   if (extraSlip) {
     const extraId = "extra_" + Date.now();
     const extraTip = {
