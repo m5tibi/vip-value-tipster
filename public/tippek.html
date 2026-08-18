@@ -593,6 +593,7 @@ function aiTipHTML(t, showResult) {
 }
 
 function comboCardHTML(c, showResult) {
+  const isExtra = c.extraSlip === true;
   const legIcon = r => r==="won"?"✅":r==="lost"?"❌":r==="push"?"↩️":r==="half_won"?"½✅":r==="half_lost"?"½❌":"⏳";
   const legs = (c.legs||[]).map(l =>
     `<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#cfd8dc;padding:4px 0;border-bottom:1px solid #16223d">
