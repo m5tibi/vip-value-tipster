@@ -839,6 +839,7 @@ async function fetchAndProcess() {
 
   // Extra Over/GG szelvény összeállítása
   const allLegsForExtra = [...(extraLegs || []), ...(comboLegs || [])];
+  console.log("Extra lábak száma:", allLegsForExtra.length, "| extraLegs:", (extraLegs||[]).length);
   const extraSlip = buildExtraSlip(allLegsForExtra);
   if (extraSlip) {
     const extraId = "extra_" + Date.now();
