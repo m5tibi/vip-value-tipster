@@ -476,7 +476,7 @@ function buildStatsMsg(title) {
 // ── AI tippek ─────────────────────────────────────────────
 // Visszatér: { singles: [...], comboLegs: [...] }
 async function fetchAiTips(matchList, alreadyTipped = []) {
-  if (!ANTHROPIC_KEY || !matchList.length) return { singles: [], comboLegs: [] };
+  if (!ANTHROPIC_KEY || !matchList.length) return { singles: [], comboLegs: [], freeTip: null, extraLegs: [] };
   console.log(`AI elemzés: ${matchList.length} meccs`);
 
   const matchText = matchList.map(m =>
@@ -543,9 +543,9 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       })
     });
     const data = await r.json();
-    if (data.error) { console.error("AI API hiba:", JSON.stringify(data.error)); return { singles: [], comboLegs: [] }; }
+    if (data.error) { console.error("AI API hiba:", JSON.stringify(data.error)); return { singles: [], comboLegs: [], freeTip: null, extraLegs: [] }; }
     const text = (data.content?.filter(b => b.type === "text").map(b => b.text) || []).join("\n");
-    if (!text.trim()) { console.log("AI: üres szöveges válasz. stop_reason:", data.stop_reason); return { singles: [], comboLegs: [] }; }
+    if (!text.trim()) { console.log("AI: üres szöveges válasz. stop_reason:", data.stop_reason); return { singles: [], comboLegs: [], freeTip: null, extraLegs: [] }; }
 
     // JSON kinyerés: 1) ```json...``` blokk, 2) nyers {} blokk
     let jsonStr = null;
@@ -560,12 +560,12 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
     }
     if (!jsonStr) {
       console.log("AI: nem sikerült JSON-t kinyerni. Válasz eleje:\n" + text.slice(0, 500));
-      return { singles: [], comboLegs: [] };
+      return { singles: [], comboLegs: [], freeTip: null, extraLegs: [] };
     }
     let obj;
     try { obj = JSON.parse(jsonStr); } catch(e) {
       console.log("AI: JSON parse hiba –", e.message, "\nPróbált JSON eleje:\n" + jsonStr.slice(0, 400));
-      return { singles: [], comboLegs: [] };
+      return { singles: [], comboLegs: [], freeTip: null, extraLegs: [] };
     }
     // A valós kezdési idő a meccslistából (odds API), nem az AI adatából
     const realCommence = name => {
@@ -612,7 +612,8 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       odds: obj.ingyenes_tipp.odds, note: obj.ingyenes_tipp.note || "",
       approved: false, sent: false, addedAt: nowHu(), result: "pending"
     } : null;
-    return { singles, comboLegs, freeTip: ft };
+    const extraLegs = [...(obj.extra_labak || [])]; 
+    return { singles, comboLegs, freeTip: ft, extraLegs };
   } catch (e) { console.error("AI tipp hiba:", e.message); return { singles: [], comboLegs: [], freeTip: null }; }
 }
 
@@ -800,7 +801,7 @@ async function fetchAndProcess() {
   }
   console.log(`Ligák átnézve (ingyenes): ${scannedLeagues} · odds-hívás (fizetős, ~3 kredit/liga): ${oddsCalls} · feldolgozható meccs: ${matchList.length}`);
 
-  const { singles, comboLegs, freeTip: newFreeTip } = await fetchAiTips(matchList, [...tippedMatches]);
+  const { singles, comboLegs, freeTip: newFreeTip, extraLegs } = await fetchAiTips(matchList, [...tippedMatches]);
 
   // Backstop: a már ma tippelt meccsekre ne kerüljön újabb SINGLE (a prompt mellett is szűrünk)
   const newAiTips = singles.filter(t => !tippedMatches.has(t.match));
@@ -837,7 +838,7 @@ async function fetchAndProcess() {
   const freshCombos = buildCombos(filteredComboLegs, matchList).filter(c => !existingKeys.has(comboKey(c)));
 
   // Extra Over/GG szelvény összeállítása
-  const allLegsForExtra = [...(obj.extra_labak || []), ...(obj.kombi_labak || [])];
+  const allLegsForExtra = [...(extraLegs || []), ...(comboLegs || [])];
   const extraSlip = buildExtraSlip(allLegsForExtra);
   if (extraSlip) {
     const extraId = "extra_" + Date.now();
