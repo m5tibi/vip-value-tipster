@@ -1100,12 +1100,15 @@ async function checkResults() {
         const hasScores = Array.isArray(game.scores) && game.scores.length > 0;
         let isCompleted = game.completed;
         if (!isCompleted && hasScores) {
+          const sinceKickoff = game.commence_time
+            ? (Date.now() - new Date(game.commence_time).getTime()) / 3600000
+            : 99;
+          if (sinceKickoff < 1.5) { continue; }  // meccs még folyamatban vagy nem kezdődött el
           if (game.last_update) {
             const sinceUpdate = (Date.now() - new Date(game.last_update).getTime()) / 60000;
             if (sinceUpdate >= 30) isCompleted = true;
-          } else if (game.commence_time) {
-            const sinceKickoff = (Date.now() - new Date(game.commence_time).getTime()) / 3600000;
-            if (sinceKickoff >= 3) isCompleted = true;
+          } else if (sinceKickoff >= 3) {
+            isCompleted = true;
           }
         }
         if (!isCompleted || !hasScores) continue;
@@ -1324,12 +1327,12 @@ setInterval(async () => {
       }
     }
   }
-  if (hour === 0 && minute === 3 && _lastCheckDay !== dayKey) {
+  if (hour === 5 && minute === 0 && _lastCheckDay !== dayKey) {
     _lastCheckDay = dayKey;
-    console.log("Napnyitó automatikus eredmény-ellenőrzés...");
+    console.log("Reggeli automatikus eredmény-ellenőrzés (05:00)...");
     await checkResults();
   }
-  if (hour === 6 && minute === 5 && _lastStatsDay !== dayKey) {
+  if (hour === 5 && minute === 0 && _lastStatsDay !== dayKey) {
     _lastStatsDay = dayKey;
     const yMsg = buildYesterdayStatsMsg();
     if (yMsg) {
@@ -1598,6 +1601,19 @@ app.post("/api/refresh", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   await fetchAndProcess();
   res.json({ ok: true, aiTips: aiTips.length });
+});
+
+app.patch("/api/free-tips/:id/result", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const { id } = req.params;
+  const { result } = req.body;
+  const ft = freeTips.find(t => t.id === id);
+  const ht = history.find(t => t.id === id);
+  if (ft) ft.result = result;
+  if (ht) ht.result = result;
+  if (!ft && !ht) return res.status(404).json({ error: 'Nem található' });
+  saveHistory();
+  res.json({ ok: true });
 });
 
 app.patch("/api/history/:id", (req, res) => {
