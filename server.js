@@ -1640,6 +1640,14 @@ app.patch("/api/history/:id", (req, res) => {
   latestTips = latestTips.map(upd);
   aiTips     = aiTips.map(upd);
   comboTips  = comboTips.map(upd);
+  // Ha pending-re állítjuk vissza és nincs benne a comboTips-ben, visszaadjuk
+  if (result === "pending") {
+    const inCombo = comboTips.some(t => t.id === req.params.id);
+    if (!inCombo) {
+      const fromHistory = history.find(t => t.id === req.params.id);
+      if (fromHistory && fromHistory.type === "combo") comboTips.push(fromHistory);
+    }
+  }
   saveHistory();
   console.log(`Kézi eredmény javítás: ${req.params.id} → ${result}`);
   res.json({ ok: true });
