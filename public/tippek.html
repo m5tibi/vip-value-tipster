@@ -1019,7 +1019,15 @@ function renderFreeTipCard(t) {
       <span style="background:#0d1b2a;border:1px solid #1a2f4a;border-radius:6px;padding:3px 10px;color:#f59e0b;font-weight:700;font-size:14px">@${o}</span>
     </div>
     ${t.note?`<div class="tip-note" style="color:#78909c;font-size:13px;line-height:1.6;border-top:1px solid #1e3a2f;padding-top:10px">${t.note}</div>`:''}
-    ${isAdmin() ? `<div style="margin-top:8px"><button class="btn-push" style="font-size:11px;padding:4px 10px" onclick="editNote('${t.id}',this)">✏️ Szerkesztés</button></div>` : ''}
+    ${isAdmin() ? `
+    <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn-push" style="font-size:11px;padding:4px 10px" onclick="editNote('${t.id}',this)">✏️ Szerkesztés</button>
+      ${t.result === 'pending' ? `
+        <button class="btn-push" style="font-size:11px;padding:4px 10px;background:#1a3a1a;color:#69f0ae" onclick="setFreeResult('${t.id}','won')">✅ Nyert</button>
+        <button class="btn-push" style="font-size:11px;padding:4px 10px;background:#3a1a1a;color:#ef9a9a" onclick="setFreeResult('${t.id}','lost')">❌ Veszített</button>
+        <button class="btn-push" style="font-size:11px;padding:4px 10px" onclick="setFreeResult('${t.id}','push')">↩️ Visszajár</button>
+      ` : `<button class="btn-push" style="font-size:11px;padding:4px 10px" onclick="setFreeResult('${t.id}','pending')">🔄 Visszaállítás</button>`}
+    </div>` : ''}
     ${t.result && t.result !== 'pending' ? `
     <div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e3a2f;display:flex;align-items:center;gap:10px">
       ${resBadge(t.result)}
@@ -1124,6 +1132,17 @@ async function setComboResult(id, result) {
   }
 }
 
+
+async function setFreeResult(id, result) {
+  const r = await fetch(\`/api/free-tips/\${id}/result\`, {
+    method: 'PATCH',
+    headers: { ...adminHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ result })
+  });
+  if (!(await handleAdminResp(r))) return;
+  await loadTips();
+  showStatus('✅ Free tipp eredmény beállítva');
+}
 
 async function editNote(id, btn) {
   const card = btn.closest(".tip-card");
