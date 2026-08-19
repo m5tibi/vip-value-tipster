@@ -622,7 +622,8 @@ function comboResultBtns(c) {
   const lost = `<button class="btn-lost" onclick="setComboResult('${c.id}','lost')">❌ Vesztett</button>`;
   const push = `<button class="btn-push" onclick="setComboResult('${c.id}','push')">↩️ Visszajár</button>`;
   const label = (!c.result || c.result === "pending") ? '<span style="font-size:11px;color:#90a4ae">Eredmény:</span>' : '<span style="font-size:10px;color:#546e7a">Javítás:</span>';
-  return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #4e342e">${label}${won}${lost}${push}</div>`;
+  const resetBtn = (c.result && c.result !== "pending") ? `<button class="btn-push" style="font-size:11px;padding:4px 10px" onclick="setComboResult('${c.id}','pending')">🔄 Visszaállítás</button>` : '';
+  return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #4e342e">${label}${won}${lost}${push}${resetBtn}</div>`;
 }
 
 function tipHTML(t, showResult) {
@@ -1019,7 +1020,7 @@ function renderFreeTipCard(t) {
       <span style="background:#0d1b2a;border:1px solid #1a2f4a;border-radius:6px;padding:3px 10px;color:#f59e0b;font-weight:700;font-size:14px">@${o}</span>
     </div>
     ${t.note?`<div class="tip-note" style="color:#78909c;font-size:13px;line-height:1.6;border-top:1px solid #1e3a2f;padding-top:10px">${t.note}</div>`:''}
-    ${isAdmin() ? '<div style="margin-top:8px"><button class="btn-push" style="font-size:11px;padding:4px 10px" onclick="editNote(\'\'+ t.id +\'\',this)">✏️ Szerkesztés</button></div>' : ''}
+    ${isAdmin() ? adminFreeBtns(t) : ''}
     ${t.result && t.result !== 'pending' ? `
     <div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e3a2f;display:flex;align-items:center;gap:10px">
       ${resBadge(t.result)}
