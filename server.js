@@ -1801,6 +1801,35 @@ app.post("/api/analyzer-history", (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+
+// ── Külső tipp import (Tipp Manager → 90perc.hu) ─────────────────────────────
+app.post("/api/admin/import-tip", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const { type, match, pick, market, odds, note, commence, legs } = req.body;
+
+  const id = "imp-" + Date.now() + "-" + Math.random().toString(36).slice(2,6);
+  const now = new Date().toISOString();
+
+  if (type === "free") {
+    const ft = { id, type: "free", match, pick, market, odds: parseFloat(odds), note, commence,
+                 approved: false, result: "pending", createdAt: now };
+    freeTips.push(ft);
+    history.push(ft);
+  } else if (type === "combo" && Array.isArray(legs)) {
+    const combo = { id, type: "combo", legs, totalOdds: parseFloat(odds), note,
+                    approved: false, result: "pending", createdAt: now };
+    comboTips.push(combo);
+    history.push(combo);
+  } else {
+    const tip = { id, type: "single", match, pick, market, odds: parseFloat(odds), note, commence,
+                  approved: false, result: "pending", createdAt: now };
+    aiTips.push(tip);
+    history.push(tip);
+  }
+  saveHistory();
+  res.json({ ok: true, id });
+});
+
 app.delete("/api/analyzer-history", (req, res) => {
   const uid = req.query.uid;
   if (!uid) return res.status(400).json({ error: 'Hiányzó uid' });
