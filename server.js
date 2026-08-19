@@ -1609,9 +1609,11 @@ app.patch("/api/free-tips/:id/result", (req, res) => {
   const { result } = req.body;
   const ft = freeTips.find(t => t.id === id);
   const ht = history.find(t => t.id === id);
+  if (!ft && !ht) return res.status(404).json({ error: 'Nem található' });
   if (ft) ft.result = result;
   if (ht) ht.result = result;
-  if (!ft && !ht) return res.status(404).json({ error: 'Nem található' });
+  // freeTips újraszűrése – lezárt tippek ne maradjanak benne
+  freeTips = history.filter(t => t.type === "free" && (!t.result || t.result === "pending"));
   saveHistory();
   res.json({ ok: true });
 });
