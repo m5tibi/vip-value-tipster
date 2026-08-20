@@ -1880,6 +1880,18 @@ app.post("/api/admin/import-tip", (req, res) => {
   res.json({ ok: true, id });
 });
 
+app.get("/api/admin/sports-list", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const r = await fetch(`https://api.the-odds-api.com/v4/sports/?apiKey=${ODDS_API_KEY}&all=true`);
+    const data = await r.json();
+    const soccer = data.filter(s => s.key.startsWith("soccer_uefa"));
+    res.json({ all_uefa: soccer, total: data.length });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.delete("/api/analyzer-history", (req, res) => {
   const uid = req.query.uid;
   if (!uid) return res.status(400).json({ error: 'Hiányzó uid' });
