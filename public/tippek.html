@@ -1156,27 +1156,28 @@ async function setFreeResult(id, result) {
 }
 
 async function editNote(id, btn) {
-  // Tipp típusának megkeresése
-  const tipData = [...(currentFreeTips||[]), ...(currentAiTips||[]), ...(currentComboTips||[])].find(t => t.id === id);
-  const isCombo = tipData && (tipData.type === "combo" || tipData.legs);
+  // Keresés az összes tipp tömbben
+  const allTips = [...(currentFreeTips||[]), ...(aiTips||[]), ...(comboTips||[]), ...(history||[])];
+  const tipData = allTips.find(t => t.id === id);
+  const isCombo = tipData && (tipData.type === "combo" || (tipData.legs && tipData.legs.length > 0));
 
   if (isCombo && tipData.legs && tipData.legs.length > 0) {
-    // Kombi szerkesztés: lábanként
     const newLegs = [];
     for (let i = 0; i < tipData.legs.length; i++) {
       const leg = tipData.legs[i];
-      const newPick = prompt(`${i+1}. láb pick (${leg.match}):\nJelenlegi: ${leg.pick}`, leg.pick);
+      const newPick = prompt(`${i+1}. láb – ${leg.match}\nTipp (pick):`, leg.pick);
       if (newPick === null) return;
-      const newOddsStr = prompt(`${i+1}. láb odds:\nJelenlegi: ${leg.odds}`, leg.odds);
+      const newOddsStr = prompt(`${i+1}. láb odds:`, String(leg.odds));
       if (newOddsStr === null) return;
-      const newOdds = parseFloat((newOddsStr || leg.odds).toString().replace(",","."));
-      newLegs.push({ ...leg, pick: newPick, market: leg.market, odds: isNaN(newOdds) ? leg.odds : newOdds });
+      const newOdds = parseFloat(newOddsStr.replace(",","."));
+      newLegs.push({ ...leg, pick: newPick, odds: isNaN(newOdds) ? leg.odds : newOdds });
     }
     const newNote = prompt("Indoklás:", tipData.note || "");
     if (newNote === null) return;
-    const patch = { legs: newLegs, note: newNote };
-    const r = await fetch("/api/history/" + encodeURIComponent(id), {
-      method: "PATCH", headers: { "Content-Type": "application/json", ...adminHeaders() },
+    const totalOdds = newLegs.reduce((p,l) => p * parseFloat(l.odds||1), 1);
+    const patch = { legs: newLegs, note: newNote, odds: parseFloat(totalOdds.toFixed(2)) };
+    const r = await fetch("/api/history/"+encodeURIComponent(id), {
+      method:"PATCH", headers:{"Content-Type":"application/json",...adminHeaders()},
       body: JSON.stringify(patch)
     });
     if (r.ok) { showStatus("✏️ Kombi szerkesztve"); await loadTips(); await loadHistory(); }
@@ -1185,25 +1186,27 @@ async function editNote(id, btn) {
   }
 
   // Single / free szerkesztés
-  const card = btn.closest(".tip-card, .combo-card, .free-card") || document.body;
-  const noteEl = card.querySelector(".tip-note, .note, [class*='note']");
-  const currentNote = tipData ? (tipData.note || "") : (noteEl ? noteEl.textContent.trim() : "");
-  const currentOdds = tipData ? (tipData.odds || "") : "";
+  const currentNote = tipData ? (tipData.note || "") : "";
+  const currentOdds = tipData ? String(tipData.odds || "") : "";
+  const currentPick = tipData ? (tipData.pick || "") : "";
 
-  const newNote = prompt("Szerkeszd az indoklást:", currentNote);
+  const newPick = prompt("Tipp (pick):", currentPick);
+  if (newPick === null) return;
+  const newOddsStr = prompt("Odds:", currentOdds);
+  if (newOddsStr === null) return;
+  const newNote = prompt("Indoklás:", currentNote);
   if (newNote === null) return;
-  const newOddsStr = prompt("Odds (hagyd üresen ha nem változtatod):", currentOdds);
-  const patch = { note: newNote };
-  if (newOddsStr !== null && newOddsStr !== "" && newOddsStr !== String(currentOdds)) {
-    const parsed = parseFloat(newOddsStr.replace(",","."));
-    if (!isNaN(parsed) && parsed > 1) patch.odds = parsed;
-  }
-  const r = await fetch("/api/history/" + encodeURIComponent(id), {
-    method: "PATCH", headers: { "Content-Type": "application/json", ...adminHeaders() },
+
+  const patch = { note: newNote, pick: newPick };
+  const parsedOdds = parseFloat(newOddsStr.replace(",","."));
+  if (!isNaN(parsedOdds) && parsedOdds > 1) patch.odds = parsedOdds;
+
+  const r = await fetch("/api/history/"+encodeURIComponent(id), {
+    method:"PATCH", headers:{"Content-Type":"application/json",...adminHeaders()},
     body: JSON.stringify(patch)
   });
   if (r.ok) { showStatus("✏️ Szerkesztés mentve"); await loadTips(); await loadHistory(); }
-  else showStatus("Hiba a szerkesztésnél!", true);
+  else showStatus("Hiba!", true);
 }
 
 async function setResult(id, result) {
