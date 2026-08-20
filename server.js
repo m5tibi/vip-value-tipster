@@ -1603,6 +1603,21 @@ app.post("/api/refresh", async (req, res) => {
   res.json({ ok: true, aiTips: aiTips.length });
 });
 
+// Csak odds adatok frissítése, AI tipp generálás nélkül (Tipp Manager használja)
+app.post("/api/refresh-odds-only", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const newList = await fetchMatchList();
+    if (newList && newList.length > 0) {
+      matchList = newList;
+      console.log(`Odds frissítve (AI nélkül): ${matchList.length} meccs`);
+    }
+    res.json({ ok: true, matches: matchList.length });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.patch("/api/free-tips/:id/result", (req, res) => {
   if (!requireAdmin(req, res)) return;
   const { id } = req.params;
@@ -1620,15 +1635,22 @@ app.patch("/api/free-tips/:id/result", (req, res) => {
 
 app.patch("/api/history/:id", (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const { result, note, comboPayout } = req.body;
+  const { result, note, comboPayout, odds, legs } = req.body;
   const patch = {};
-  if (note !== undefined) {
-    patch.note = note;
+  if (note !== undefined || odds !== undefined || legs !== undefined) {
+    if (note !== undefined) patch.note = note;
+    if (odds !== undefined) patch.odds = parseFloat(odds);
+    if (legs !== undefined) {
+      patch.legs = legs;
+      // Össz odds újraszámítása
+      const totalOdds = legs.reduce((p, l) => p * parseFloat(l.odds || 1), 1);
+      patch.totalOdds = parseFloat(totalOdds.toFixed(2));
+    }
     const upd = t => t.id === req.params.id ? { ...t, ...patch } : t;
     history = history.map(upd); latestTips = latestTips.map(upd);
-    aiTips = aiTips.map(upd); comboTips = comboTips.map(upd);
+    aiTips = aiTips.map(upd); comboTips = comboTips.map(upd); freeTips = freeTips.map(upd);
     saveHistory();
-    console.log(`Note szerkesztve: ${req.params.id}`);
+    console.log(`Szerkesztve: ${req.params.id}${odds ? " odds:"+odds : ""}${note !== undefined ? " note" : ""}`);
     return res.json({ ok: true });
   }
   const validResults = ["won","lost","push","half_won","half_lost","pending"];
