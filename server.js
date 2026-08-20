@@ -1635,14 +1635,14 @@ app.patch("/api/free-tips/:id/result", (req, res) => {
 
 app.patch("/api/history/:id", (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const { result, note, comboPayout, odds, legs } = req.body;
+  const { result, note, comboPayout, odds, legs, pick } = req.body;
   const patch = {};
-  if (note !== undefined || odds !== undefined || legs !== undefined) {
+  if (note !== undefined || odds !== undefined || legs !== undefined || pick !== undefined) {
     if (note !== undefined) patch.note = note;
     if (odds !== undefined) patch.odds = parseFloat(odds);
+    if (pick !== undefined) patch.pick = pick;
     if (legs !== undefined) {
       patch.legs = legs;
-      // Össz odds újraszámítása
       const totalOdds = legs.reduce((p, l) => p * parseFloat(l.odds || 1), 1);
       patch.totalOdds = parseFloat(totalOdds.toFixed(2));
     }
