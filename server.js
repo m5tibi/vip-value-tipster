@@ -204,7 +204,7 @@ const SPORT_MAP = {
   "soccer_norway_eliteserien":           { sport: "soccer", label: "⚽ Norvég Eliteserien" },
   "soccer_sweden_allsvenskan":           { sport: "soccer", label: "⚽ Svéd Allsvenskan" },
   "soccer_poland_ekstraklasa":           { sport: "soccer", label: "⚽ Lengyel Ekstraklasa" },
-  "soccer_scotland_premiership":          { sport: "soccer", label: "⚽ Skót Premiership" },
+  "soccer_spl":                           { sport: "soccer", label: "⚽ Skót Premiership" },
   "soccer_uefa_champs_league_qualification":      { sport: "soccer", label: "⚽ BL-selejtező" },
   "soccer_uefa_europa_league_qualification":      { sport: "soccer", label: "⚽ EL-selejtező" },
   "soccer_uefa_conference_league_qualification":  { sport: "soccer", label: "⚽ Konferencia Liga selejtező" },
@@ -216,6 +216,10 @@ const SPORT_MAP = {
   "soccer_sweden_superettan":              { sport: "soccer", label: "⚽ Svéd Superettan" },
   "soccer_germany_liga3":                  { sport: "soccer", label: "⚽ Német 3. Liga" },
   "soccer_concacaf_leagues_cup":           { sport: "soccer", label: "⚽ Leagues Cup" },
+  "soccer_russia_premier_league":          { sport: "soccer", label: "⚽ Orosz Premier Liga" },
+  "soccer_league_of_ireland":              { sport: "soccer", label: "⚽ Ír Liga" },
+  "soccer_china_superleague":              { sport: "soccer", label: "⚽ Kínai Szuperliga" },
+  "soccer_england_efl_cup":                { sport: "soccer", label: "⚽ EFL Kupa" },
 
   // Amerika / Ázsia / Óceánia
   "soccer_brazil_campeonato":            { sport: "soccer", label: "⚽ Brazil Serie A" },
@@ -1885,7 +1889,7 @@ app.get("/api/admin/sports-list", async (req, res) => {
   try {
     const r = await fetch(`https://api.the-odds-api.com/v4/sports/?apiKey=${ODDS_API_KEY}&all=true`);
     const data = await r.json();
-    const soccer = data.filter(s => s.active === true && s.key.startsWith("soccer"));
+    const soccer = data.filter(s => s.key.startsWith("soccer_uefa"));
     res.json({ all_uefa: soccer, total: data.length });
   } catch(e) {
     res.status(500).json({ error: e.message });
