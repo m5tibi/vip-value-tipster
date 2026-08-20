@@ -1885,7 +1885,7 @@ app.get("/api/admin/sports-list", async (req, res) => {
   try {
     const r = await fetch(`https://api.the-odds-api.com/v4/sports/?apiKey=${ODDS_API_KEY}&all=true`);
     const data = await r.json();
-    const soccer = data.filter(s => s.key.startsWith("soccer_uefa"));
+    const soccer = data.filter(s => s.active === true && s.key.startsWith("soccer"));
     res.json({ all_uefa: soccer, total: data.length });
   } catch(e) {
     res.status(500).json({ error: e.message });
