@@ -510,11 +510,13 @@ HÁROM dolgot adj:
    - Lehetőleg KÜLÖNBÖZŐ meccsekről. NE adj under tippet!
    - Ha nincs 2-3 meggyőző tipp, adj kevesebbet – inkább 1 erős mint 3 közepes!
 
-3) "ingyenes_tipp": 1 db INGYENES tipp, különálló single.
-   - MÁS meccsről mint a "tippek" mezőben szereplők.
+3) "ingyenes_tipp": 1 db INGYENES tipp – MINDEN ESETBEN KÖTELEZŐ!
+   - MINDIG adj ingyenes tippet, kivétel nélkül!
+   - MÁS meccsről mint a "tippek" és "kombi_labak" mezőkben szereplők.
    - 1.65-1.90 odds között.
-   - KÖTELEZŐ ha legalább 2 single tipp van a válaszban.
-   - Ne mondjon ellent a "tippek" vagy "kombi_labak" mezőknek!
+   - Kötelező 2-3 mondatos magyar note konkrét statisztikával!
+   - Ha nincs megfelelő odds, adj 1.65-es oddson is tippet.
+   - Ha "ingyenes_tipp" mező hiányzik, a válasz ÉRVÉNYTELEN!
 
 2) "kombi_labak": 2-4 BIZTONSÁGOS láb kombi szelvényekhez.
    - CSAK akkor adj kombilábakat, ha legalább 2 NAGYON BIZTONSÁGOS láb van (85%+ valószínűség).
@@ -541,6 +543,7 @@ Az indoklásban HIVATKOZZ konkrét adatokra: pl. "az utolsó 6 hazai meccsből 5
 
 KÖZÖS szabályok:
 - Az "odds" mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd.
+- Minden "note" mező KIZÁRÓLAG az adott meccs csapatairól szóljon – NE keverd össze más meccsek adataival!
 - Rövid (2-3 mondat) magyar indoklás, KONKRÉT statisztikákra hivatkozva.
 - Inkább kevesebb, de erős és jól indokolt tipp!
 
