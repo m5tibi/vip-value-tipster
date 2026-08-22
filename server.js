@@ -742,9 +742,10 @@ async function fetchMatchListOnly() {
         return h >= 1.5 && h <= WINDOW_HOURS;
       });
       if (!hasUpcoming) continue;
+      console.log(`[match-list] ${sportKey}: van közelgő meccs, odds lekérés...`);
       const url = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h,totals,spreads&oddsFormat=decimal&dateFormat=iso`;
       const r = await fetch(url);
-      if (!r.ok) continue;
+      if (!r.ok) { console.log(`[match-list] ${sportKey}: odds hiba ${r.status}`); continue; }
       const games = await r.json();
       for (const g of (Array.isArray(games) ? games : [])) {
         const h = (new Date(g.commence_time) - now) / 3600000;
@@ -769,6 +770,7 @@ async function fetchMatchListOnly() {
       }
     } catch(e) { /* kihagyjuk */ }
   }
+  console.log(`[match-list] fetchMatchListOnly kész: ${newList.length} meccs`);
   return newList;
 }
 
