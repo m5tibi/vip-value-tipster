@@ -493,7 +493,9 @@ async function fetchAiTips(matchList, alreadyTipped = []) {
     ? `\nEZEKRE A MECCSEKRE MÁR VAN AKTÍV TIPP (single VAGY ingyenes tipp) – NE szerepeljen SEMMILYEN tippként (sem single, sem kombi láb, sem ingyenes tipp): ${alreadyTipped.join("; ")}\n`
     : "";
 
-  const prompt = `Te egy profi labdarúgás-fogadási elemző vagy. Használj web keresést az aktuális formához, sérülésekhez és keretinformációkhoz az alábbi közelgő foci meccsekre (a következő ~36 óra).
+  const prompt = `FONTOS: Minden szöveget kizárólag MAGYAR NYELVEN írj! Az indoklások, megjegyzések, pick nevek mind magyarul legyenek!
+
+Te egy profi labdarúgás-fogadási elemző vagy. Használj web keresést az aktuális formához, sérülésekhez és keretinformációkhoz az alábbi közelgő foci meccsekre (a következő ~36 óra).
 
 Mai meccsek (valós bookmaker oddsokkal):
 ${matchText}
