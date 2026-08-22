@@ -728,6 +728,51 @@ function buildCombos(legs, matchList = []) {
 const isApproved = t => t.approved !== false;
 
 // ── Fő frissítő ───────────────────────────────────────────
+// Csak meccs lista összeállítása AI nélkül (refresh-odds-only és mondomatutit Tipp Manager számára)
+async function fetchMatchListOnly() {
+  const now = new Date();
+  const newList = [];
+  for (const [sportKey, meta] of Object.entries(SPORT_MAP)) {
+    try {
+      const er = await fetch(`https://api.the-odds-api.com/v4/sports/${sportKey}/events?apiKey=${ODDS_API_KEY}&dateFormat=iso`);
+      if (!er.ok) continue;
+      const events = await er.json();
+      const hasUpcoming = (Array.isArray(events) ? events : []).some(e => {
+        const h = (new Date(e.commence_time) - now) / 3600000;
+        return h >= 1.5 && h <= WINDOW_HOURS;
+      });
+      if (!hasUpcoming) continue;
+      const url = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h,totals,spreads&oddsFormat=decimal&dateFormat=iso`;
+      const r = await fetch(url);
+      if (!r.ok) continue;
+      const games = await r.json();
+      for (const g of (Array.isArray(games) ? games : [])) {
+        const h = (new Date(g.commence_time) - now) / 3600000;
+        if (h < 1.5 || h > WINDOW_HOURS) continue;
+        const odds = [];
+        for (const bk of (g.bookmakers || [])) {
+          for (const mkt of (bk.markets || [])) {
+            for (const oc of (mkt.outcomes || [])) {
+              odds.push({ market: mkt.key, name: oc.name, odds: oc.price, bookmaker: bk.title });
+            }
+          }
+        }
+        if (!odds.length) continue;
+        const d = new Date(g.commence_time);
+        const hStr = d.toLocaleString("hu-HU", { timeZone: "Europe/Budapest", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+        newList.push({
+          sport: meta.label,
+          match: `${g.home_team} vs ${g.away_team}`,
+          commence: hStr.replace(",", " ").replace("  ", " "),
+          odds
+        });
+      }
+    } catch(e) { /* kihagyjuk */ }
+  }
+  return newList;
+}
+
+
 async function fetchAndProcess() {
   const now   = new Date();
   console.log(`Elemzés indul: ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}`);
@@ -1615,7 +1660,7 @@ app.post("/api/refresh", async (req, res) => {
 app.post("/api/refresh-odds-only", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
-    const newList = await fetchMatchList();
+    const newList = await fetchMatchListOnly();
     if (newList && newList.length > 0) {
       matchList = newList;
       console.log(`Odds frissítve (AI nélkül): ${matchList.length} meccs`);
