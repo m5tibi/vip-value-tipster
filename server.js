@@ -513,7 +513,7 @@ HÁROM dolgot adj:
 3) "ingyenes_tipp": 1 db INGYENES tipp – MINDEN ESETBEN KÖTELEZŐ!
    - MINDIG adj ingyenes tippet, kivétel nélkül!
    - MÁS meccsről mint a "tippek" és "kombi_labak" mezőkben szereplők.
-   - 1.65-1.90 odds között.
+   - 1.50-1.90 odds között (inkább 1.65+, de 1.50 is elfogadható).
    - Kötelező 2-3 mondatos magyar note konkrét statisztikával!
    - Ha nincs megfelelő odds, adj 1.65-es oddson is tippet.
    - Ha "ingyenes_tipp" mező hiányzik, a válasz ÉRVÉNYTELEN!
