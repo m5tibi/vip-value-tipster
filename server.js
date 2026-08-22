@@ -1664,10 +1664,11 @@ app.post("/api/refresh-odds-only", async (req, res) => {
   try {
     const newList = await fetchMatchListOnly();
     if (newList && newList.length > 0) {
-      matchList = newList;
-      console.log(`Odds frissítve (AI nélkül): ${matchList.length} meccs`);
+      lastMatchList = newList;
+      try { require("fs").writeFileSync(process.env.DATA_DIR || "/data" + "/last_match_list.json", JSON.stringify(lastMatchList)); } catch(e) {}
+      console.log(`Odds frissítve (AI nélkül): ${lastMatchList.length} meccs`);
     }
-    res.json({ ok: true, matches: matchList.length });
+    res.json({ ok: true, matches: lastMatchList.length });
   } catch(e) {
     res.status(500).json({ error: e.message });
   }
