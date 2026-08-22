@@ -881,7 +881,14 @@ async function fetchAndProcess() {
 
   // Backstop: a már ma tippelt meccsekre ne kerüljön újabb SINGLE (a prompt mellett is szűrünk)
   const tippedNorm = new Set([...tippedMatches].map(normMatch));
-  const newAiTips = singles.filter(t => !tippedMatches.has(t.match) && !tippedNorm.has(normMatch(t.match)));
+  // Ha a free tipp ugyanolyan meccs+pick mint egy single → töröljük a singlek közül
+  const ftMatch = newFreeTip?.match || "";
+  const ftPick  = newFreeTip?.pick  || "";
+  const newAiTips = singles.filter(t =>
+    !tippedMatches.has(t.match) && !tippedNorm.has(normMatch(t.match)) &&
+    !(ftMatch && t.match === ftMatch && t.pick === ftPick)
+  );
+  if (singles.length > newAiTips.length) console.log(`[dedup] Free tipppel azonos single kiszűrve: ${ftMatch}`);
 
   // Új single tippek hozzáadása a history-hoz (a meglévők megtartásával)
   const existingIds = new Set(history.map(t => t.id));
