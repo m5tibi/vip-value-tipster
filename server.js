@@ -521,7 +521,7 @@ HÁROM dolgot adj:
 2) "kombi_labak": 2-4 BIZTONSÁGOS láb kombi szelvényekhez.
    - CSAK akkor adj kombilábakat, ha legalább 2 NAGYON BIZTONSÁGOS láb van (85%+ valószínűség).
    - Ha nincs elég meggyőző láb: "kombi_labak": []
-   - Max 2 láb per kombi! Jellemző odds: 1.15-1.45 (max 1.45).
+   - Max 2 láb per kombi! Jellemző odds: 1.20-1.50 (min 1.20, max 1.50).
    - TILOS: -1.5 vagy annál agresszívabb hendikep kombi lábban.
 
 4) "extra_labak": MINDIG add meg ezt a mezőt! Keress 3-4 gólgazdag meccset extra szelvényhez.
@@ -651,7 +651,7 @@ function normMatch(s) {
 
 function buildExtraSlip(legs) {
   // Extra szelvény: Over/GG/BTTS lábak, 1.50-2.20 odds között
-  const MIN_LEG = 1.50, MAX_LEG = 2.20, MIN_TOTAL = 4.50, MAX_TOTAL = 10.00;
+  const MIN_LEG = 1.50, MAX_LEG = 2.20, MIN_TOTAL = 4.50, MAX_TOTAL = 15.00;
   const validMarkets = ["over", "btts", "gg", "mindkét", "both", "gol-gol", "gól-gól"];
   const filtered = legs.filter(l => {
     const o = parseFloat(l.odds) || 0;
@@ -690,11 +690,13 @@ function buildCombos(legs, matchList = []) {
     });
     return m ? m.commence : null;
   };
-  const MAX_COMBO_LEG_ODDS = 1.45;
+  const MIN_COMBO_LEG_ODDS = 1.20;
+  const MAX_COMBO_LEG_ODDS = 1.50;
   const byMatch = {};
   for (const l of legs) {
     if (!l.match || !l.odds) continue;
-    if (parseFloat(l.odds) > MAX_COMBO_LEG_ODDS) continue;  // max odds szűrő
+    const lo = parseFloat(l.odds);
+    if (lo < MIN_COMBO_LEG_ODDS || lo > MAX_COMBO_LEG_ODDS) continue;  // 1.20-1.50 szűrő
     if (!byMatch[l.match] || l.odds < byMatch[l.match].odds) byMatch[l.match] = l;
   }
   const pool = Object.values(byMatch).sort((a, b) => a.odds - b.odds);   // legbiztosabb elöl
