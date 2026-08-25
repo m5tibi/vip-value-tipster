@@ -146,28 +146,21 @@ async function sendPlanCancelled(to) {
 }
 
 // ── Új tippek értesítő ────────────────────────────────────────
-async function sendNewTips(to, tips, combos, freeTips = []) {
-  if (!tips.length && !combos.length && !freeTips.length) return;
-  const freeRows = freeTips.map(t =>
-    `<tr>
-      <td colspan="4" style="padding:10px 6px;border-bottom:1px solid #1e3a2f;background:#071a10">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-          <span style="background:rgba(0,230,118,.15);color:#00e676;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">🆓 INGYENES</span>
-          <span style="color:#e0e0e0;font-weight:600">${t.match}</span>
-        </div>
-        <div style="color:#80cbc4;font-size:12px">${t.market} · <b style="color:#e0e0e0">${t.pick}</b> <span style="color:#f59e0b;font-weight:700">@ ${t.odds}</span></div>
-        ${t.note ? `<div style="color:#78909c;font-size:12px;margin-top:4px">${t.note}</div>` : ""}
+async function sendNewTips(to, tips, combos) {
+  if (!tips.length && !combos.length) return;
+  const tipRows = tips.map(t => {
+    const note = (t.note || t.ai_note || "").trim();
+    return `<tr>
+      <td colspan="4" style="padding:8px 6px 2px;border-bottom:none">
+        <span style="color:#e0e0e0;font-weight:600">${t.match}</span>
+        <span style="color:#80cbc4;font-size:12px;margin-left:8px">${t.market}</span>
+        <span style="color:#e0e0e0;margin-left:8px">${t.pick}</span>
+        <span style="color:#f59e0b;font-weight:700;margin-left:8px">@ ${t.odds}</span>
+        ${t.commence ? `<span style="color:#546e7a;font-size:11px;margin-left:8px">🕐 ${t.commence}</span>` : ''}
       </td>
-    </tr>`
-  ).join("");
-  const tipRows = tips.map(t =>
-    `<tr>
-      <td style="padding:8px 6px;border-bottom:1px solid #1e3a2f;color:#e0e0e0;font-weight:600">${t.match}</td>
-      <td style="padding:8px 6px;border-bottom:1px solid #1e3a2f;color:#80cbc4">${t.market}</td>
-      <td style="padding:8px 6px;border-bottom:1px solid #1e3a2f;color:#e0e0e0">${t.pick}</td>
-      <td style="padding:8px 6px;border-bottom:1px solid #1e3a2f;color:#f59e0b;font-weight:700">@ ${t.odds}</td>
-    </tr>`
-  ).join("");
+    </tr>
+    ${note ? `<tr><td colspan="4" style="padding:2px 6px 8px;border-bottom:1px solid #1e3a2f;color:#A0A0C0;font-size:12px;line-height:1.5">${note}</td></tr>` : '<tr><td colspan="4" style="border-bottom:1px solid #1e3a2f"></td></tr>'}`;
+  }).join("");
   const comboRows = combos.map(c =>
     `<tr>
       <td colspan="4" style="padding:8px 6px;border-bottom:1px solid #1e3a2f;color:#ffcc80">
@@ -177,25 +170,9 @@ async function sendNewTips(to, tips, combos, freeTips = []) {
   ).join("");
   return send({
     to,
-    subject: (() => {
-      const parts = [];
-      if (freeTips.length) parts.push(`${freeTips.length} ingyenes`);
-      if (tips.length) parts.push(`${tips.length} single`);
-      if (combos.length) parts.push(`${combos.length} kombi`);
-      return `⚽ Új tippek: ${parts.join(" + ")} – 90perc.hu`;
-    })(),
-    text: [
-      ...freeTips.map(t => `🆓 INGYENES: ${t.match}: ${t.pick} @ ${t.odds}`),
-      ...tips.map(t => `${t.match}: ${t.pick} @ ${t.odds}`),
-      ...combos.map(c => `🎰 Kombi: ${c.legs.map(l=>l.pick).join(" + ")} @ ${c.odds}`)
-    ].join("\n"),
-    html: shell((() => {
-      const parts = [];
-      if (freeTips.length) parts.push(`${freeTips.length} ingyenes tipp`);
-      if (tips.length) parts.push(`${tips.length} single tipp`);
-      if (combos.length) parts.push(`${combos.length} kombi tipp`);
-      return `Új tippek: ${parts.join(" + ")}`;
-    })(), `
+    subject: `⚽ ${tips.length} új tipp érkezett – 90perc.hu`,
+    text: tips.map(t => `${t.match}: ${t.pick} @ ${t.odds}`).join("\n"),
+    html: shell(`${tips.length} új tipp érkezett`, `
       <table style="width:100%;border-collapse:collapse;margin:10px 0">
         <thead>
           <tr style="color:#546e7a;font-size:11px;text-transform:uppercase">
@@ -205,7 +182,7 @@ async function sendNewTips(to, tips, combos, freeTips = []) {
             <th style="padding:6px;text-align:left;border-bottom:1px solid #1e3a2f">Odds</th>
           </tr>
         </thead>
-        <tbody>${freeRows}${tipRows}${comboRows}</tbody>
+        <tbody>${tipRows}${comboRows}</tbody>
       </table>
       ${button("https://90perc.hu/tippek.html", "⚽ Megnézem az összes tippet")}
       <p style="color:#546e7a;font-size:11px;margin:10px 0 0">A tippek kizárólag tájékoztató jellegűek. A fogadás pénzügyi veszteséggel járhat.</p>
