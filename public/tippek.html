@@ -655,10 +655,18 @@ function renderFreeTipSection() {
         </div>`;
       }
     }
+    const commenceStr = tip.commence ? `🕐 ${tip.commence}` : "";
+    const commenceDateStr = (() => {
+      if (!tip.commence) return "";
+      const c = String(tip.commence);
+      const parts = c.split(" ");
+      if (parts.length >= 2) return parts.slice(0,-1).join(" ") + " · 🕐 " + parts[parts.length-1];
+      return "🕐 " + c;
+    })();
     return `<div style="background:#071a10;border:2px solid #00e676;border-radius:12px;padding:18px;margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        ${approvedBadge}
-        <span style="color:#5d7a96;font-size:11px">${tip.addedAt||""}</span>
+        ${admin ? approvedBadge : ""}
+        <span style="color:#5d7a96;font-size:11px">${admin ? (tip.addedAt||"") : commenceDateStr}</span>
       </div>
       ${renderFreeTipCard(tip)}
       ${adminBtns}
