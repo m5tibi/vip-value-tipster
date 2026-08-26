@@ -650,15 +650,11 @@ function normMatch(s) {
 }
 
 function buildExtraSlip(legs) {
-  // Extra szelvény: Over/GG/BTTS lábak, 1.50-2.20 odds között
+  // Extra szelvény: minden piac, 1.50-2.20 odds között
   const MIN_LEG = 1.50, MAX_LEG = 2.20, MIN_TOTAL = 4.50, MAX_TOTAL = 15.00;
-  const validMarkets = ["over", "btts", "gg", "mindkét", "both", "gol-gol", "gól-gól"];
   const filtered = legs.filter(l => {
     const o = parseFloat(l.odds) || 0;
-    const pickLow = (l.pick || "").toLowerCase();
-    const marketLow = (l.market || "").toLowerCase();
-    const isOverGG = validMarkets.some(m => pickLow.includes(m) || marketLow.includes(m));
-    return isOverGG && o >= MIN_LEG && o <= MAX_LEG;
+    return o >= MIN_LEG && o <= MAX_LEG;
   });
   if (filtered.length < 3) return null;
   // Max 4 láb, sort by odds desc; ha 4 láb > MAX_TOTAL, próbáljuk 3-mal
@@ -923,9 +919,9 @@ async function fetchAndProcess() {
   const filteredComboLegs = comboLegs.filter(l => !tippedMatches.has(l.match) && !tippedComboLegs.has(l.match));
   const freshCombos = buildCombos(filteredComboLegs, matchList).filter(c => !existingKeys.has(comboKey(c)));
 
-  // Extra Over/GG szelvény – csak ha nincs már aktív
+  // Extra szelvény – csak ha nincs már aktív
   const hasActiveExtra = history.some(t => t.type === "combo" && t.extraSlip === true && (!t.result || t.result === "pending"));
-  // Extra Over/GG szelvény összeállítása
+  // Extra szelvény összeállítása
   const allLegsForExtra = [...(extraLegs || []), ...(comboLegs || [])];
   console.log("Extra lábak száma:", allLegsForExtra.length, "| extraLegs:", (extraLegs||[]).length);
   console.log("Extra lábak részletei:", JSON.stringify(allLegsForExtra.map(l => ({pick: l.pick, market: l.market, odds: l.odds}))));
@@ -933,12 +929,9 @@ async function fetchAndProcess() {
   console.log("Extra szelvény eredmény:", extraSlip ? "MEGVAN, odds: " + extraSlip.totalOdds : "NEM GENERÁLT");
   // Ha extra szelvény nem jött össze, a valid Over/GG lábakat single tippként mentjük
   if (!extraSlip) {
-    const validMarkets = ["over", "btts", "gg", "mindkét", "both"];
     const extraSingles = allLegsForExtra.filter(l => {
       const o = parseFloat(l.odds) || 0;
-      const p = (l.pick || "").toLowerCase();
-      const m = (l.market || "").toLowerCase();
-      return o >= MIN_SINGLE_ODDS && validMarkets.some(vm => p.includes(vm) || m.includes(vm))
+      return o >= MIN_SINGLE_ODDS
         && l.match && !tippedMatches.has(l.match) && !tippedNorm.has(normMatch(l.match));
     });
     if (extraSingles.length > 0) {
@@ -948,7 +941,7 @@ async function fetchAndProcess() {
           id: "extra-s-" + Date.now() + "-" + Math.random().toString(36).slice(2,5),
           type: "ai", match: l.match, market: l.market, pick: l.pick,
           odds: parseFloat(l.odds), sportLabel: "⚽",
-          note: "Over/GG tipp – extra szelvény lábából.", sport: "soccer",
+          note: "Extra szelvény lábából.", sport: "soccer",
           commence: l.commence, live: false, approved: false, sent: false,
           addedAt: nowHu(), result: "pending"
         };
@@ -968,7 +961,7 @@ async function fetchAndProcess() {
         match: l.match, odds: l.odds, pick: l.pick, market: l.market,
         commence: l.commence, result: "pending"
       })),
-      note: "🎯 Extra Over/GG szelvény – magasabb kockázat, nagyobb potenciális nyeremény.",
+      note: "🎯 Extra szelvény – magasabb kockázat, nagyobb potenciális nyeremény.",
       addedAt: new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" }),
       result: "pending", extraSlip: true
     };
