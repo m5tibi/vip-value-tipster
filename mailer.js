@@ -146,8 +146,8 @@ async function sendPlanCancelled(to) {
 }
 
 // ── Új tippek értesítő ────────────────────────────────────────
-async function sendNewTips(to, tips, combos) {
-  if (!tips.length && !combos.length) return;
+async function sendNewTips(to, tips, combos, frees = []) {
+  if (!tips.length && !combos.length && !frees.length) return;
   const tipRows = tips.map(t => {
     const note = (t.note || t.ai_note || "").trim();
     return `<tr>
@@ -182,7 +182,7 @@ async function sendNewTips(to, tips, combos) {
             <th style="padding:6px;text-align:left;border-bottom:1px solid #1e3a2f">Odds</th>
           </tr>
         </thead>
-        <tbody>${tipRows}${comboRows}</tbody>
+        <tbody>${freeRows}${tipRows}${comboRows}</tbody>
       </table>
       ${button("https://90perc.hu/tippek.html", "⚽ Megnézem az összes tippet")}
       <p style="color:#546e7a;font-size:11px;margin:10px 0 0">A tippek kizárólag tájékoztató jellegűek. A fogadás pénzügyi veszteséggel járhat.</p>
