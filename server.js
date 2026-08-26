@@ -512,7 +512,7 @@ HÁROM dolgot adj:
 
 3) "ingyenes_tipp": 1 db INGYENES tipp – MINDEN ESETBEN KÖTELEZŐ!
    - MINDIG adj ingyenes tippet, kivétel nélkül!
-   - MÁS meccsről mint a "tippek" és "kombi_labak" mezőkben szereplők.
+   - Lehet UGYANAZ a meccs mint valamelyik single tipp – ha nincs jobb opció, a legjobb singlet add free tippként is.
    - 1.50-1.90 odds között (inkább 1.65+, de 1.50 is elfogadható).
    - Kötelező 2-3 mondatos magyar note konkrét statisztikával!
    - Ha nincs megfelelő odds, adj 1.65-es oddson is tippet.
@@ -651,7 +651,7 @@ function normMatch(s) {
 
 function buildExtraSlip(legs) {
   // Extra szelvény: minden piac, 1.50-2.20 odds között
-  const MIN_LEG = 1.50, MAX_LEG = 2.20, MIN_TOTAL = 4.50, MAX_TOTAL = 15.00;
+  const MIN_LEG = 1.30, MAX_LEG = 2.20, MIN_TOTAL = 3.50, MAX_TOTAL = 15.00;
   const filtered = legs.filter(l => {
     const o = parseFloat(l.odds) || 0;
     return o >= MIN_LEG && o <= MAX_LEG;
