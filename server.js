@@ -1919,6 +1919,7 @@ app.get("/api/match-list", (req, res) => {
     .filter(t => t.result === "pending" && t.type === "ai")
     .map(t => t.pick).filter(Boolean);
   // Múltbeli meccsek kiszűrése (csak ma és holnap)
+  console.log(`[match-list] ${lastMatchList.length} meccs a cacheben, szűrés...`);
   const now = Date.now();
   const freshMatches = lastMatchList.filter(m => {
     if (!m.commence) return true;
@@ -1928,8 +1929,10 @@ app.get("/api/match-list", (req, res) => {
     if (!match) return true;
     const [,mm,dd,hh,min] = match;
     const d = new Date(`2026-${mm}-${dd}T${hh}:${min}:00`);
-    return (d.getTime() - now) > -3600000;  // max 1 óra múltban
+    const hoursAgo = (now - d.getTime()) / 3600000;
+    return hoursAgo < 2;  // max 2 óra múltban
   });
+  console.log(`[match-list] ${freshMatches.length} friss meccs visszaadva (${lastMatchList.length - freshMatches.length} kiszűrve)`);  
   res.json({ matches: freshMatches, tippedMatches, tippedPicks, generatedAt: new Date().toISOString() });
 });
 
