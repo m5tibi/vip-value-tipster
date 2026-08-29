@@ -1918,7 +1918,19 @@ app.get("/api/match-list", (req, res) => {
   const tippedPicks = history
     .filter(t => t.result === "pending" && t.type === "ai")
     .map(t => t.pick).filter(Boolean);
-  res.json({ matches: lastMatchList, tippedMatches, tippedPicks, generatedAt: new Date().toISOString() });
+  // Múltbeli meccsek kiszűrése (csak ma és holnap)
+  const now = Date.now();
+  const freshMatches = lastMatchList.filter(m => {
+    if (!m.commence) return true;
+    // commence formátum: "08.29 13:30" → dátum
+    const c = String(m.commence);
+    const match = c.match(/(\d{2})\.(\d{2})\s+(\d{2}):(\d{2})/);
+    if (!match) return true;
+    const [,mm,dd,hh,min] = match;
+    const d = new Date(`2026-${mm}-${dd}T${hh}:${min}:00`);
+    return (d.getTime() - now) > -3600000;  // max 1 óra múltban
+  });
+  res.json({ matches: freshMatches, tippedMatches, tippedPicks, generatedAt: new Date().toISOString() });
 });
 
 
