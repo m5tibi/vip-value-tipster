@@ -912,13 +912,17 @@ async function checkResults() {
       const g = legGames[i];
       // Ha a meccs kezdési ideje még nem jött el (>0 óra van hátra), ne értékeljük ki
       if (leg.commence) {
-        // commence formátum: "08.29 13:30" → YYYY-MM-DDThh:mm:00
         const commenceHu = leg.commence.replace(/^(\d{2})\.(\d{2})\s+(\d{2}):(\d{2})$/, "2026-$1-$2T$3:$4:00");
         const hoursUntil = (new Date(commenceHu) - Date.now()) / 3600000;
-        if (hoursUntil > 0.5) return leg.result || null;  // még nem kezdődött el
+        if (hoursUntil > 0.5) {
+          console.log(`    Láb kihagyva (jövőbeli, ${hoursUntil.toFixed(1)}h): ${leg.match}`);
+          return leg.result || null;
+        }
       }
       const fresh = g ? settleMarket(leg.market, leg.pick, g.home_team, g.away_team, g.homeScore, g.awayScore) : null;
-      return fresh || leg.result || null;
+      const res = fresh || leg.result || null;
+      if (res) console.log(`    Láb eredmény: ${leg.match} → ${res} (fresh:${fresh}, g:${!!g}, commence:${leg.commence})`);
+      return res;
     });
     const legs      = combo.legs.map((l, i) => ({ ...l, result: legRes[i] }));
     const legsFilled = JSON.stringify(legs) !== JSON.stringify(combo.legs);
