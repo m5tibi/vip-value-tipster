@@ -1898,3 +1898,27 @@ if (FOOTBALLDATA_TOKEN) {
 
 const lastRun = loadLastRun();
 if (lastRun) console.log(`Utolsó futás: ${Math.round((Date.now() - new Date(lastRun).getTime()) / 60000)} perce`);
+// Meccs lista lekérése (mondomatutit Tipp Manager számára)
+let lastMatchList = [];
+(() => {
+  try {
+    const saved = JSON.parse(require("fs").readFileSync((process.env.DATA_DIR || "/data") + "/last_match_list.json", "utf8"));
+    if (Array.isArray(saved)) lastMatchList = saved;
+    console.log(`Meccs lista betöltve: ${lastMatchList.length} meccs`);
+  } catch(e) {}
+})();
+
+app.get("/api/match-list", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const tippedMatches = [...new Set(history
+    .filter(t => t.result === "pending" && (t.type === "ai" || t.type === "combo" || t.type === "free"))
+    .flatMap(t => t.type === "combo" ? (t.legs||[]).map(l => l.match) : [t.match])
+    .filter(Boolean)
+  )];
+  const tippedPicks = history
+    .filter(t => t.result === "pending" && t.type === "ai")
+    .map(t => t.pick).filter(Boolean);
+  res.json({ matches: lastMatchList, tippedMatches, tippedPicks, generatedAt: new Date().toISOString() });
+});
+
+
