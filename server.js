@@ -929,7 +929,8 @@ async function checkResults() {
     });
     const legs      = combo.legs.map((l, i) => ({ ...l, result: legRes[i] }));
     const legsFilled = JSON.stringify(legs) !== JSON.stringify(combo.legs);
-    const anyLost   = legResFresh.some(r => r === "lost");  // csak friss evaluáció
+    // Csak akkor lost, ha az aktuális futásban megtalált meccset értékeltük ki vesztesnek
+    const anyLost   = legRes.some((r, i) => r === "lost" && legGames[i] !== null);
     const allKnown  = legRes.every(r => !!r);
 
     if (anyLost) {
