@@ -1330,7 +1330,7 @@ app.patch("/api/history/:id", (req, res) => {
     }
     const upd = t => t.id === req.params.id ? { ...t, ...patch } : t;
     history = history.map(upd); latestTips = latestTips.map(upd);
-    aiTips = aiTips.map(upd); comboTips = comboTips.map(upd); freeTips = freeTips.map(upd);
+    aiTips = aiTips.map(upd); comboTips = comboTips.map(upd); if (typeof freeTips !== "undefined") freeTips = freeTips.map(upd);
     saveHistory();
     console.log(`Szerkesztve: ${req.params.id}${odds ? " odds:"+odds : ""}${note !== undefined ? " note" : ""}`);
     return res.json({ ok: true });
@@ -1345,7 +1345,7 @@ app.patch("/api/history/:id", (req, res) => {
   latestTips = latestTips.map(upd);
   aiTips     = aiTips.map(upd);
   comboTips  = comboTips.map(upd);
-  freeTips   = freeTips ? freeTips.map(upd) : freeTips;
+  if (typeof freeTips !== "undefined" && freeTips) freeTips = freeTips.map(upd);
   // Ha pending-re állítjuk vissza és nincs benne a comboTips-ben, visszaadjuk
   if (result === "pending") {
     const inCombo = comboTips.some(t => t.id === req.params.id);
