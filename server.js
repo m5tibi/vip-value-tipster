@@ -917,6 +917,7 @@ async function checkResults() {
         const hoursUntil = (new Date(commenceHu) - Date.now()) / 3600000;
         if (hoursUntil > 0.5) {
           console.log(`    Láb kihagyva (jövőbeli, ${hoursUntil.toFixed(1)}h): ${leg.match}`);
+          legResFresh.push(null);
           return leg.result || null;
         }
       }
@@ -928,7 +929,7 @@ async function checkResults() {
     });
     const legs      = combo.legs.map((l, i) => ({ ...l, result: legRes[i] }));
     const legsFilled = JSON.stringify(legs) !== JSON.stringify(combo.legs);
-    const anyLost   = legRes.some(r => r === "lost");
+    const anyLost   = legResFresh.some(r => r === "lost");  // csak friss evaluáció
     const allKnown  = legRes.every(r => !!r);
 
     if (anyLost) {
