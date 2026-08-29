@@ -922,8 +922,10 @@ async function checkResults() {
       const fresh = g ? settleMarket(leg.market, leg.pick, g.home_team, g.away_team, g.homeScore, g.awayScore) : null;
       const res = fresh || leg.result || null;
       if (res) console.log(`    Láb eredmény: ${leg.match} → ${res} (fresh:${fresh}, g:${!!g}, commence:${leg.commence})`);
-      return res;
+      return { res, fresh };  // fresh külön visszaadva
     });
+    const legResFresh = legRes.map(r => r.fresh);  // csak aktuális evaluáció
+    const legResAll   = legRes.map(r => r.res);    // régi eredmény is benne
     const legs      = combo.legs.map((l, i) => ({ ...l, result: legRes[i] }));
     const legsFilled = JSON.stringify(legs) !== JSON.stringify(combo.legs);
     const anyLost   = legRes.some(r => r === "lost");
