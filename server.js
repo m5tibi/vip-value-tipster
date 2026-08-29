@@ -912,7 +912,8 @@ async function checkResults() {
       const g = legGames[i];
       // Ha a meccs kezdési ideje még nem jött el (>0 óra van hátra), ne értékeljük ki
       if (leg.commence) {
-        const commenceHu = leg.commence.replace(/^(\d{2})\.(\d{2})\s+(\d{2}):(\d{2})$/, "2026-$2-$1T$3:$4:00");
+        // commence formátum: "08.29 13:30" → YYYY-MM-DDThh:mm:00
+        const commenceHu = leg.commence.replace(/^(\d{2})\.(\d{2})\s+(\d{2}):(\d{2})$/, "2026-$1-$2T$3:$4:00");
         const hoursUntil = (new Date(commenceHu) - Date.now()) / 3600000;
         if (hoursUntil > 0.5) return leg.result || null;  // még nem kezdődött el
       }
