@@ -1280,6 +1280,57 @@ app.get("/api/status", (req, res) => {
 });
 
 
+
+app.get("/api/admin/stats", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const SETTLED = ["won","lost","push","half_won","half_lost"];
+  const allSettled = [...history, ...comboTips].filter(t => isApproved(t) && SETTLED.includes(t.result));
+  const won       = allSettled.filter(t => t.result === "won").length;
+  const lost      = allSettled.filter(t => t.result === "lost").length;
+  const halfWon   = allSettled.filter(t => t.result === "half_won").length;
+  const halfLost  = allSettled.filter(t => t.result === "half_lost").length;
+  const push      = allSettled.filter(t => t.result === "push").length;
+  const decN      = won + lost + halfWon + halfLost;
+  const winRate   = decN ? (((won + halfWon * 0.5) / decN) * 100).toFixed(1) : null;
+  const profit    = allSettled.reduce((sum, t) => {
+    if (t.type === "combo") {
+      const p = parseFloat(t.comboPayout);
+      return sum + (isNaN(p) ? (t.result === "won" ? (parseFloat(t.odds)||1)-1 : -1) : p - 1);
+    }
+    const o = parseFloat(t.odds) || 1;
+    if (t.result === "won")       return sum + (o - 1);
+    if (t.result === "lost")      return sum - 1;
+    if (t.result === "half_won")  return sum + (o - 1) / 2;
+    if (t.result === "half_lost") return sum - 0.5;
+    return sum;
+  }, 0);
+  const roi = allSettled.length ? ((profit / allSettled.length) * 100).toFixed(1) : null;
+
+  // Havi bontás
+  const byMonth = {};
+  allSettled.forEach(t => {
+    const d = (t.createdAt || t.addedAt || "").slice(0,7); // "2026-08"
+    if (!d) return;
+    if (!byMonth[d]) byMonth[d] = { settled:0, won:0, lost:0, profit:0 };
+    byMonth[d].settled++;
+    const isCombo = t.type === "combo";
+    const cp = isCombo ? parseFloat(t.comboPayout) : NaN;
+    if (t.result === "won")       { byMonth[d].won++;  byMonth[d].profit += isCombo && !isNaN(cp) ? cp-1 : (parseFloat(t.odds)||1)-1; }
+    if (t.result === "half_won")  { byMonth[d].won++;  byMonth[d].profit += ((parseFloat(t.odds)||1)-1)/2; }
+    if (t.result === "lost")      { byMonth[d].lost++; byMonth[d].profit -= 1; }
+    if (t.result === "half_lost") { byMonth[d].lost++; byMonth[d].profit -= 0.5; }
+  });
+  const monthly = Object.entries(byMonth).sort().map(([month, s]) => ({
+    month, settled: s.settled, won: s.won, lost: s.lost,
+    profit: parseFloat(s.profit.toFixed(2)),
+    roi: s.settled ? parseFloat(((s.profit/s.settled)*100).toFixed(1)) : 0,
+    winRate: (s.won+s.lost) ? parseFloat(((s.won/(s.won+s.lost))*100).toFixed(1)) : null
+  }));
+
+  res.json({ settled: allSettled.length, won, lost, push, halfWon, halfLost,
+             winRate, profit: parseFloat(profit.toFixed(2)), roi, monthly });
+});
+
 app.get("/api/public-stats", (req, res) => {
   const isFociSrv = t => /soccer|foci|⚽/i.test((t.sport || "") + " " + (t.sportLabel || ""));
   const H = history.filter(t =>
