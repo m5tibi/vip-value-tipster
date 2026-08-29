@@ -1315,15 +1315,45 @@ app.post("/api/refresh", async (req, res) => {
 
 app.patch("/api/history/:id", (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const { result } = req.body;
+  const { result, note, comboPayout, odds, legs, pick } = req.body;
+
+  // Note / odds / pick / legs szerkesztés
+  if (note !== undefined || odds !== undefined || legs !== undefined || pick !== undefined) {
+    const patch = {};
+    if (note !== undefined) patch.note = note;
+    if (odds !== undefined) patch.odds = parseFloat(odds);
+    if (pick !== undefined) patch.pick = pick;
+    if (legs !== undefined) {
+      patch.legs = legs;
+      const totalOdds = legs.reduce((p, l) => p * parseFloat(l.odds || 1), 1);
+      patch.totalOdds = parseFloat(totalOdds.toFixed(2));
+    }
+    const upd = t => t.id === req.params.id ? { ...t, ...patch } : t;
+    history = history.map(upd); latestTips = latestTips.map(upd);
+    aiTips = aiTips.map(upd); comboTips = comboTips.map(upd); freeTips = freeTips.map(upd);
+    saveHistory();
+    console.log(`Szerkesztve: ${req.params.id}${odds ? " odds:"+odds : ""}${note !== undefined ? " note" : ""}`);
+    return res.json({ ok: true });
+  }
+
+  // Eredmény kézi beállítása
   const validResults = ["won","lost","push","half_won","half_lost","pending"];
   if (!validResults.includes(result)) return res.status(400).json({ error: "Érvénytelen eredmény" });
-  const patch = { result, manual: true };       // kézi jelölést az auto-újraértékelés nem írja felül
+  const patch = { result, manual: true };
   const upd = t => t.id === req.params.id ? { ...t, ...patch } : t;
   history    = history.map(upd);
   latestTips = latestTips.map(upd);
   aiTips     = aiTips.map(upd);
   comboTips  = comboTips.map(upd);
+  freeTips   = freeTips ? freeTips.map(upd) : freeTips;
+  // Ha pending-re állítjuk vissza és nincs benne a comboTips-ben, visszaadjuk
+  if (result === "pending") {
+    const inCombo = comboTips.some(t => t.id === req.params.id);
+    if (!inCombo) {
+      const fromHistory = history.find(t => t.id === req.params.id);
+      if (fromHistory && fromHistory.type === "combo") comboTips.push(fromHistory);
+    }
+  }
   saveHistory();
   console.log(`Kézi eredmény javítás: ${req.params.id} → ${result}`);
   res.json({ ok: true });
