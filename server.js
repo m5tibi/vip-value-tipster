@@ -908,6 +908,7 @@ async function checkResults() {
   // "lost" (bekerül a statisztikába), a hátralévő lábakat pedig a későbbi futások töltik ki.
   for (const combo of combosToCheck) {
     const legGames = combo.legs.map(leg => findByName(leg.match));
+    const legResFresh = [];  // csak az aktuális futás fresh eredményei
     const legRes = combo.legs.map((leg, i) => {
       const g = legGames[i];
       // Ha a meccs kezdési ideje még nem jött el (>0 óra van hátra), ne értékeljük ki
@@ -922,10 +923,9 @@ async function checkResults() {
       const fresh = g ? settleMarket(leg.market, leg.pick, g.home_team, g.away_team, g.homeScore, g.awayScore) : null;
       const res = fresh || leg.result || null;
       if (res) console.log(`    Láb eredmény: ${leg.match} → ${res} (fresh:${fresh}, g:${!!g}, commence:${leg.commence})`);
-      return { res, fresh };  // fresh külön visszaadva
+      legResFresh.push(fresh);  // aktuális evaluáció eredménye
+      return res;
     });
-    const legResFresh = legRes.map(r => r.fresh);  // csak aktuális evaluáció
-    const legResAll   = legRes.map(r => r.res);    // régi eredmény is benne
     const legs      = combo.legs.map((l, i) => ({ ...l, result: legRes[i] }));
     const legsFilled = JSON.stringify(legs) !== JSON.stringify(combo.legs);
     const anyLost   = legRes.some(r => r === "lost");
