@@ -918,7 +918,7 @@ async function checkResults() {
         if (hoursUntil > 0.5) {
           console.log(`    Láb kihagyva (jövőbeli, ${hoursUntil.toFixed(1)}h): ${leg.match}`);
           legResFresh.push(null);
-          return leg.result || null;
+          return null;  // jövőbeli meccsnek nem lehet érvényes eredménye
         }
       }
       const fresh = g ? settleMarket(leg.market, leg.pick, g.home_team, g.away_team, g.homeScore, g.awayScore) : null;
