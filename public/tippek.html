@@ -785,25 +785,6 @@ function renderHistory() {
       if (lsPr)  { lsPr.textContent = (p >= 0 ? "+" : "") + parseFloat(p).toFixed(2); lsPr.style.color = p >= 0 ? "#f59e0b" : "#ef9a9a"; }
       if (lsRoi) { lsRoi.textContent = r2 != null ? (p >= 0 ? "+" : "") + r2 + "%" : "–"; lsRoi.style.color = p >= 0 ? "#00e676" : "#ef9a9a"; }
       if (lsSt)  { lsSt.textContent = (d.settled ?? settled.length) + " " + window.t("tips.settled_basis"); }
-    // Havi bontás adminnak
-    if (isAdmin() && d.monthly && d.monthly.length) {
-      let existing = document.getElementById("monthly-stats");
-      if (!existing) {
-        existing = document.createElement("div");
-        existing.id = "monthly-stats";
-        existing.style.cssText = "margin:16px 0;padding:12px;background:#0a2f1f;border-radius:8px;font-size:12px";
-        const lsBar = document.getElementById("live-stats-bar");
-        if (lsBar && lsBar.parentNode) lsBar.parentNode.insertBefore(existing, lsBar.nextSibling);
-      }
-      const rows = d.monthly.slice().reverse().map(m => {
-        const col = m.profit >= 0 ? "#69f0ae" : "#ef9a9a";
-        return `<span style="margin-right:16px;white-space:nowrap"><b style="color:#80cbc4">${m.month}</b>: `+
-               `${m.settled} tipp · `+
-               `<span style="color:${col}">${m.profit>=0?"+":""}${m.profit} egység</span> · `+
-               `${m.winRate ?? "–"}% win</span>`;
-      }).join("");
-      existing.innerHTML = `<div style="color:#546e7a;font-size:11px;margin-bottom:6px">📅 HAVI BONTÁS (admin)</div>${rows}`;
-    }
     }
   }).catch(() => {
     if (!isAdmin()) return;
