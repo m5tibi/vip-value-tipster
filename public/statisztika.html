@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- statisztika.html v1.1 | 2026-08-30 -->
 <html lang="hu" data-i18n-title="stat.page_title">
 <head>
 <meta charset="UTF-8"/>
@@ -264,6 +265,7 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
     <a href="#" class="tg-channel-link" target="_blank" rel="noopener" style="color:#229ED9">Telegram</a> ·
     <a href="/aszf.html" data-i18n="footer.tos">ÁSZF</a> ·
     <span data-i18n="stat.footer_note">Az adatok automatikusan, manipuláció nélkül kerülnek rögzítésre. 18+</span>
+    · <span style="opacity:.35;font-size:10px;letter-spacing:.3px">v1.1</span>
   </p>
 </footer>
 
@@ -551,21 +553,26 @@ function renderMonthlyTable(monthly) {
     el.innerHTML = '<div class="empty" style="padding:20px">Nincs havi adat</div>';
     return;
   }
+
+  function fmtMonth(raw) {
+    // raw = "2026-08" → "2026. Augusztus"
+    const m = String(raw || '').match(/^(\d{4})-(\d{2})$/);
+    if (!m) return raw || '–';
+    return `${m[1]}. ${monthName(parseInt(m[2], 10) - 1)}`;
+  }
+
   // Legújabb hónap előre
   const rows = monthly.slice().reverse().map(m => {
     const p   = parseFloat(m.profit) || 0;
     const col = p >= 0 ? 'pos' : 'neg';
     const profStr = (p >= 0 ? '+' : '') + p.toFixed(2);
-    // ROI: ha szerver nem adja, számítsuk: profit / settled * 100
-    const roiVal = m.roi != null
-      ? parseFloat(m.roi)
-      : (m.settled ? (p / m.settled) * 100 : null);
-    const roiStr = roiVal != null
-      ? (roiVal >= 0 ? '+' : '') + roiVal.toFixed(1) + '%'
-      : '–';
+    const roiVal  = m.roi != null ? parseFloat(m.roi)
+                  : (m.settled ? (p / m.settled) * 100 : null);
+    const roiStr  = roiVal != null
+      ? (roiVal >= 0 ? '+' : '') + roiVal.toFixed(1) + '%' : '–';
     const wr = m.winRate != null ? m.winRate + '%' : '–';
     return `<tr>
-      <td class="m-name">${m.month || '–'}</td>
+      <td class="m-name">${fmtMonth(m.month)}</td>
       <td class="m-num">${m.settled ?? '–'}</td>
       <td class="m-num">${wr}</td>
       <td class="m-pl ${col}">${profStr}</td>
