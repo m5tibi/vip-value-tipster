@@ -1,3 +1,4 @@
+// server.js v2.1 | 2026-08-30
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
