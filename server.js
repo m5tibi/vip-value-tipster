@@ -242,6 +242,7 @@ console.log(`History betöltve: ${history.length} tipp`);
 // FONTOS: dátumtól függetlenül minden pending tipp visszakerül, mert egy tipp
 // gyakran az előző napon lett felvéve a mai/esti meccsre – ezeknek is látszaniuk kell.
 let latestTips = [];   // (megszűnt value tippek – üresen tartva a kompatibilitásért)
+let freeTips = [];
 let aiTips     = history.filter(t => t.type === "ai"    && (!t.result || t.result === "pending"));
 let comboTips  = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
 console.log(`Visszaállítva: ${aiTips.length} AI tipp + ${comboTips.length} kombi`);
@@ -494,8 +495,24 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       match: l.match, sportLabel: l.sportLabel || "⚽",
       market: l.market, pick: l.pick, odds: parseFloat(l.odds) || 0, commence: l.commence || null
     })).filter(l => l.match && l.market && l.pick && l.odds > 1);
-    return { singles, comboLegs };
-  } catch (e) { console.error("AI tipp hiba:", e.message); return { singles: [], comboLegs: [] }; }
+    // Ingyenes tipp feldolgozása
+    const ft = obj.ingyenes_tipp;
+    let freeTip = null;
+    if (ft && ft.match && ft.pick && ft.odds && parseFloat(ft.odds) >= 1.50) {
+      freeTip = {
+        id: `free-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: "free", match: ft.match,
+        commence: realCommence(ft.match) || ft.commence || null,
+        market: ft.market || "1X2", pick: ft.pick,
+        odds: parseFloat(ft.odds), note: ft.note || "",
+        approved: false, sent: false,
+        addedAt: nowHu(), result: "pending"
+      };
+    } else if (ft) {
+      console.log(`Ingyenes tipp: az AI nem javasolt (null visszatérés vagy odds < 1.50)`);
+    }
+    return { singles, comboLegs, freeTip };
+  } catch (e) { console.error("AI tipp hiba:", e.message); return { singles: [], comboLegs: [], freeTip: null }; }
 }
 
 function comboHash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0; return h.toString(36); }
@@ -649,7 +666,7 @@ async function fetchAndProcess() {
   }
   console.log(`Ligák átnézve (ingyenes): ${scannedLeagues} · odds-hívás (fizetős, ~3 kredit/liga): ${oddsCalls} · feldolgozható meccs: ${matchList.length}`);
 
-  const { singles, comboLegs } = await fetchAiTips(matchList, [...tippedMatches]);
+  const { singles, comboLegs, freeTip } = await fetchAiTips(matchList, [...tippedMatches]);
 
   // Backstop: a már ma tippelt meccsekre ne kerüljön újabb SINGLE (a prompt mellett is szűrünk)
   const newAiTips = singles.filter(t => !tippedMatches.has(t.match));
@@ -673,9 +690,27 @@ async function fetchAndProcess() {
   if (freshCombos.length) { history = [...freshCombos, ...history]; saveHistory(); }
   comboTips = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
 
+  // Ingyenes tipp mentése
+  let newFreeTip = null;
+  if (freeTip) {
+    const hasFreeTodayAlready = history.some(t => t.type === "free" && t.addedAt && t.addedAt.startsWith(new Date().toLocaleDateString("hu-HU").replaceAll(". ", ".").replace(".", "")));
+    if (!hasFreeTodayAlready && !existingIds.has(freeTip.id)) {
+      history = [freeTip, ...history];
+      newFreeTip = freeTip;
+      saveHistory();
+      console.log(`Ingyenes tipp hozzáadva: ${freeTip.match} | ${freeTip.pick} @${freeTip.odds}`);
+    }
+  } else {
+    console.log("Ingyenes tipp: az AI nem javasolt (null visszatérés vagy odds < 1.50)");
+  }
+  freeTips = history.filter(t => t.type === "free" && (!t.result || t.result === "pending"));
+
   // Státusz-értesítés Telegramra (a tippek TARTALMA NEM megy ki – az csak jóváhagyás után,
   // a "📤 Jóváhagyottak küldése" gombbal). Ez csak egy heads-up, hogy lefutott a lekérdezés.
   const total = fresh.length + freshCombos.length;
+  const extraSlip = freshCombos.find(c => c.note && c.note.includes("Extra"));
+  if (extraSlip) console.log(`Extra szelvény mentve: ${(extraSlip.legs||[]).length} láb, össz odds ${extraSlip.odds}`);
+  else if (freshCombos.length === 0) console.log("Extra szelvény eredmény: NEM GENERÁLT");
   console.log(`Frissítve – ${fresh.length} új AI tipp, ${freshCombos.length} új kombi (jóváhagyásra várnak)`);
 }
 
@@ -1247,6 +1282,7 @@ app.get("/api/tips", (req, res) => {
   res.json({
     aiTips:    admin ? aiTips    : aiTips.filter(isApproved),
     comboTips: admin ? comboTips : comboTips.filter(isApproved),
+    freeTips:  admin ? freeTips  : freeTips.filter(isApproved),
     admin
   });
 });
@@ -2041,5 +2077,3 @@ app.get("/api/match-list", (req, res) => {
   console.log(`[match-list] ${freshMatches.length} friss meccs visszaadva (${lastMatchList.length - freshMatches.length} kiszűrve)`);  
   res.json({ matches: freshMatches, tippedMatches, tippedPicks, generatedAt: new Date().toISOString() });
 });
-
-
