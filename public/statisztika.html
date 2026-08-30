@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- statisztika.html v1.1 | 2026-08-30 -->
+<!-- statisztika.html v1.2 | 2026-08-30 -->
 <html lang="hu" data-i18n-title="stat.page_title">
 <head>
 <meta charset="UTF-8"/>
@@ -265,7 +265,7 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
     <a href="#" class="tg-channel-link" target="_blank" rel="noopener" style="color:#229ED9">Telegram</a> ·
     <a href="/aszf.html" data-i18n="footer.tos">ÁSZF</a> ·
     <span data-i18n="stat.footer_note">Az adatok automatikusan, manipuláció nélkül kerülnek rögzítésre. 18+</span>
-    · <span style="opacity:.35;font-size:10px;letter-spacing:.3px">v1.1</span>
+    · <span style="opacity:.35;font-size:10px;letter-spacing:.3px">v1.2</span>
   </p>
 </footer>
 
@@ -348,11 +348,20 @@ function calcStats(tips) {
   return { settled: settled.length, winRate, profit: parseFloat(profit.toFixed(2)), roi };
 }
 
+// Admin státusz: session-alapú (email+jelszó) VAGY localStorage (?admin=PWD mód)
+let _isAdmin = localStorage.getItem('vbt_admin') === '1';
+function isAdmin() { return _isAdmin; }
+
+function getAdminHeaders() {
+  const pwd = localStorage.getItem('vbt_admin_pwd') || '';
+  const b64 = s => btoa(unescape(encodeURIComponent(s)));
+  return { 'x-admin-password-b64': b64(pwd) };
+}
+
 function updateScoreboard(stats) {
-  const adminPass = localStorage.getItem("vbt_admin");
   const sc = document.getElementById("scoreboard");
   const ch = document.getElementById("chart-section");
-  if (!adminPass) {
+  if (!isAdmin()) {
     if (sc) sc.style.display = "none";
     if (ch) ch.style.display = "none";
     return;
@@ -463,7 +472,7 @@ function buildPeriodPicker(tips) {
 }
 
 function drawChart(tips) {
-  if (!localStorage.getItem("vbt_admin")) return;
+  if (!isAdmin()) return;
   const canvas = document.getElementById('profit-chart');
   const ctx    = canvas.getContext('2d');
   const dpr    = window.devicePixelRatio || 1;
@@ -611,6 +620,17 @@ function renderMonthlyTable(monthly) {
 
 async function loadData() {
   try {
+    // 1. Admin státusz: session (email+jelszó) VAGY localStorage (?admin=PWD)
+    if (!_isAdmin) {
+      try {
+        const meRes = await fetch('/api/auth/me', { cache: 'no-store' });
+        if (meRes.ok) {
+          const me = await meRes.json();
+          if (me && me.isAdmin) _isAdmin = true;
+        }
+      } catch(e) { /* session lekérés sikertelen – marad a localStorage állapot */ }
+    }
+
     const [histRes, pubRes] = await Promise.all([
       fetch('/api/history'),
       fetch('/api/public-stats')
@@ -639,12 +659,8 @@ async function loadData() {
     renderTable(allTips);
 
     // Admin: havi bontás betöltése /api/admin/stats-ból
-    if (localStorage.getItem('vbt_admin')) {
-      const pwd    = localStorage.getItem('vbt_admin_pwd') || '';
-      const b64pwd = s => btoa(unescape(encodeURIComponent(s)));
-      fetch('/api/admin/stats', {
-        headers: { 'x-admin-password-b64': b64pwd(pwd) }
-      })
+    if (isAdmin()) {
+      fetch('/api/admin/stats', { headers: getAdminHeaders() })
         .then(r => r.json())
         .then(d => {
           renderMonthlyTable(d.monthly || []);
