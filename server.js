@@ -1,4 +1,4 @@
-// server.js v2.1 | 2026-08-30
+// server.js v2.2 | 2026-08-30
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -407,7 +407,7 @@ async function fetchAiTips(matchList, alreadyTipped = []) {
 Mai meccsek (valós bookmaker oddsokkal):
 ${matchText}
 ${skipNote}
-HÁROM dolgot adj:
+KÉT dolgot adj:
 
 1) "tippek": 2-3 ERŐS single tipp (csak a legjobbak, ne erőltesd a számot).
    - MECCSENKÉNT LEGFELJEBB 1 single tipp – a legerősebb piacot válaszd az adott meccsre. Ne adj több tippet ugyanarra a meccsre!
@@ -420,20 +420,13 @@ HÁROM dolgot adj:
    - Ezek külön-külön NEM elég értékesek single tippnek (alacsony odds, jellemzően 1.15-1.55), de kombinálva szép össz oddsot adnak.
    - Magas valószínűségű kimenetelek: erős favorit győzelme, Over 1.5, Under 4.5, hendikep -1 / -1.5 nagy favoritnál stb.
 
-3) "ingyenes_tipp": KÖTELEZŐ MEZŐ! Minden esetben adj meg 1 ingyenes tippet!
-   - MINDIG töltsd ki – ha nincs kiemelkedő külön meccs, a legjobb single tippedet add meg itt is (de MÁS meccsről ha lehetséges).
-   - Legalább 1.50 odds! Lehet single (1.50-2.00 odds) VAGY kombi (2-3 láb, 1.20-1.55 lábankénti odds).
-   - Ha single típus: add meg a "match", "market", "pick", "odds", "note", "commence" mezőket.
-   - Ha kombi típus: add meg a "type":"kombi" mezőt és a "legs" tömböt (minden lábban: match, pick, odds, commence).
-   - SOHA ne hagyd null-on vagy üresen! Ez egy kötelező ingyenes tipp a nem-előfizető látogatóknak.
-
 KÖZÖS szabályok:
 - Az "odds" mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd (a megfelelő piac/kimenet oddsát).
 - A "market" és "pick" pontosan egyezzen egy valós piaccal/kimenettel; a csapatnév a fent megadott formában szerepeljen.
-- Rövid (1-2 mondat) magyar indoklás valós adatok alapján (csak a "tippek"-hez és az "ingyenes_tipp"-hez kell note).
+- Rövid (1-2 mondat) magyar indoklás valós adatok alapján (csak a "tippek"-hez kell note).
 
 Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
-{"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"1X2","pick":"...","odds":1.85,"note":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28}],"ingyenes_tipp":{"type":"single","match":"...","market":"1X2","pick":"...","odds":1.72,"note":"...","commence":"07.05 20:00"}}`;
+{"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"1X2","pick":"...","odds":1.85,"note":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28}]}`;
 
   try {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -1352,17 +1345,33 @@ app.get("/api/admin/stats", (req, res) => {
 
   // Havi bontás
   const byMonth = {};
+
+  function tipMonth(t) {
+    // Próbálja ISO formátumból: "2026-08-30T..." → "2026-08"
+    const raw = t.createdAt || t.addedAt || "";
+    if (!raw) return null;
+    // ISO: "2026-08-..." → slice(0,7) = "2026-08" ✓
+    const isoMatch = String(raw).match(/^(\d{4}-\d{2})/);
+    if (isoMatch) return isoMatch[1];
+    // Magyar: "30.08.2026" → "2026-08"
+    const huMatch = String(raw).match(/^(\d{2})\.(\d{2})\.(\d{4})/);
+    if (huMatch) return `${huMatch[3]}-${huMatch[2]}`;
+    return null;
+  }
+
   allSettled.forEach(t => {
-    const d = (t.createdAt || t.addedAt || "").slice(0,7); // "2026-08"
+    const d = tipMonth(t);
     if (!d) return;
-    if (!byMonth[d]) byMonth[d] = { settled:0, won:0, lost:0, profit:0 };
+    if (!byMonth[d]) byMonth[d] = { settled: 0, won: 0, lost: 0, profit: 0 };
     byMonth[d].settled++;
     const isCombo = t.type === "combo";
     const cp = isCombo ? parseFloat(t.comboPayout) : NaN;
-    if (t.result === "won")       { byMonth[d].won++;  byMonth[d].profit += isCombo && !isNaN(cp) ? cp-1 : (parseFloat(t.odds)||1)-1; }
-    if (t.result === "half_won")  { byMonth[d].won++;  byMonth[d].profit += ((parseFloat(t.odds)||1)-1)/2; }
+    const o = parseFloat(t.odds) || 1;
+    if (t.result === "won")       { byMonth[d].won++;  byMonth[d].profit += isCombo && !isNaN(cp) ? cp - 1 : o - 1; }
+    if (t.result === "half_won")  { byMonth[d].won++;  byMonth[d].profit += (o - 1) / 2; }
     if (t.result === "lost")      { byMonth[d].lost++; byMonth[d].profit -= 1; }
     if (t.result === "half_lost") { byMonth[d].lost++; byMonth[d].profit -= 0.5; }
+    // push: settled-be beleszámít, de profit 0 (tét visszajár) → külön ág nem kell
   });
   const monthly = Object.entries(byMonth).sort().map(([month, s]) => ({
     month, settled: s.settled, won: s.won, lost: s.lost,
