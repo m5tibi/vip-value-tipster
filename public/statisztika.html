@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- statisztika.html v1.2 | 2026-08-30 -->
+<!-- statisztika.html v1.3 | 2026-08-30 -->
 <html lang="hu" data-i18n-title="stat.page_title">
 <head>
 <meta charset="UTF-8"/>
@@ -265,7 +265,7 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
     <a href="#" class="tg-channel-link" target="_blank" rel="noopener" style="color:#229ED9">Telegram</a> ·
     <a href="/aszf.html" data-i18n="footer.tos">ÁSZF</a> ·
     <span data-i18n="stat.footer_note">Az adatok automatikusan, manipuláció nélkül kerülnek rögzítésre. 18+</span>
-    · <span style="opacity:.35;font-size:10px;letter-spacing:.3px">v1.2</span>
+    · <span style="opacity:.35;font-size:10px;letter-spacing:.3px">v1.3</span>
   </p>
 </footer>
 
@@ -432,6 +432,9 @@ function setFilter(f, btn) {
   renderTable(getPeriodTips());
 }
 
+// Admin stats cache – egyszer töltjük be, minden scoreboard ebből olvas
+let _adminStats = null;
+
 function setPeriod(period, btn) {
   currentPeriod = period;
   document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
@@ -439,16 +442,33 @@ function setPeriod(period, btn) {
 
   const chartTitleEl = document.querySelector('.chart-title');
   const titleNode = chartTitleEl.childNodes[0];
+
   if (period === 'all') {
     titleNode.textContent = window.t('stat.chart_title');
-    // All-time: szerver oldali stats (single forrás)
-    fetch('/api/public-stats').then(r=>r.json()).then(d => {
-      updateScoreboard({ settled: d.settled, winRate: d.winRate, profit: d.profit, roi: d.roi });
-    }).catch(() => updateScoreboard(calcStats(getPeriodTips())));
+    if (isAdmin() && _adminStats) {
+      // Admin: /api/admin/stats-ból (single + kombi, konzisztens a havi bontással)
+      updateScoreboard({ settled: _adminStats.settled, winRate: _adminStats.winRate,
+                         profit: _adminStats.profit, roi: _adminStats.roi });
+    } else if (!isAdmin()) {
+      fetch('/api/public-stats').then(r=>r.json()).then(d => {
+        updateScoreboard({ settled: d.settled, winRate: d.winRate, profit: d.profit, roi: d.roi });
+      }).catch(() => updateScoreboard(calcStats(getPeriodTips())));
+    }
   } else {
     const [year, month] = period.split('-');
     titleNode.textContent = `${year} ${monthName(parseInt(month, 10) - 1)} – ${window.t('stat.chart_title')}`;
-    updateScoreboard(calcStats(getPeriodTips()));
+    if (isAdmin() && _adminStats) {
+      // Admin: a havi bontásból vesszük a scoreboard számokat (konzisztens!)
+      const mData = (_adminStats.monthly || []).find(m => m.month === period);
+      if (mData) {
+        updateScoreboard({ settled: mData.settled, winRate: mData.winRate,
+                           profit: mData.profit, roi: mData.roi });
+      } else {
+        updateScoreboard(calcStats(getPeriodTips()));
+      }
+    } else {
+      updateScoreboard(calcStats(getPeriodTips()));
+    }
   }
 
   const periodTips = getPeriodTips();
@@ -658,11 +678,15 @@ async function loadData() {
     drawChart(allTips.slice().reverse());
     renderTable(allTips);
 
-    // Admin: havi bontás betöltése /api/admin/stats-ból
+    // Admin: havi bontás + admin scoreboard betöltése /api/admin/stats-ból
     if (isAdmin()) {
       fetch('/api/admin/stats', { headers: getAdminHeaders() })
         .then(r => r.json())
         .then(d => {
+          _adminStats = d;
+          // Scoreboard felülírása admin adatokkal (konzisztens a havi bontással)
+          updateScoreboard({ settled: d.settled, winRate: d.winRate,
+                             profit: d.profit, roi: d.roi });
           renderMonthlyTable(d.monthly || []);
           document.getElementById('monthly-admin-wrap').classList.add('visible');
         })
