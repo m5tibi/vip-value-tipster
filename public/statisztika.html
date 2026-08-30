@@ -147,6 +147,34 @@
     .period-bar{gap:6px}
     .period-btn{font-size:11px;padding:5px 10px;border-radius:6px}
   }
+  /* ADMIN HAVI BONTÁS */
+  .monthly-wrap{max-width:860px;margin:24px auto 0;padding:0 20px;display:none}
+  .monthly-wrap.visible{display:block}
+  .monthly-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px;
+               font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+  .monthly-hdr .adm-tag{background:rgba(245,158,11,.12);color:var(--gold);
+                         border:1px solid rgba(245,158,11,.3);border-radius:4px;
+                         padding:2px 8px;font-size:10px;font-weight:700;letter-spacing:.5px}
+  .mon-table{width:100%;border-collapse:collapse;font-size:13px;
+             background:var(--surf);border:1px solid var(--border);
+             border-radius:var(--radius);overflow:hidden}
+  .mon-table thead th{padding:10px 14px;font-size:10px;font-weight:700;color:var(--muted);
+                      letter-spacing:1px;text-transform:uppercase;text-align:left;
+                      border-bottom:2px solid var(--border);background:rgba(0,0,0,.2)}
+  .mon-table tbody tr{border-bottom:1px solid rgba(26,47,74,.4);transition:background .1s}
+  .mon-table tbody tr:last-child{border-bottom:none}
+  .mon-table tbody tr:hover{background:rgba(12,26,46,.5)}
+  .mon-table td{padding:10px 14px;vertical-align:middle}
+  .mon-table .m-name{color:#fff;font-weight:600}
+  .mon-table .m-num{font-family:'Oswald',sans-serif;font-size:15px;color:var(--text)}
+  .mon-table .m-pl{font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;text-align:right}
+  .mon-table .m-roi{font-size:13px;text-align:right;font-weight:600}
+  .mon-table .pos{color:var(--green)}
+  .mon-table .neg{color:var(--red)}
+  .mon-table tfoot td{padding:10px 14px;font-weight:700;font-size:12px;color:var(--muted);
+                      border-top:2px solid var(--border);background:rgba(0,0,0,.18)}
+  .mon-table th:nth-child(n+3),.mon-table td:nth-child(n+3){text-align:right}
+
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:#5d7a96;cursor:pointer;transition:all .15s}button.lang-toggle:hover{border-color:#00e676;color:#00e676}
 </style>
@@ -191,6 +219,17 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
       <span id="chart-current">–</span>
     </div>
     <canvas id="profit-chart"></canvas>
+  </div>
+</div>
+
+<!-- ADMIN HAVI BONTÁS – csak admin látja -->
+<div class="monthly-wrap" id="monthly-admin-wrap">
+  <div class="monthly-hdr">
+    📅 Havi bontás
+    <span class="adm-tag">👤 ADMIN</span>
+  </div>
+  <div id="monthly-table-container">
+    <div class="loading" style="padding:20px;font-size:13px">Betöltés...</div>
   </div>
 </div>
 
@@ -506,6 +545,63 @@ function drawChart(tips) {
   document.getElementById('chart-current').style.color = isPositive ? '#00e676' : '#ef4444';
 }
 
+function renderMonthlyTable(monthly) {
+  const el = document.getElementById('monthly-table-container');
+  if (!monthly || !monthly.length) {
+    el.innerHTML = '<div class="empty" style="padding:20px">Nincs havi adat</div>';
+    return;
+  }
+  // Legújabb hónap előre
+  const rows = monthly.slice().reverse().map(m => {
+    const p   = parseFloat(m.profit) || 0;
+    const col = p >= 0 ? 'pos' : 'neg';
+    const profStr = (p >= 0 ? '+' : '') + p.toFixed(2);
+    // ROI: ha szerver nem adja, számítsuk: profit / settled * 100
+    const roiVal = m.roi != null
+      ? parseFloat(m.roi)
+      : (m.settled ? (p / m.settled) * 100 : null);
+    const roiStr = roiVal != null
+      ? (roiVal >= 0 ? '+' : '') + roiVal.toFixed(1) + '%'
+      : '–';
+    const wr = m.winRate != null ? m.winRate + '%' : '–';
+    return `<tr>
+      <td class="m-name">${m.month || '–'}</td>
+      <td class="m-num">${m.settled ?? '–'}</td>
+      <td class="m-num">${wr}</td>
+      <td class="m-pl ${col}">${profStr}</td>
+      <td class="m-roi ${col}">${roiStr}</td>
+    </tr>`;
+  }).join('');
+
+  // Összesítő sor
+  const totSettled = monthly.reduce((s, m) => s + (m.settled ?? 0), 0);
+  const totProfit  = monthly.reduce((s, m) => s + (parseFloat(m.profit) || 0), 0);
+  const totCol     = totProfit >= 0 ? 'var(--green)' : 'var(--red)';
+  const totRoi     = totSettled ? ((totProfit / totSettled) * 100).toFixed(1) : null;
+
+  el.innerHTML = `<table class="mon-table">
+    <thead><tr>
+      <th>Hónap</th>
+      <th style="text-align:right">Lezárt</th>
+      <th style="text-align:right">Win %</th>
+      <th style="text-align:right">Profit (e.)</th>
+      <th style="text-align:right">ROI</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr>
+      <td><b>Összesen</b></td>
+      <td style="text-align:right;font-family:'Oswald',sans-serif">${totSettled}</td>
+      <td>–</td>
+      <td style="text-align:right;font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;color:${totCol}">
+        ${(totProfit >= 0 ? '+' : '') + totProfit.toFixed(2)}
+      </td>
+      <td style="text-align:right;font-weight:600;color:${totCol}">
+        ${totRoi != null ? (totProfit >= 0 ? '+' : '') + totRoi + '%' : '–'}
+      </td>
+    </tr></tfoot>
+  </table>`;
+}
+
 async function loadData() {
   try {
     const [histRes, pubRes] = await Promise.all([
@@ -534,6 +630,25 @@ async function loadData() {
     }
     drawChart(allTips.slice().reverse());
     renderTable(allTips);
+
+    // Admin: havi bontás betöltése /api/admin/stats-ból
+    if (localStorage.getItem('vbt_admin')) {
+      const pwd    = localStorage.getItem('vbt_admin_pwd') || '';
+      const b64pwd = s => btoa(unescape(encodeURIComponent(s)));
+      fetch('/api/admin/stats', {
+        headers: { 'x-admin-password-b64': b64pwd(pwd) }
+      })
+        .then(r => r.json())
+        .then(d => {
+          renderMonthlyTable(d.monthly || []);
+          document.getElementById('monthly-admin-wrap').classList.add('visible');
+        })
+        .catch(() => {
+          document.getElementById('monthly-table-container').innerHTML =
+            '<div class="empty" style="padding:20px">Havi adatok betöltése sikertelen</div>';
+          document.getElementById('monthly-admin-wrap').classList.add('visible');
+        });
+    }
   } catch(e) {
     document.getElementById('tips-table').innerHTML =
       `<div class="empty">${window.t('stat.load_err')}</div>`;
