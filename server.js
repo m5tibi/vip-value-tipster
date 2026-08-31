@@ -1,4 +1,4 @@
-// server.js v2.12 | 2026-08-31
+// server.js v2.13 | 2026-08-31
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -915,15 +915,16 @@ function settleMarket(market, pick, homeTeam, awayTeam, homeScore, awayScore) {
 
 // ── Eredményjelölés ───────────────────────────────────────
 async function checkResults() {
-  const pendingSingles = history.filter(t =>
-    (t.type === "ai" || t.type === "free") && (t.result === "pending" || !t.manual)
-  );
-  // Kombik: a nyitottak ÉS azok, amelyek már lezártak, de van még kitöltetlen lábuk
-  // (korai vesztes esetén a hátralévő lábakat a későbbi futások töltik ki).
+  // AI single tippek: pending vagy nem manual
+  const pendingAi   = history.filter(t => t.type === "ai"   && (t.result === "pending" || !t.manual));
+  // Free tippek: csak a valóban pending-ek
+  const pendingFree = history.filter(t => t.type === "free"  && (!t.result || t.result === "pending"));
+  const pendingSingles = [...pendingAi, ...pendingFree];
+  // Kombik: nyitottak ÉS amelyeknek van még kitöltetlen lábuk
   const combosToCheck = history.filter(t => t.type === "combo" &&
     (!t.result || t.result === "pending" || (t.legs || []).some(l => !l.result)));
   if (!pendingSingles.length && !combosToCheck.length) return;
-  console.log(`Eredmények ellenőrzése (${pendingSingles.length} single, ${combosToCheck.length} kombi)...`);
+  console.log(`Eredmények ellenőrzése (${pendingAi.length} single, ${combosToCheck.length} kombi, ${pendingFree.length} free)...`);
   let changed = false;
   const fdCache = {};
 
@@ -988,8 +989,9 @@ async function checkResults() {
     const fix = tip.result && tip.result !== "pending" && tip.result !== result ? " (JAVÍTÁS)" : "";
     console.log(`  ${g.home_team} vs ${g.away_team}: ${g.homeScore}-${g.awayScore} [${g.src}] · ${tip.pick} → ${result}${fix}`);
     const patch = { result, homeScore: g.homeScore, awayScore: g.awayScore, settledAt: nowHu() };
-    history = history.map(t => t.id === tip.id ? { ...t, ...patch } : t);
-    aiTips  = aiTips.map(t => t.id === tip.id ? { ...t, ...patch } : t);
+    history  = history.map(t => t.id === tip.id ? { ...t, ...patch } : t);
+    aiTips   = aiTips.map(t => t.id === tip.id ? { ...t, ...patch } : t);
+    freeTips = freeTips.map(t => t.id === tip.id ? { ...t, ...patch } : t);
     changed = true;
   }
 
