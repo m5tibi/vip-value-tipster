@@ -148,6 +148,22 @@ async function sendPlanCancelled(to) {
 // ── Új tippek értesítő ────────────────────────────────────────
 async function sendNewTips(to, tips, combos, frees = []) {
   if (!tips.length && !combos.length && !frees.length) return;
+
+  const freeRows = frees.map(t => {
+    const note = (t.note || t.ai_note || "").trim();
+    return `<tr>
+      <td colspan="4" style="padding:8px 6px 2px;border-bottom:none;background:rgba(139,92,246,.08)">
+        <span style="color:#c084fc;font-weight:700;font-size:12px">🆓 INGYENES TIPP</span>
+        <span style="color:#e0e0e0;font-weight:600;margin-left:8px">${t.match}</span>
+        <span style="color:#80cbc4;font-size:12px;margin-left:8px">${t.market || ''}</span>
+        <span style="color:#e0e0e0;margin-left:8px">${t.pick}</span>
+        <span style="color:#f59e0b;font-weight:700;margin-left:8px">@ ${t.odds}</span>
+        ${t.commence ? `<span style="color:#546e7a;font-size:11px;margin-left:8px">🕐 ${t.commence}</span>` : ''}
+      </td>
+    </tr>
+    ${note ? `<tr><td colspan="4" style="padding:2px 6px 8px;border-bottom:1px solid #2d1f4e;color:#c084fc;font-size:12px;line-height:1.5;background:rgba(139,92,246,.05)">${note}</td></tr>` : '<tr><td colspan="4" style="border-bottom:1px solid #2d1f4e;background:rgba(139,92,246,.05)"></td></tr>'}`;
+  }).join("");
+
   const tipRows = tips.map(t => {
     const note = (t.note || t.ai_note || "").trim();
     return `<tr>
@@ -161,6 +177,7 @@ async function sendNewTips(to, tips, combos, frees = []) {
     </tr>
     ${note ? `<tr><td colspan="4" style="padding:2px 6px 8px;border-bottom:1px solid #1e3a2f;color:#A0A0C0;font-size:12px;line-height:1.5">${note}</td></tr>` : '<tr><td colspan="4" style="border-bottom:1px solid #1e3a2f"></td></tr>'}`;
   }).join("");
+
   const comboRows = combos.map(c =>
     `<tr>
       <td colspan="4" style="padding:8px 6px;border-bottom:1px solid #1e3a2f;color:#ffcc80">
@@ -168,11 +185,20 @@ async function sendNewTips(to, tips, combos, frees = []) {
       </td>
     </tr>`
   ).join("");
+
+  // Tárgy és cím dinamikusan
+  const parts = [];
+  if (tips.length)   parts.push(`${tips.length} új VIP tipp`);
+  if (combos.length) parts.push(`${combos.length} kombi`);
+  if (frees.length)  parts.push(`🆓 ingyenes tipp`);
+  const subject = `⚽ ${parts.join(" + ")} – 90perc.hu`;
+  const title   = parts.join(" + ");
+
   return send({
     to,
-    subject: `⚽ ${tips.length} új tipp érkezett – 90perc.hu`,
-    text: tips.map(t => `${t.match}: ${t.pick} @ ${t.odds}`).join("\n"),
-    html: shell(`${tips.length} új tipp érkezett`, `
+    subject,
+    text: [...tips, ...frees].map(t => `${t.match}: ${t.pick} @ ${t.odds}`).join("\n"),
+    html: shell(title, `
       <table style="width:100%;border-collapse:collapse;margin:10px 0">
         <thead>
           <tr style="color:#546e7a;font-size:11px;text-transform:uppercase">
