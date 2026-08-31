@@ -1,4 +1,4 @@
-// server.js v2.9 | 2026-08-31
+// server.js v2.10 | 2026-08-31
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -2163,19 +2163,20 @@ app.get("/api/match-list", (req, res) => {
   const tippedPicks = history
     .filter(t => t.result === "pending" && t.type === "ai")
     .map(t => t.pick).filter(Boolean);
-  // Múltbeli meccsek kiszűrése (csak ma és holnap)
+  // Múltbeli meccsek kiszűrése – csak a jövőbeli meccsek (max 2 óra múltban)
   console.log(`[match-list] ${lastMatchList.length} meccs a cacheben, szűrés...`);
   const now = Date.now();
   const freshMatches = lastMatchList.filter(m => {
     if (!m.commence) return true;
-    // commence formátum: "08.29 13:30" → dátum
-    const c = String(m.commence);
-    const match = c.match(/(\d{2})\.(\d{2})\s+(\d{2}):(\d{2})/);
+    // Kezeli: "08.30 12:15" és "08.30. 12:15" (hu-HU locale trailing dot) és "08.30, 12:15"
+    const c = String(m.commence).replace(",", " ");
+    const match = c.match(/(\d{2})\.(\d{2})\.?\s+(\d{2}):(\d{2})/);
     if (!match) return true;
     const [,mm,dd,hh,min] = match;
-    const d = new Date(`2026-${mm}-${dd}T${hh}:${min}:00`);
+    // Budapest (UTC+2) → UTC korrekció
+    const d = new Date(`2026-${mm}-${dd}T${hh}:${min}:00+02:00`);
     const hoursAgo = (now - d.getTime()) / 3600000;
-    return hoursAgo < 2;  // max 2 óra múltban
+    return hoursAgo < 2;  // max 2 óra múltban tartunk meg
   });
   console.log(`[match-list] ${freshMatches.length} friss meccs visszaadva (${lastMatchList.length - freshMatches.length} kiszűrve)`);  
   res.json({ matches: freshMatches, tippedMatches, tippedPicks, generatedAt: new Date().toISOString() });
