@@ -1,4 +1,4 @@
-// server.js v2.10 | 2026-08-31
+// server.js v2.11 | 2026-08-31
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -1170,9 +1170,68 @@ setInterval(async () => {
     console.log("Napnyitó automatikus eredmény-ellenőrzés...");
     await checkResults();
   }
-  if (hour === 0 && minute === 5 && _lastStatsDay !== dayKey) {
+  // 06:00 – Előző napi eredmény összegző Telegramra (00:05-ös általános stats helyett)
+  if (hour === 6 && minute === 0 && _lastStatsDay !== dayKey) {
     _lastStatsDay = dayKey;
-    await sendTelegram(buildStatsMsg("90perc.hu – Napi statisztika"));
+    try {
+      const SETTLED = ["won", "lost", "push", "half_won", "half_lost"];
+      // Tegnapi dátum (Budapest)
+      const yest = new Date();
+      yest.setDate(yest.getDate() - 1);
+      const yestStr = yest.toLocaleDateString("hu-HU", { timeZone: "Europe/Budapest",
+        year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\./g,"").trim()
+        .replace(/(\d{4})\s*(\d{2})\s*(\d{2})/, "$1-$2-$3");
+      // Előző napon lezárt tippek (settledAt kezdete = tegnap)
+      const yestSettled = history.filter(t =>
+        SETTLED.includes(t.result) && isApproved(t) &&
+        t.settledAt && String(t.settledAt).slice(0,10) === yestStr
+      );
+      if (!yestSettled.length) {
+        await sendTelegram(`📊 <b>Előző nap (${yestStr})</b>\nNincs lezárt tipp.`);
+      } else {
+        function dayStats(tips) {
+          const settled = tips.length;
+          const won = tips.filter(t => t.result === "won").length;
+          const halfWon = tips.filter(t => t.result === "half_won").length;
+          const lost = tips.filter(t => t.result === "lost").length;
+          const halfLost = tips.filter(t => t.result === "half_lost").length;
+          const decN = won + lost + halfWon + halfLost;
+          const wr = decN ? (((won + halfWon * 0.5) / decN) * 100).toFixed(2) : "0";
+          const profit = tips.reduce((s, t) => {
+            if (t.type === "combo") {
+              const p = parseFloat(t.comboPayout);
+              return s + (isNaN(p) ? (t.result === "won" ? (parseFloat(t.odds)||1)-1 : -1) : p-1);
+            }
+            const o = parseFloat(t.odds) || 1;
+            if (t.result === "won")       return s + (o - 1);
+            if (t.result === "lost")      return s - 1;
+            if (t.result === "half_won")  return s + (o - 1) / 2;
+            if (t.result === "half_lost") return s - 0.5;
+            return s;
+          }, 0);
+          const roi = settled ? ((profit / settled) * 100).toFixed(2) : "0";
+          return { settled, won: won + halfWon, profit, wr, roi };
+        }
+        const all  = dayStats(yestSettled);
+        const vip  = dayStats(yestSettled.filter(t => t.type !== "free"));
+        const free = dayStats(yestSettled.filter(t => t.type === "free"));
+        const sign = v => (v >= 0 ? "+" : "") + v.toFixed(2);
+        const dateHU = yest.toLocaleDateString("hu-HU", { timeZone: "Europe/Budapest",
+          year: "numeric", month: "2-digit", day: "2-digit" });
+        const msg = `🔥 <b>Statisztika – Előző nap (${dateHU})</b>\n\n`+
+          `📊 <b>Összesített</b>\n`+
+          `- Kiértékelt: ${all.settled} db\n`+
+          `- Nyertes: ${all.won} db\n`+
+          `- Találati: ${all.wr}%\n`+
+          `- Profit: ${sign(all.profit)} egység\n`+
+          `- ROI: ${sign(parseFloat(all.roi))}%\n\n`+
+          (vip.settled ? `📝 <b>VIP:</b> ${vip.settled} lezárt, ${vip.won} nyert, Profit: ${sign(vip.profit)}\n` : "")+
+          (free.settled ? `🆓 <b>Free:</b> ${free.settled} lezárt, ${free.won} nyert, Profit: ${sign(free.profit)}` : "");
+        await sendTelegram(msg);
+      }
+    } catch(e) {
+      console.error("Reggeli összegző hiba:", e.message);
+    }
   }
 }, 60000);
 
