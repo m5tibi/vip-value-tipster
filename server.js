@@ -1,4 +1,4 @@
-// server.js v2.11 | 2026-08-31
+// server.js v2.12 | 2026-08-31
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -915,7 +915,9 @@ function settleMarket(market, pick, homeTeam, awayTeam, homeScore, awayScore) {
 
 // ── Eredményjelölés ───────────────────────────────────────
 async function checkResults() {
-  const pendingSingles = history.filter(t => t.type === "ai"    && (t.result === "pending" || !t.manual));
+  const pendingSingles = history.filter(t =>
+    (t.type === "ai" || t.type === "free") && (t.result === "pending" || !t.manual)
+  );
   // Kombik: a nyitottak ÉS azok, amelyek már lezártak, de van még kitöltetlen lábuk
   // (korai vesztes esetén a hátralévő lábakat a későbbi futások töltik ki).
   const combosToCheck = history.filter(t => t.type === "combo" &&
@@ -1069,7 +1071,11 @@ async function checkResults() {
     }
   }
 
-  if (changed) { saveHistory(); console.log("Eredmények mentve ✓"); }
+  if (changed) {
+    saveHistory();
+    freeTips = history.filter(t => t.type === "free" && (!t.result || t.result === "pending"));
+    console.log("Eredmények mentve ✓");
+  }
   else console.log("Nincs új lezárt meccs.");
 }
 
