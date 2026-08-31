@@ -1,4 +1,4 @@
-// server.js v2.4 | 2026-08-31
+// server.js v2.5 | 2026-08-31
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -428,7 +428,7 @@ async function fetchAiTips(matchList, alreadyTipped = []) {
 Mai meccsek (valós bookmaker oddsokkal):
 ${matchText}
 ${skipNote}
-KÉT dolgot adj:
+HÁROM dolgot adj – MINDHÁROM KÖTELEZŐ:
 
 1) "tippek": 2-3 ERŐS single tipp (csak a legjobbak, ne erőltesd a számot).
    - MECCSENKÉNT LEGFELJEBB 1 single tipp – a legerősebb piacot válaszd az adott meccsre. Ne adj több tippet ugyanarra a meccsre!
@@ -441,13 +441,19 @@ KÉT dolgot adj:
    - Ezek külön-külön NEM elég értékesek single tippnek (alacsony odds, jellemzően 1.15-1.55), de kombinálva szép össz oddsot adnak.
    - Magas valószínűségű kimenetelek: erős favorit győzelme, Over 1.5, Under 4.5, hendikep -1 / -1.5 nagy favoritnál stb.
 
+3) "ingyenes_tipp": ⚠️ KÖTELEZŐ – NE hagyd ki, NE add null-ként! Mindig töltsd ki!
+   - Ha nincs külön kiemelkedő meccs, add meg a legjobb single tippedet ide is (lehet ugyanaz a meccs).
+   - Minimum 1.50 odds. Lehet single VAGY kombi (2-3 láb, 1.20-1.55 lábankénti odds).
+   - Single esetén: "type":"single", add meg a "match","market","pick","odds","note","commence" mezőket.
+   - Kombi esetén: "type":"kombi", add meg a "legs" tömböt (minden lábban: match, pick, odds, commence).
+
 KÖZÖS szabályok:
 - Az "odds" mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd (a megfelelő piac/kimenet oddsát).
 - A "market" és "pick" pontosan egyezzen egy valós piaccal/kimenettel; a csapatnév a fent megadott formában szerepeljen.
-- Rövid (1-2 mondat) magyar indoklás valós adatok alapján (csak a "tippek"-hez kell note).
+- Rövid (1-2 mondat) magyar indoklás valós adatok alapján (csak a "tippek"-hez és "ingyenes_tipp"-hez kell note).
 
 Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
-{"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"1X2","pick":"...","odds":1.85,"note":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28}]}`;
+{"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"1X2","pick":"...","odds":1.85,"note":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28}],"ingyenes_tipp":{"type":"single","match":"...","market":"1X2","pick":"...","odds":1.72,"note":"...","commence":"07.05 20:00"}}`;
 
   try {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
