@@ -1,4 +1,4 @@
-// server.js v2.2 | 2026-08-30
+// server.js v2.3 | 2026-08-30
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -367,16 +367,38 @@ function calcComboStats() {
 }
 
 function buildStatsMsg(title) {
-  const { total, won, lost, push, halfWon, halfLost, pend, wr, profitStr, roiStr } = calcStats();
-  const pushTotal = push + halfWon + halfLost;   // a fél eredmények a visszajárhoz számítanak
-  const cs = calcComboStats();
-  const comboSection = cs.total ? `\n\n🎰 <b>Kombi tippek</b> <i>(külön)</i>\n`+
-    `Nyert/Vesztett: <b>${cs.won}</b> / <b>${cs.lost}</b> (folyamatban: ${cs.pend})\n`+
-    `Profit: <b>${cs.profitStr} egység</b> · ROI: <b>${cs.roiStr}</b>` : "";
+  // Ugyanaz a számítás mint az /api/admin/stats endpointban → track record oldallal konzisztens
+  const SETTLED_RES = ["won", "lost", "push", "half_won", "half_lost"];
+  const allSettled = [...history, ...comboTips].filter(t => isApproved(t) && SETTLED_RES.includes(t.result));
+  const won      = allSettled.filter(t => t.result === "won").length;
+  const lost     = allSettled.filter(t => t.result === "lost").length;
+  const halfWon  = allSettled.filter(t => t.result === "half_won").length;
+  const halfLost = allSettled.filter(t => t.result === "half_lost").length;
+  const push     = allSettled.filter(t => t.result === "push").length;
+  const pend     = history.filter(t => isApproved(t) && (!t.result || t.result === "pending")).length;
+  const decN     = won + lost + halfWon + halfLost;
+  const wr       = decN ? (((won + halfWon * 0.5) / decN) * 100).toFixed(1) + "%" : "–";
+  const profit   = allSettled.reduce((sum, t) => {
+    if (t.type === "combo") {
+      const p = parseFloat(t.comboPayout);
+      return sum + (isNaN(p) ? (t.result === "won" ? (parseFloat(t.odds)||1)-1 : -1) : p - 1);
+    }
+    const o = parseFloat(t.odds) || 1;
+    if (t.result === "won")       return sum + (o - 1);
+    if (t.result === "lost")      return sum - 1;
+    if (t.result === "half_won")  return sum + (o - 1) / 2;
+    if (t.result === "half_lost") return sum - 0.5;
+    return sum;
+  }, 0);
+  const roi       = allSettled.length ? ((profit / allSettled.length) * 100).toFixed(1) : "–";
+  const profitStr = allSettled.length ? (profit >= 0 ? "+" : "") + profit.toFixed(2) : "–";
+  const roiStr    = roi !== "–" ? (profit >= 0 ? "+" : "") + roi + "%" : "–";
+  const pushTotal = push + halfWon + halfLost;
+
   return `📈 <b>${title}</b>\n`+
     `📅 ${new Date().toLocaleDateString("hu-HU")}\n\n`+
-    `📊 <b>Összesítés</b>\n`+
-    `Összes tipp: <b>${total}</b>\n`+
+    `📊 <b>Összesítés</b> <i>(single + kombi + free)</i>\n`+
+    `Lezárt tipp: <b>${allSettled.length}</b>\n`+
     `⏳ Folyamatban: <b>${pend}</b>\n`+
     `✅ Nyert: <b>${won}</b>\n`+
     `❌ Vesztett: <b>${lost}</b>\n`+
@@ -384,8 +406,7 @@ function buildStatsMsg(title) {
     `📉 <b>Teljesítmény</b>\n`+
     `Win %: <b>${wr}</b>\n`+
     `Profit: <b>${profitStr} egység</b>\n`+
-    `ROI: <b>${roiStr}</b>`+
-    comboSection;
+    `ROI: <b>${roiStr}</b>`;
 }
 
 // ── AI tippek ─────────────────────────────────────────────
@@ -1106,9 +1127,9 @@ setInterval(async () => {
       }, 0);
       const roi = weekTips.length ? ((profit / weekTips.length) * 100).toFixed(1) : "0";
       const stats = { won, lost, push, halfWon, halfLost, profit, roi, winRate, settled: weekTips.length };
-      const recipients = usersDb.all().filter(u => !u.isAdmin && u.emailVerified !== false && (u.plan === "pro" || !auth.PAID_MODE));
-      console.log(`Heti összefoglaló e-mail: ${recipients.length} felhasználónak`);
-      for (const u of recipients) {
+      const adminUsers = usersDb.all().filter(u => u.isAdmin && u.emailVerified !== false);
+      console.log(`Heti összefoglaló e-mail: ${adminUsers.length} admin felhasználónak`);
+      for (const u of adminUsers) {
         mailer.sendWeeklySummary(u.email, stats).catch(e => console.error(`Heti email hiba (${u.email}):`, e.message));
       }
     }
