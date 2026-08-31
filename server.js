@@ -1,4 +1,4 @@
-// server.js v2.6 | 2026-08-31
+// server.js v2.9 | 2026-08-31
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -522,7 +522,16 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
     const comboLegs = (Array.isArray(obj.kombi_labak) ? obj.kombi_labak : []).map(l => ({
       match: l.match, sportLabel: l.sportLabel || "⚽",
       market: l.market, pick: l.pick, odds: parseFloat(l.odds) || 0, commence: l.commence || null
-    })).filter(l => l.match && l.market && l.pick && l.odds > 1);
+    })).filter(l => {
+      if (!l.match || !l.market || !l.pick || l.odds <= 1) return false;
+      // Hiányos meccs név kiszűrése (pl. csak "Wolverhampton Wanderers" vs nélkül)
+      const hasVs = /\svs\.?\s|\s@\s/i.test(l.match);
+      if (!hasVs) {
+        console.log(`Kombi láb kiszűrve (hiányos meccs név): "${l.match}"`);
+        return false;
+      }
+      return true;
+    });
     // Ingyenes tipp feldolgozása
     const ft = obj.ingyenes_tipp;
     let freeTip = null;
@@ -1549,33 +1558,65 @@ app.patch("/api/history/:id/approve", (req, res) => {
   history   = history.map(set);
   aiTips    = aiTips.map(set);
   comboTips = comboTips.map(set);
+  freeTips  = freeTips.map(set);
   saveHistory();
   res.json({ ok: true });
 });
 
-// Jóváhagyott, még el nem küldött tippek kézi kiküldése Telegramra
+// Jóváhagyott, még el nem küldött tippek kézi kiküldése Telegramra + e-mailben
 app.post("/api/tips/send", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const singlesToSend = history.filter(t => t.type === "ai"    && isApproved(t) && !t.sent && (!t.result || t.result === "pending"));
   const combosToSend  = history.filter(t => t.type === "combo" && isApproved(t) && !t.sent && (!t.result || t.result === "pending"));
-  if (!singlesToSend.length && !combosToSend.length) {
+  const freesToSend   = freeTips.filter(t =>                      isApproved(t) && !t.sent && (!t.result || t.result === "pending"));
+
+  if (!singlesToSend.length && !combosToSend.length && !freesToSend.length) {
     return res.json({ ok: true, sent: 0, message: "Nincs kiküldendő (jóváhagyott, még el nem küldött) tipp." });
   }
-  const sentIds = new Set([...singlesToSend, ...combosToSend].map(t => t.id));
-  const mark = t => sentIds.has(t.id) ? { ...t, sent: true } : t;
-  history = history.map(mark); aiTips = aiTips.map(mark); comboTips = comboTips.map(mark);
-  saveHistory();
-  const total = singlesToSend.length + combosToSend.length;
-  console.log(`Tippek kiküldve: ${total} (csak e-mail, Telegram nélkül)`);
 
-  // E-mail értesítő az összes aktív előfizetőnek
+  // Sent jelölés minden tömbben
+  const sentIds = new Set([...singlesToSend, ...combosToSend, ...freesToSend].map(t => t.id));
+  const mark = t => sentIds.has(t.id) ? { ...t, sent: true } : t;
+  history   = history.map(mark);
+  aiTips    = aiTips.map(mark);
+  comboTips = comboTips.map(mark);
+  freeTips  = freeTips.map(mark);
+  saveHistory();
+
+  const total = singlesToSend.length + combosToSend.length + freesToSend.length;
+  console.log(`Tippek kiküldve: ${total} (${singlesToSend.length} single, ${combosToSend.length} kombi, ${freesToSend.length} free)`);
+
+  // ── Telegram értesítő ──────────────────────────────────────────
+  const dateStr = new Date().toLocaleDateString("hu-HU");
+  const lines = [`📤 <b>Új tippek – ${dateStr}</b>\n`];
+  if (singlesToSend.length) {
+    lines.push("🎯 <b>SINGLE TIPPEK:</b>");
+    singlesToSend.forEach(t => {
+      lines.push(`• <b>${t.match}</b>\n  ${t.pick} @${t.odds} | ${t.sportLabel || "⚽"} 🕐 ${t.commence || "–"}`);
+    });
+  }
+  if (combosToSend.length) {
+    combosToSend.forEach(c => {
+      const legs = (c.legs || []).map(l => `  – ${l.match} | ${l.pick} @${l.odds}`).join("\n");
+      lines.push(`\n🎰 <b>KOMBI</b> (${(c.legs||[]).length} lábas, össz odds: ${c.odds})\n${legs}`);
+    });
+  }
+  if (freesToSend.length) {
+    lines.push("\n🆓 <b>INGYENES TIPP:</b>");
+    freesToSend.forEach(t => {
+      lines.push(`• <b>${t.match}</b>\n  ${t.pick} @${t.odds} | 🕐 ${t.commence || "–"}`);
+    });
+  }
+  sendTelegram(lines.join("\n")).catch(e => console.error("Telegram hiba:", e.message));
+
+  // ── E-mail értesítő az összes aktív előfizetőnek ────────────────
   const recipients = usersDb.all().filter(u =>
     !u.isAdmin && u.emailVerified !== false &&
     (u.plan === "pro" || !auth.PAID_MODE)
   );
   console.log(`Tip e-mail küldése ${recipients.length} felhasználónak...`);
   for (const u of recipients) {
-    mailer.sendNewTips(u.email, singlesToSend, combosToSend)
+    mailer.sendNewTips(u.email, singlesToSend, combosToSend, freesToSend)
       .catch(e => console.error(`Tip email hiba (${u.email}):`, e.message));
   }
 
