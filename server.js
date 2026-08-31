@@ -1,4 +1,4 @@
-// server.js v2.5 | 2026-08-31
+// server.js v2.6 | 2026-08-31
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -243,7 +243,7 @@ console.log(`History betöltve: ${history.length} tipp`);
 // FONTOS: dátumtól függetlenül minden pending tipp visszakerül, mert egy tipp
 // gyakran az előző napon lett felvéve a mai/esti meccsre – ezeknek is látszaniuk kell.
 let latestTips = [];   // (megszűnt value tippek – üresen tartva a kompatibilitásért)
-let freeTips = [];
+let freeTips = history.filter(t => t.type === "free" && (!t.result || t.result === "pending"));
 let aiTips     = history.filter(t => t.type === "ai"    && (!t.result || t.result === "pending"));
 let comboTips  = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
 console.log(`Visszaállítva: ${aiTips.length} AI tipp + ${comboTips.length} kombi`);
@@ -1512,6 +1512,7 @@ app.delete("/api/history", (req, res) => {
   latestTips = [];
   aiTips     = [];
   comboTips  = [];
+  freeTips   = [];
   saveHistory();
   console.log("History törölve ✓");
   res.json({ ok: true });
@@ -1525,6 +1526,7 @@ app.delete("/api/history/:id", (req, res) => {
   history   = history.filter(t => t.id !== id);
   aiTips    = aiTips.filter(t => t.id !== id);
   comboTips = comboTips.filter(t => t.id !== id);
+  freeTips  = history.filter(t => t.type === "free" && (!t.result || t.result === "pending"));
   const removed = before - history.length;
   if (removed) saveHistory();
   console.log(`Tipp törölve (${id}): ${removed} db`);
