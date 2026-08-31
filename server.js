@@ -1,4 +1,4 @@
-// server.js v2.3 | 2026-08-30
+// server.js v2.4 | 2026-08-31
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -520,7 +520,7 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
     // Ingyenes tipp feldolgozása
     const ft = obj.ingyenes_tipp;
     let freeTip = null;
-    if (ft && ft.match && ft.pick && ft.odds && parseFloat(ft.odds) >= 1.50) {
+    if (ft && ft.match && ft.pick && ft.odds && parseFloat(ft.odds) >= 1.40) {
       freeTip = {
         id: `free-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         type: "free", match: ft.match,
@@ -530,8 +530,24 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
         approved: false, sent: false,
         addedAt: nowHu(), result: "pending"
       };
-    } else if (ft) {
-      console.log(`Ingyenes tipp: az AI nem javasolt (null visszatérés vagy odds < 1.50)`);
+      console.log(`Ingyenes tipp (AI): ${freeTip.match} | ${freeTip.pick} @${freeTip.odds}`);
+    } else {
+      // Debug: mi jött vissza az AI-tól
+      console.log(`Ingyenes tipp AI válasz: ${JSON.stringify(ft)}`);
+      // Fallback: a legjobb single tippet adjuk free-ként (ha van)
+      if (singles.length > 0) {
+        const best = singles.reduce((a, b) => parseFloat(b.odds) > parseFloat(a.odds) ? b : a);
+        freeTip = {
+          ...best,
+          id: `free-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          type: "free",
+          approved: false, sent: false,
+          addedAt: nowHu(), result: "pending"
+        };
+        console.log(`Ingyenes tipp (fallback, legjobb single): ${freeTip.match} | ${freeTip.pick} @${freeTip.odds}`);
+      } else {
+        console.log(`Ingyenes tipp: nincs érvényes tipp (AI: ${ft ? `odds=${ft.odds}` : "null"})`);
+      }
     }
     return { singles, comboLegs, freeTip };
   } catch (e) { console.error("AI tipp hiba:", e.message); return { singles: [], comboLegs: [], freeTip: null }; }
