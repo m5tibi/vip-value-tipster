@@ -1,4 +1,4 @@
-// server.js v2.13 | 2026-08-31
+// server.js v2.15 | 2026-08-31
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -1178,8 +1178,8 @@ setInterval(async () => {
     console.log("Napnyitó automatikus eredmény-ellenőrzés...");
     await checkResults();
   }
-  // 06:00 – Előző napi eredmény összegző Telegramra (00:05-ös általános stats helyett)
-  if (hour === 5 && minute === 20 && _lastStatsDay !== dayKey) {
+  // 05:00 – Előző napi eredmény összegző Telegramra (00:05-ös általános stats helyett)
+  if (hour === 5 && minute === 30 && _lastStatsDay !== dayKey) {
     _lastStatsDay = dayKey;
     try {
       const SETTLED = ["won", "lost", "push", "half_won", "half_lost"];
@@ -1190,9 +1190,19 @@ setInterval(async () => {
         year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\./g,"").trim()
         .replace(/(\d{4})\s*(\d{2})\s*(\d{2})/, "$1-$2-$3");
       // Előző napon lezárt tippek (settledAt kezdete = tegnap)
+      // settledAt lehet ISO ("2026-08-31T21:00") vagy magyar locale ("2026. 8. 31. 21:00:00")
+      function parseSettledDate(s) {
+        if (!s) return null;
+        s = String(s);
+        const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+        const hu = s.match(/^(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/);
+        if (hu) return `${hu[1]}-${String(hu[2]).padStart(2,"0")}-${String(hu[3]).padStart(2,"0")}`;
+        return null;
+      }
       const yestSettled = history.filter(t =>
         SETTLED.includes(t.result) && isApproved(t) &&
-        t.settledAt && String(t.settledAt).slice(0,10) === yestStr
+        parseSettledDate(t.settledAt) === yestStr
       );
       if (!yestSettled.length) {
         await sendTelegram(`📊 <b>Előző nap (${yestStr})</b>\nNincs lezárt tipp.`);
