@@ -1,4 +1,4 @@
-// server.js v2.18 | 2026-09-02
+// server.js v2.19 | 2026-09-02
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -131,8 +131,9 @@ app.use('/api/odds', require('./routes/odds'));
 
 const ADMIN_PWD     = process.env.ADMIN_PASSWORD;
 const ODDS_API_KEY  = process.env.ODDS_API_KEY;
-const TG_BOT_TOKEN  = process.env.TG_BOT_TOKEN;
-const TG_CHAT_ID    = process.env.TG_CHAT_ID;
+const TG_BOT_TOKEN       = process.env.TG_BOT_TOKEN;
+const TG_CHAT_ID         = process.env.TG_CHAT_ID;           // publikus csatorna: -1004455319345
+const TG_PRIVATE_CHAT_ID = process.env.TG_PRIVATE_CHAT_ID || "1326707238"; // admin privát
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const FOOTBALLDATA_TOKEN = process.env.FOOTBALLDATA_TOKEN;   // opcionális: 90 perces eredményhez (football-data.org)
 const DATA_FILE     = "/data/history.json";
@@ -268,7 +269,23 @@ function todayHU() {
 }
 
 // ── Telegram ──────────────────────────────────────────────
+// Admin privát üzenet (reggeli összegző, VIP tipp értesítő)
 async function sendTelegram(text) {
+  if (!TG_BOT_TOKEN || !TG_PRIVATE_CHAT_ID) return;
+  try {
+    const r    = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: TG_PRIVATE_CHAT_ID, text, parse_mode: "HTML" })
+    });
+    const data = await r.json();
+    if (!data.ok) console.error("Telegram (privát) hiba:", JSON.stringify(data));
+    else console.log("Telegram privát: üzenet elküldve ✓");
+  } catch (e) { console.error("Telegram (privát) hiba:", e.message); }
+}
+
+// Publikus csatorna üzenet (csak ingyenes tippek)
+async function sendToChannel(text) {
   if (!TG_BOT_TOKEN || !TG_CHAT_ID) return;
   try {
     const r    = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
@@ -277,9 +294,9 @@ async function sendTelegram(text) {
       body: JSON.stringify({ chat_id: TG_CHAT_ID, text, parse_mode: "HTML" })
     });
     const data = await r.json();
-    if (!data.ok) console.error("Telegram hiba:", JSON.stringify(data));
-    else console.log("Telegram: üzenet elküldve ✓");
-  } catch (e) { console.error("Telegram hiba:", e.message); }
+    if (!data.ok) console.error("Telegram (csatorna) hiba:", JSON.stringify(data));
+    else console.log("Telegram csatorna: üzenet elküldve ✓");
+  } catch (e) { console.error("Telegram (csatorna) hiba:", e.message); }
 }
 
 // ── Ázsiai kiértékelés ────────────────────────────────────
@@ -1179,7 +1196,7 @@ setInterval(async () => {
     await checkResults();
   }
   // 05:00 – Előző napi eredmény összegző Telegramra (00:05-ös általános stats helyett)
-  if (hour === 6 && minute === 20 && _lastStatsDay !== dayKey) {
+  if (hour === 5 && minute === 0 && _lastStatsDay !== dayKey) {
     _lastStatsDay = dayKey;
     try {
       const SETTLED = ["won", "lost", "push", "half_won", "half_lost"];
@@ -1672,28 +1689,40 @@ app.post("/api/tips/send", async (req, res) => {
   const total = singlesToSend.length + combosToSend.length + freesToSend.length;
   console.log(`Tippek kiküldve: ${total} (${singlesToSend.length} single, ${combosToSend.length} kombi, ${freesToSend.length} free)`);
 
-  // ── Telegram értesítő ──────────────────────────────────────────
+  // ── Telegram értesítők ──────────────────────────────────────────
   const dateStr = new Date().toLocaleDateString("hu-HU");
-  const lines = [`📤 <b>Új tippek – ${dateStr}</b>\n`];
-  if (singlesToSend.length) {
-    lines.push("🎯 <b>SINGLE TIPPEK:</b>");
-    singlesToSend.forEach(t => {
-      lines.push(`• <b>${t.match}</b>\n  ${t.pick} @${t.odds} | ${t.sportLabel || "⚽"} 🕐 ${t.commence || "–"}`);
-    });
+
+  // VIP tippek → admin privát chat
+  if (singlesToSend.length || combosToSend.length) {
+    const lines = [`📤 <b>Új VIP tippek – ${dateStr}</b>\n`];
+    if (singlesToSend.length) {
+      lines.push("🎯 <b>SINGLE TIPPEK:</b>");
+      singlesToSend.forEach(t => {
+        lines.push(`• <b>${t.match}</b>\n  ${t.pick} @${t.odds} | ${t.sportLabel || "⚽"} 🕐 ${t.commence || "–"}`);
+      });
+    }
+    if (combosToSend.length) {
+      combosToSend.forEach(c => {
+        const legs = (c.legs || []).map(l => `  – ${l.match} | ${l.pick} @${l.odds}`).join("\n");
+        lines.push(`\n🎰 <b>KOMBI</b> (${(c.legs||[]).length} lábas, össz odds: ${c.odds})\n${legs}`);
+      });
+    }
+    sendTelegram(lines.join("\n")).catch(e => console.error("Telegram privát hiba:", e.message));
   }
-  if (combosToSend.length) {
-    combosToSend.forEach(c => {
-      const legs = (c.legs || []).map(l => `  – ${l.match} | ${l.pick} @${l.odds}`).join("\n");
-      lines.push(`\n🎰 <b>KOMBI</b> (${(c.legs||[]).length} lábas, össz odds: ${c.odds})\n${legs}`);
-    });
-  }
+
+  // Free tippek → publikus csatorna
   if (freesToSend.length) {
-    lines.push("\n🆓 <b>INGYENES TIPP:</b>");
     freesToSend.forEach(t => {
-      lines.push(`• <b>${t.match}</b>\n  ${t.pick} @${t.odds} | 🕐 ${t.commence || "–"}`);
+      const noteStr = t.note ? `\n\n<i>${t.note}</i>` : "";
+      const msg = `🆓 <b>INGYENES TIPP</b>\n\n`+
+        `<b>${t.match}</b>\n`+
+        `${t.pick} @${t.odds} | 🕐 ${t.commence || "–"}`+
+        noteStr+
+        `\n\n🌐 <a href="https://90perc.hu">90perc.hu</a> | `+
+        `📲 <a href="https://t.me/+DHhLxcVboA8yOTI0">Csatlakozz a csatornához</a>`;
+      sendToChannel(msg).catch(e => console.error("Telegram csatorna hiba:", e.message));
     });
   }
-  sendTelegram(lines.join("\n")).catch(e => console.error("Telegram hiba:", e.message));
 
   // ── E-mail értesítő az összes aktív előfizetőnek ────────────────
   const recipients = usersDb.all().filter(u =>
