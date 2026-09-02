@@ -1,4 +1,4 @@
-// server.js v2.16 | 2026-08-31
+// server.js v2.18 | 2026-09-02
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -1179,7 +1179,7 @@ setInterval(async () => {
     await checkResults();
   }
   // 05:00 – Előző napi eredmény összegző Telegramra (00:05-ös általános stats helyett)
-  if (hour === 5 && minute === 0 && _lastStatsDay !== dayKey) {
+  if (hour === 6 && minute === 20 && _lastStatsDay !== dayKey) {
     _lastStatsDay = dayKey;
     try {
       const SETTLED = ["won", "lost", "push", "half_won", "half_lost"];
@@ -1190,7 +1190,7 @@ setInterval(async () => {
         year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\./g,"").trim()
         .replace(/(\d{4})\s*(\d{2})\s*(\d{2})/, "$1-$2-$3");
       // Előző napon lezárt tippek (settledAt kezdete = tegnap)
-      // settledAt lehet ISO ("2026-08-31T21:00") vagy magyar locale ("2026. 8. 31. 21:00:00")
+      // settledAt formátum parser: ISO vagy magyar locale
       function parseSettledDate(s) {
         if (!s) return null;
         s = String(s);
@@ -1200,10 +1200,15 @@ setInterval(async () => {
         if (hu) return `${hu[1]}-${String(hu[2]).padStart(2,"0")}-${String(hu[3]).padStart(2,"0")}`;
         return null;
       }
-      const yestSettled = history.filter(t =>
-        SETTLED.includes(t.result) && isApproved(t) &&
-        parseSettledDate(t.settledAt) === yestStr
-      );
+      // settledAt lehet tegnapi VAGY mai korai (00:03 checkResults tegnap esti meccsekre)
+      const todayStr = new Date().toLocaleDateString("hu-HU", { timeZone: "Europe/Budapest",
+        year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\./g,"").trim()
+        .replace(/(\d{4})\s*(\d{2})\s*(\d{2})/, "$1-$2-$3");
+      const yestSettled = history.filter(t => {
+        if (!SETTLED.includes(t.result) || !isApproved(t) || !t.settledAt) return false;
+        const sd = parseSettledDate(t.settledAt);
+        return sd === yestStr || sd === todayStr;
+      });
       if (!yestSettled.length) {
         await sendTelegram(`📊 <b>Előző nap (${yestStr})</b>\nNincs lezárt tipp.`);
       } else {
@@ -1247,7 +1252,8 @@ setInterval(async () => {
           `- Profit: ${sign(all.profit)} egység\n`+
           `- ROI: ${sign(parseFloat(all.roi))}%\n\n`+
           (vip.settled  ? `📝 <b>VIP:</b> ${vip.settled} lezárt, ${vip.won} nyert${vip.push ? `, ${vip.push} visszajár` : ""}, Profit: ${sign(vip.profit)}\n` : "")+
-          (free.settled ? `🆓 <b>Free:</b> ${free.settled} lezárt, ${free.won} nyert${free.push ? `, ${free.push} visszajár` : ""}, Profit: ${sign(free.profit)}` : "");
+          (free.settled ? `🆓 <b>Free:</b> ${free.settled} lezárt, ${free.won} nyert${free.push ? `, ${free.push} visszajár` : ""}, Profit: ${sign(free.profit)}\n` : "")+
+          `\n🌐 www.90perc.hu`;
         await sendTelegram(msg);
       }
     } catch(e) {
