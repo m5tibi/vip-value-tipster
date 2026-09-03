@@ -231,13 +231,15 @@ function renderList() {
 function updateStats() {
   const members = allMembers.filter(u => !u.isAdmin);
   const pro = members.filter(u => u.plan === 'pro' && !u.cancelledAt).length;
-  const proActive = members.filter(u => u.plan === 'pro').length;
+  // Csak valódi Stripe-os előfizetők (kézzel hozzáadottak kizárva)
+  const proStripe = members.filter(u => u.plan === 'pro' && !u.cancelledAt && u.stripeCustomerId).length;
   const cancelled = members.filter(u => u.cancelledAt).length;
   document.getElementById('s-total').textContent = members.length;
   document.getElementById('s-pro').textContent = pro;
-  document.getElementById('s-mrr').textContent = (pro * 14990).toLocaleString('hu-HU');
+  document.getElementById('s-mrr').textContent = (proStripe * 14990).toLocaleString('hu-HU');
   document.getElementById('s-cancelled').textContent = cancelled;
-  document.getElementById('page-sub').textContent = `${members.length} tag · ${pro} aktív fizető · ${cancelled} lemondott · MRR: ${(pro*14990).toLocaleString('hu-HU')} Ft`;
+  document.getElementById('page-sub').textContent =
+    `${members.length} tag · ${pro} aktív fizető (${proStripe} Stripe) · ${cancelled} lemondott · MRR: ${(proStripe*14990).toLocaleString('hu-HU')} Ft`;
 }
 
 async function loadMembers() {
