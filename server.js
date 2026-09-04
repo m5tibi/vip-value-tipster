@@ -1196,7 +1196,7 @@ setInterval(async () => {
     await checkResults();
   }
   // 05:00 – Előző napi eredmény összegző Telegramra (00:05-ös általános stats helyett)
-  if (hour === 5 && minute === 0 && _lastStatsDay !== dayKey) {
+  if (hour === 6 && minute === 40 && _lastStatsDay !== dayKey) {
     _lastStatsDay = dayKey;
     try {
       const SETTLED = ["won", "lost", "push", "half_won", "half_lost"];
