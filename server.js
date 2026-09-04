@@ -1,4 +1,4 @@
-// server.js v2.19 | 2026-09-02
+// server.js v2.21 | 2026-09-04
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -1190,9 +1190,9 @@ setInterval(async () => {
       }
     }
   }
-  if (hour === 0 && minute === 3 && _lastCheckDay !== dayKey) {
+  if (hour === 6 && minute === 35 && _lastCheckDay !== dayKey) {
     _lastCheckDay = dayKey;
-    console.log("Napnyitó automatikus eredmény-ellenőrzés...");
+    console.log("Reggeli automatikus eredmény-ellenőrzés (04:30)...");
     await checkResults();
   }
   // 05:00 – Előző napi eredmény összegző Telegramra (00:05-ös általános stats helyett)
@@ -1206,26 +1206,35 @@ setInterval(async () => {
       const yestStr = yest.toLocaleDateString("hu-HU", { timeZone: "Europe/Budapest",
         year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\./g,"").trim()
         .replace(/(\d{4})\s*(\d{2})\s*(\d{2})/, "$1-$2-$3");
-      // Előző napon lezárt tippek (settledAt kezdete = tegnap)
-      // settledAt formátum parser: ISO vagy magyar locale
-      function parseSettledDate(s) {
-        if (!s) return null;
-        s = String(s);
+      // Tegnapi meccsek: a commence (meccs dátuma) alapján szűrünk
+      function parseSingleCommence(s) {
+        const c = String(s || "");
+        const m1 = c.match(/^(\d{2})\.(\d{2})/);
+        if (m1) return `2026-${m1[1]}-${m1[2]}`;
+        const m2 = c.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m2) return `${m2[1]}-${m2[2]}-${m2[3]}`;
+        return null;
+      }
+      function parseCommenceDate(t) {
+        // Kombi: az UTOLSÓ láb dátuma (amikor ténylegesen lezárul)
+        if (t.type === "combo" && Array.isArray(t.legs) && t.legs.length) {
+          const dates = t.legs.map(l => parseSingleCommence(l.commence)).filter(Boolean).sort();
+          if (dates.length) return dates[dates.length - 1];
+        }
+        const d = parseSingleCommence(t.commence);
+        if (d) return d;
+        // addedAt / settledAt fallback
+        const raw = t.addedAt || t.settledAt || "";
+        const s = String(raw);
         const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
         if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
         const hu = s.match(/^(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/);
         if (hu) return `${hu[1]}-${String(hu[2]).padStart(2,"0")}-${String(hu[3]).padStart(2,"0")}`;
         return null;
       }
-      // settledAt lehet tegnapi VAGY mai korai (00:03 checkResults tegnap esti meccsekre)
-      const todayStr = new Date().toLocaleDateString("hu-HU", { timeZone: "Europe/Budapest",
-        year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\./g,"").trim()
-        .replace(/(\d{4})\s*(\d{2})\s*(\d{2})/, "$1-$2-$3");
-      const yestSettled = history.filter(t => {
-        if (!SETTLED.includes(t.result) || !isApproved(t) || !t.settledAt) return false;
-        const sd = parseSettledDate(t.settledAt);
-        return sd === yestStr || sd === todayStr;
-      });
+      const yestSettled = history.filter(t =>
+        SETTLED.includes(t.result) && isApproved(t) && parseCommenceDate(t) === yestStr
+      );
       if (!yestSettled.length) {
         await sendTelegram(`📊 <b>Előző nap (${yestStr})</b>\nNincs lezárt tipp.`);
       } else {
