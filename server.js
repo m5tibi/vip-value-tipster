@@ -1,4 +1,4 @@
-// server.js v2.21 | 2026-09-04
+// server.js v2.22 | 2026-09-04
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -1190,13 +1190,13 @@ setInterval(async () => {
       }
     }
   }
-  if (hour === 6 && minute === 35 && _lastCheckDay !== dayKey) {
+  if (hour === 6 && minute === 55 && _lastCheckDay !== dayKey) {
     _lastCheckDay = dayKey;
     console.log("Reggeli automatikus eredmény-ellenőrzés (04:30)...");
     await checkResults();
   }
   // 05:00 – Előző napi eredmény összegző Telegramra (00:05-ös általános stats helyett)
-  if (hour === 6 && minute === 40 && _lastStatsDay !== dayKey) {
+  if (hour === 7 && minute === 0 && _lastStatsDay !== dayKey) {
     _lastStatsDay = dayKey;
     try {
       const SETTLED = ["won", "lost", "push", "half_won", "half_lost"];
@@ -1208,8 +1208,9 @@ setInterval(async () => {
         .replace(/(\d{4})\s*(\d{2})\s*(\d{2})/, "$1-$2-$3");
       // Tegnapi meccsek: a commence (meccs dátuma) alapján szűrünk
       function parseSingleCommence(s) {
-        const c = String(s || "");
-        const m1 = c.match(/^(\d{2})\.(\d{2})/);
+        const c = String(s || "").trim();
+        // "09.03 20:30" vagy "09. 03. 00:30" (szóközzel)
+        const m1 = c.match(/^(\d{2})\.\s*(\d{2})/);
         if (m1) return `2026-${m1[1]}-${m1[2]}`;
         const m2 = c.match(/^(\d{4})-(\d{2})-(\d{2})/);
         if (m2) return `${m2[1]}-${m2[2]}-${m2[3]}`;
