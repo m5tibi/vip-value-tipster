@@ -1,4 +1,4 @@
-// server.js v2.23 | 2026-09-04
+// server.js v2.24 | 2026-09-04
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -214,7 +214,7 @@ const SPORT_MAP = {
 };
 
 const EXCLUDED_BM = ["betfair_ex_eu", "betfair_ex_uk", "matchbook", "betfair_sb_uk", "smarkets"];
-const WINDOW_HOURS = 24;   // meddig előre nézzen a tippekhez/kombikhoz (több meccs → kombi is összeáll)
+const WINDOW_HOURS = 24;   // meddig előre nézzen a tippekhez/kombikhoz
 const MIN_SINGLE_ODDS = 1.50;   // single tippnél minimum odds (a kombi lábakra NEM vonatkozik)
 
 let history    = loadHistory();
@@ -1190,13 +1190,13 @@ setInterval(async () => {
       }
     }
   }
-  if (hour === 7 && minute === 15 && _lastCheckDay !== dayKey) {
+  if (hour === 7 && minute === 20 && _lastCheckDay !== dayKey) {
     _lastCheckDay = dayKey;
     console.log("Reggeli automatikus eredmény-ellenőrzés (04:30)...");
     await checkResults();
   }
   // 05:00 – Előző napi eredmény összegző Telegramra (00:05-ös általános stats helyett)
-  if (hour === 7 && minute ===25 && _lastStatsDay !== dayKey) {
+  if (hour === 7 && minute === 30 && _lastStatsDay !== dayKey) {
     _lastStatsDay = dayKey;
     try {
       const SETTLED = ["won", "lost", "push", "half_won", "half_lost"];
