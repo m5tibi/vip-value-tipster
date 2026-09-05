@@ -1190,13 +1190,13 @@ setInterval(async () => {
       }
     }
   }
-  if (hour === 6 && minute === 05 && _lastCheckDay !== dayKey) {
+  if (hour === 4 && minute === 30 && _lastCheckDay !== dayKey) {
     _lastCheckDay = dayKey;
     console.log("Reggeli automatikus eredmény-ellenőrzés (04:30)...");
     await checkResults();
   }
   // 05:00 – Előző napi eredmény összegző Telegramra (00:05-ös általános stats helyett)
-  if (hour === 6 && minute === 10 && _lastStatsDay !== dayKey) {
+  if (hour === 5 && minute === 00 && _lastStatsDay !== dayKey) {
     _lastStatsDay = dayKey;
     try {
       const SETTLED = ["won", "lost", "push", "half_won", "half_lost"];
