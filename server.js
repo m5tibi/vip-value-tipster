@@ -1,4 +1,4 @@
-// server.js v2.24 | 2026-09-04
+// server.js v2.25 | 2026-09-05
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -1190,13 +1190,13 @@ setInterval(async () => {
       }
     }
   }
-  if (hour === 5 && minute === 45 && _lastCheckDay !== dayKey) {
+  if (hour === 6 && minute === 05 && _lastCheckDay !== dayKey) {
     _lastCheckDay = dayKey;
     console.log("Reggeli automatikus eredmény-ellenőrzés (04:30)...");
     await checkResults();
   }
   // 05:00 – Előző napi eredmény összegző Telegramra (00:05-ös általános stats helyett)
-  if (hour === 5 && minute === 50 && _lastStatsDay !== dayKey) {
+  if (hour === 6 && minute === 10 && _lastStatsDay !== dayKey) {
     _lastStatsDay = dayKey;
     try {
       const SETTLED = ["won", "lost", "push", "half_won", "half_lost"];
@@ -1234,7 +1234,7 @@ setInterval(async () => {
         return null;
       }
       const yestSettled = history.filter(t =>
-        SETTLED.includes(t.result) && t.sent === true && parseCommenceDate(t) === yestStr
+        SETTLED.includes(t.result) && isApproved(t) && parseCommenceDate(t) === yestStr
       );
       if (!yestSettled.length) {
         await sendTelegram(`📊 <b>Előző nap (${yestStr})</b>\nNincs lezárt tipp.`);
