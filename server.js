@@ -1,4 +1,4 @@
-// server.js v2.25 | 2026-09-05
+// server.js v2.26 | 2026-09-07
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -451,7 +451,7 @@ HÁROM dolgot adj – MINDHÁROM KÖTELEZŐ:
    - MECCSENKÉNT LEGFELJEBB 1 single tipp – a legerősebb piacot válaszd az adott meccsre. Ne adj több tippet ugyanarra a meccsre!
    - CSAK legalább ${MIN_SINGLE_ODDS} oddsú single tippet adj – az ennél alacsonyabb oddsú kimenetet NE tedd single tippnek (a nagyon alacsony oddsúak a kombi lábak közé valók).
    - Lehetőleg KÜLÖNBÖZŐ meccsekről legyenek. Ha csak 1 meccs van elérhető, akkor csak 1 tippet adj.
-   - Csak pozitív kimenetel: over gólok, hendikep győzelem, csapat győzelme. NE adj under tippet a singlekbe.
+   - PIACVÁLTOZATOSSÁG: ne csak győzelmet adj! Választhatsz: Over 2.5 / Under 2.5, BTTS (mindkét csapat szerez gólt), ázsiai hendikep (-0.5, -1), 1X2. A legértékesebb piacot válaszd az adott meccsre.
 
 2) "kombi_labak": 4-6 BIZTONSÁGOS, alacsony kockázatú láb kombi szelvényekhez.
    - MINDEGYIK láb MÁS meccsről legyen – használj annyi különböző meccset, amennyi elérhető (legalább 2, hogy összeálljon egy kötés; ha van elég meccs, adj 4-6 lábat, hogy több, NEM átfedő kötés is kijöjjön).
@@ -470,7 +470,7 @@ KÖZÖS szabályok:
 - Rövid (1-2 mondat) magyar indoklás valós adatok alapján (csak a "tippek"-hez és "ingyenes_tipp"-hez kell note).
 
 Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
-{"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"1X2","pick":"...","odds":1.85,"note":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ FIFA VB 2026","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28}],"ingyenes_tipp":{"type":"single","match":"...","market":"1X2","pick":"...","odds":1.72,"note":"...","commence":"07.05 20:00"}}`;
+{"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ Premier League","commence":"07.05 20:00","market":"Over 2.5","pick":"Over 2.5","odds":1.85,"note":"..."},{"match":"...","sport":"soccer","sportLabel":"⚽ La Liga","commence":"07.05 21:00","market":"BTTS","pick":"Igen","odds":1.78,"note":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ Bundesliga","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28},{"match":"...","sportLabel":"⚽ Serie A","commence":"07.05 20:00","market":"1X2","pick":"Csapat A","odds":1.35}],"ingyenes_tipp":{"type":"single","match":"...","market":"BTTS","pick":"Igen","odds":1.72,"note":"...","commence":"07.05 20:00"}}`;
 
   try {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -1196,7 +1196,7 @@ setInterval(async () => {
     await checkResults();
   }
   // 05:00 – Előző napi eredmény összegző Telegramra (00:05-ös általános stats helyett)
-  if (hour === 5 && minute === 00 && _lastStatsDay !== dayKey) {
+  if (hour === 5 && minute === 0 && _lastStatsDay !== dayKey) {
     _lastStatsDay = dayKey;
     try {
       const SETTLED = ["won", "lost", "push", "half_won", "half_lost"];
