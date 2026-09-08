@@ -1,4 +1,4 @@
-// server.js v2.28 | 2026-09-08
+// server.js v2.29 | 2026-09-08
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -558,15 +558,15 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       .filter(t => { if (seenMatch.has(t.match)) return false; seenMatch.add(t.match); return true; });
     const comboLegs = (Array.isArray(obj.kombi_labak) ? obj.kombi_labak : []).map(l => ({
       match: l.match, sportLabel: l.sportLabel || "⚽",
-      market: l.market, pick: l.pick, odds: parseFloat(l.odds) || 0, commence: l.commence || null
+      market: inferMarket(l.pick, l.market), pick: l.pick,
+      odds: parseFloat(l.odds) || 0, commence: l.commence || null
     })).filter(l => {
       if (!l.match || !l.market || !l.pick || l.odds <= 1) return false;
-      // Hiányos meccs név kiszűrése (pl. csak "Wolverhampton Wanderers" vs nélkül)
+      // Hiányos meccs név kiszűrése
       const hasVs = /\svs\.?\s|\s@\s/i.test(l.match);
-      if (!hasVs) {
-        console.log(`Kombi láb kiszűrve (hiányos meccs név): "${l.match}"`);
-        return false;
-      }
+      if (!hasVs) { console.log(`Kombi láb kiszűrve (hiányos meccs név): "${l.match}"`); return false; }
+      // Odds limit: kombi lábnak maximum 1.60 odds (felette → single, nem kombi)
+      if (l.odds > 1.60) { console.log(`Kombi láb kiszűrve (odds > 1.60): "${l.match}" @ ${l.odds}`); return false; }
       return true;
     });
     // Ingyenes tipp feldolgozása
