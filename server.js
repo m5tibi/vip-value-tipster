@@ -1,4 +1,4 @@
-// server.js v2.26 | 2026-09-07
+// server.js v2.27 | 2026-09-08
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -522,15 +522,35 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       });
       return m ? m.commence : null;
     };
-    const singlesAll = (Array.isArray(obj.tippek) ? obj.tippek : []).map(t => ({
-      id: `ai-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      type: "ai", sport: t.sport, sportLabel: t.sportLabel,
-      match: t.match, commence: realCommence(t.match) || t.commence || null,
-      market: t.market, pick: t.pick, odds: t.odds,
-      live: false, note: t.note,
-      approved: false, sent: false,
-      addedAt: nowHu(), result: "pending"
-    }));
+    // Market mező automatikus kitöltése ha az AI kihagyta
+    function inferMarket(pick, market) {
+      if (market) return market;
+      const p = (pick || "").toLowerCase();
+      if (p.includes("over")) return "Over/Under";
+      if (p.includes("under")) return "Over/Under";
+      if (p === "igen" || p === "yes" || p.includes("btts")) return "BTTS";
+      if (p === "nem" || p === "no") return "BTTS";
+      return "1X2";
+    }
+    function fixPick(pick, market) {
+      // BTTS tippnél a pick legyen "Igen" vagy "Nem"
+      if (market === "BTTS" && !["igen","nem","yes","no"].includes((pick||"").toLowerCase())) return "Igen";
+      return pick;
+    }
+
+    const singlesAll = (Array.isArray(obj.tippek) ? obj.tippek : []).map(t => {
+      const market = inferMarket(t.pick, t.market);
+      const pick   = fixPick(t.pick, market);
+      return {
+        id: `ai-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: "ai", sport: t.sport, sportLabel: t.sportLabel,
+        match: t.match, commence: realCommence(t.match) || t.commence || null,
+        market, pick, odds: t.odds,
+        live: false, note: t.note,
+        approved: false, sent: false,
+        addedAt: nowHu(), result: "pending"
+      };
+    });
     // Backstop: minimum odds szűrő + meccsenként legfeljebb 1 single (az AI a legerősebbet teszi előre)
     const seenMatch = new Set();
     const singles = singlesAll
@@ -553,11 +573,13 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
     const ft = obj.ingyenes_tipp;
     let freeTip = null;
     if (ft && ft.match && ft.pick && ft.odds && parseFloat(ft.odds) >= 1.40) {
+      const ftMarket = inferMarket(ft.pick, ft.market);
+      const ftPick   = fixPick(ft.pick, ftMarket);
       freeTip = {
         id: `free-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         type: "free", match: ft.match,
         commence: realCommence(ft.match) || ft.commence || null,
-        market: ft.market || "1X2", pick: ft.pick,
+        market: ftMarket, pick: ftPick,
         odds: parseFloat(ft.odds), note: ft.note || "",
         approved: false, sent: false,
         addedAt: nowHu(), result: "pending"
