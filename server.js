@@ -1,4 +1,4 @@
-// server.js v2.27 | 2026-09-08
+// server.js v2.28 | 2026-09-08
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -778,7 +778,45 @@ async function fetchAndProcess() {
   const existingKeys = new Set(history.filter(t => t.type === "combo").map(comboKey));
   // Backstop: ha egy kombi láb meccse már single tippként szerepel (ma, pending), kiszűrjük
   const filteredComboLegs = comboLegs.filter(l => !tippedMatches.has(l.match));
-  const freshCombos = buildCombos(filteredComboLegs, matchList).filter(c => !existingKeys.has(comboKey(c)));
+  // Kombi tippek validálása: AI oddsok vs valódi Odds API oddsok
+  // Ha az AI odds > 10%-kal alacsonyabb a valódinál → kizárjuk (AI kitalált oddsot adott)
+  function getRealOdds(legMatch, legMarket, legPick, matchList) {
+    const entry = matchList.find(m => {
+      const n1 = (m.match || "").toLowerCase().replace(/[^a-z0-9]/g,"");
+      const n2 = (legMatch || "").toLowerCase().replace(/[^a-z0-9]/g,"");
+      return n1 === n2 || n1.includes(n2) || n2.includes(n1);
+    });
+    if (!entry) return null;
+    const lm = (legMarket || "").toLowerCase();
+    const lp = (legPick  || "").toLowerCase();
+    for (const o of (entry.odds || [])) {
+      const om = (o.market || "").toLowerCase();
+      const on = (o.name   || "").toLowerCase();
+      // 1X2 egyezés: market "1x2" és a csapatnév egyezik
+      if (lm.includes("1x2") && om.includes("1x2") && on.includes(lp.split(" ")[0])) return o.odds;
+      // Over/Under egyezés
+      if ((lm.includes("over") || lm.includes("under")) && om === lm) return o.odds;
+      // Hendikep egyezés
+      if (lm.includes("hendikep") && om.includes("hendikep") && on.includes(lp.split(" ")[0])) return o.odds;
+      // BTTS
+      if (lm.includes("btts") && om.includes("btts")) return o.odds;
+    }
+    return null;
+  }
+
+  const MAX_ODDS_DIFF = 0.10; // 10% tolerancia
+  const validatedComboLegs = filteredComboLegs.filter(l => {
+    const realOdds = getRealOdds(l.match, l.market, l.pick, matchList);
+    if (!realOdds) return true; // ha nem találjuk a valódi oddsot, megtartjuk
+    const aiOdds  = parseFloat(l.odds) || 0;
+    if (aiOdds < realOdds * (1 - MAX_ODDS_DIFF)) {
+      console.log(`[kombi] Láb kiszűrve (AI odds kitalált): ${l.match} | AI: ${aiOdds} vs valódi: ${realOdds}`);
+      return false;
+    }
+    return true;
+  });
+
+  const freshCombos = buildCombos(validatedComboLegs, matchList).filter(c => !existingKeys.has(comboKey(c)));
   if (freshCombos.length) { history = [...freshCombos, ...history]; saveHistory(); }
   comboTips = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
 
