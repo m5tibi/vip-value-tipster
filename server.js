@@ -1,4 +1,4 @@
-// server.js v2.29 | 2026-09-08
+// server.js v2.30 | 2026-09-08
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -269,19 +269,30 @@ function todayHU() {
 }
 
 // ── Telegram ──────────────────────────────────────────────
-// Admin privát üzenet (reggeli összegző, VIP tipp értesítő)
-async function sendTelegram(text) {
+// Admin privát üzenet (reggeli összegző, VIP tipp értesítő) – 1 retry timeout esetén
+async function sendTelegram(text, attempt = 1) {
   if (!TG_BOT_TOKEN || !TG_PRIVATE_CHAT_ID) return;
   try {
-    const r    = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
+    const r = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: TG_PRIVATE_CHAT_ID, text, parse_mode: "HTML" })
+      body: JSON.stringify({ chat_id: TG_PRIVATE_CHAT_ID, text, parse_mode: "HTML" }),
+      signal: ctrl.signal
     });
+    clearTimeout(timer);
     const data = await r.json();
     if (!data.ok) console.error("Telegram (privát) hiba:", JSON.stringify(data));
     else console.log("Telegram privát: üzenet elküldve ✓");
-  } catch (e) { console.error("Telegram (privát) hiba:", e.message); }
+  } catch (e) {
+    if (attempt === 1) {
+      console.warn(`Telegram (privát) timeout/hiba – újrapróbálkozás 10s múlva...`);
+      setTimeout(() => sendTelegram(text, 2), 10000);
+    } else {
+      console.error("Telegram (privát) hiba (2. kísérlet):", e.message);
+    }
+  }
 }
 
 // Publikus csatorna üzenet (csak ingyenes tippek)
