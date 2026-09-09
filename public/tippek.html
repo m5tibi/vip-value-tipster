@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- tippek.html v1.4 | 2026-09-09 -->
+<!-- tippek.html v1.5 | 2026-09-09 -->
 <html lang="hu">
 <head>
 <meta charset="UTF-8" />
@@ -283,7 +283,7 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
       <span data-i18n-html="tips.footer_disclaimer2"><b style="color:#ffcc80">18+</b> · A tippek <b>nem garantálnak nyereséget</b>, tájékoztató jellegűek — a fogadás pénzügyi veszteséggel járhat.</span><br>
       <span data-i18n-html="tips.footer_gamble">A szerencsejáték függőséget okozhat. Segítség: <b style="color:#ffcc80">116-123</b> (ingyenes, éjjel-nappal)</span>
     </div>
-    <div style="text-align:center;margin-top:6px;opacity:.3;font-size:10px;letter-spacing:.3px">v1.4</div>
+    <div style="text-align:center;margin-top:6px;opacity:.3;font-size:10px;letter-spacing:.3px">v1.5</div>
   </footer>
 </div>
 
@@ -1194,7 +1194,7 @@ async function editNote(id, btn) {
       method:"PATCH", headers:{"Content-Type":"application/json",...adminHeaders()},
       body: JSON.stringify(patch)
     });
-    if (r.ok) { showStatus("✏️ Kombi szerkesztve"); await loadTips(); await loadHistory(); }
+    if (r.ok) { showStatus("✏️ Kombi szerkesztve"); await loadHistory(); await loadTips(); }
     else showStatus("Hiba!", true);
     return;
   }
@@ -1222,7 +1222,7 @@ async function editNote(id, btn) {
     method:"PATCH", headers:{"Content-Type":"application/json",...adminHeaders()},
     body: JSON.stringify(patch)
   });
-  if (r.ok) { showStatus("✏️ Szerkesztés mentve"); await loadTips(); await loadHistory(); }
+  if (r.ok) { showStatus("✏️ Szerkesztés mentve"); await loadHistory(); await loadTips(); }
   else showStatus("Hiba!", true);
 }
 
