@@ -1,4 +1,4 @@
-// server.js v2.31 | 2026-09-09
+// server.js v2.33 | 2026-09-09
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -466,8 +466,15 @@ HÁROM dolgot adj – MINDHÁROM KÖTELEZŐ:
 
 2) "kombi_labak": 4-6 BIZTONSÁGOS, alacsony kockázatú láb kombi szelvényekhez.
    - MINDEGYIK láb MÁS meccsről legyen – használj annyi különböző meccset, amennyi elérhető (legalább 2, hogy összeálljon egy kötés; ha van elég meccs, adj 4-6 lábat, hogy több, NEM átfedő kötés is kijöjjön).
-   - Ezek külön-külön NEM elég értékesek single tippnek (alacsony odds, jellemzően 1.15-1.55), de kombinálva szép össz oddsot adnak.
+   - Ezek külön-külön NEM elég értékesek single tippnek, de kombinálva értékes össz oddsot adnak.
    - Magas valószínűségű kimenetelek: erős favorit győzelme, Over 1.5, Under 4.5, hendikep -1 / -1.5 nagy favoritnál stb.
+   - PIACVÁLTOZATOSSÁG: kombi lábak lehetnek Over 1.5, BTTS, hendikep – ne csak győzelmek!
+   - KÖTELEZŐ ODDS SZABÁLYOK – ezeket a rendszer szerver oldalon is ellenőrzi:
+     * Egy láb odds: MINIMUM 1.20, MAXIMUM 1.60 – ezen kívüli lábak automatikusan kiszűrődnek!
+     * 2 lábas kombi össz odds: MINIMUM 2.00
+     * 3 lábas kombi össz odds: MINIMUM 2.80 – 3 × 1.26-os láb (= 2.02) NEM FOGADHATÓ EL!
+     * 4+ lábas kombi össz odds: MINIMUM 3.50
+   - Ha egy kombi nem érné el a minimumot, válassz magasabb oddsú lábakat vagy ne generáld!
 
 3) "ingyenes_tipp": ⚠️ KÖTELEZŐ – NE hagyd ki, NE add null-ként! Mindig töltsd ki!
    - Ha nincs külön kiemelkedő meccs, add meg a legjobb single tippedet ide is (lehet ugyanaz a meccs).
@@ -828,13 +835,15 @@ async function fetchAndProcess() {
     return true;
   });
 
-  const MIN_COMBO_TOTAL = 2.00; // minimum össz kombi odds
   const freshCombos = buildCombos(validatedComboLegs, matchList)
     .filter(c => !existingKeys.has(comboKey(c)))
     .filter(c => {
-      const totalOdds = (c.legs || []).reduce((p, l) => p * parseFloat(l.odds || 1), 1);
-      if (totalOdds < MIN_COMBO_TOTAL) {
-        console.log(`Kombi kiszűrve (össz odds ${totalOdds.toFixed(2)} < ${MIN_COMBO_TOTAL}): ${(c.legs||[]).map(l=>l.match).join(", ")}`);
+      const legs = c.legs || [];
+      const totalOdds = legs.reduce((p, l) => p * parseFloat(l.odds || 1), 1);
+      // Minimális össz odds lábak számától függően
+      const minTotal = legs.length <= 2 ? 2.00 : legs.length === 3 ? 2.80 : 3.50;
+      if (totalOdds < minTotal) {
+        console.log(`Kombi kiszűrve (össz odds ${totalOdds.toFixed(2)} < ${minTotal} [${legs.length} láb]): ${legs.map(l=>l.match).join(", ")}`);
         return false;
       }
       return true;
