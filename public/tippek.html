@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- tippek.html v1.3 | 2026-09-05 -->
+<!-- tippek.html v1.4 | 2026-09-09 -->
 <html lang="hu">
 <head>
 <meta charset="UTF-8" />
@@ -283,7 +283,7 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
       <span data-i18n-html="tips.footer_disclaimer2"><b style="color:#ffcc80">18+</b> · A tippek <b>nem garantálnak nyereséget</b>, tájékoztató jellegűek — a fogadás pénzügyi veszteséggel járhat.</span><br>
       <span data-i18n-html="tips.footer_gamble">A szerencsejáték függőséget okozhat. Segítség: <b style="color:#ffcc80">116-123</b> (ingyenes, éjjel-nappal)</span>
     </div>
-    <div style="text-align:center;margin-top:6px;opacity:.3;font-size:10px;letter-spacing:.3px">v1.3</div>
+    <div style="text-align:center;margin-top:6px;opacity:.3;font-size:10px;letter-spacing:.3px">v1.4</div>
   </footer>
 </div>
 
@@ -1200,10 +1200,13 @@ async function editNote(id, btn) {
   }
 
   // Single / free szerkesztés
-  const currentNote = tipData ? (tipData.note || "") : "";
-  const currentOdds = tipData ? String(tipData.odds || "") : "";
-  const currentPick = tipData ? (tipData.pick || "") : "";
+  const currentNote  = tipData ? (tipData.note   || "") : "";
+  const currentOdds  = tipData ? String(tipData.odds  || "") : "";
+  const currentPick  = tipData ? (tipData.pick   || "") : "";
+  const currentMkt   = tipData ? (tipData.market || "") : "";
 
+  const newMkt = prompt("Piac (pl. 1X2 / Over 2.5 / BTTS / Hendikep -1):", currentMkt);
+  if (newMkt === null) return;
   const newPick = prompt("Tipp (pick):", currentPick);
   if (newPick === null) return;
   const newOddsStr = prompt("Odds:", currentOdds);
@@ -1211,7 +1214,7 @@ async function editNote(id, btn) {
   const newNote = prompt("Indoklás:", currentNote);
   if (newNote === null) return;
 
-  const patch = { note: newNote, pick: newPick };
+  const patch = { note: newNote, pick: newPick, market: newMkt };
   const parsedOdds = parseFloat(newOddsStr.replace(",","."));
   if (!isNaN(parsedOdds) && parsedOdds > 1) patch.odds = parsedOdds;
 
