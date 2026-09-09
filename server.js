@@ -1,4 +1,4 @@
-// server.js v2.30 | 2026-09-08
+// server.js v2.31 | 2026-09-09
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -576,8 +576,9 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       // Hiányos meccs név kiszűrése
       const hasVs = /\svs\.?\s|\s@\s/i.test(l.match);
       if (!hasVs) { console.log(`Kombi láb kiszűrve (hiányos meccs név): "${l.match}"`); return false; }
-      // Odds limit: kombi lábnak maximum 1.60 odds (felette → single, nem kombi)
+      // Odds limit: kombi lábnak maximum 1.60 és minimum 1.20 odds
       if (l.odds > 1.60) { console.log(`Kombi láb kiszűrve (odds > 1.60): "${l.match}" @ ${l.odds}`); return false; }
+      if (l.odds < 1.20) { console.log(`Kombi láb kiszűrve (odds < 1.20): "${l.match}" @ ${l.odds}`); return false; }
       return true;
     });
     // Ingyenes tipp feldolgozása
@@ -827,7 +828,17 @@ async function fetchAndProcess() {
     return true;
   });
 
-  const freshCombos = buildCombos(validatedComboLegs, matchList).filter(c => !existingKeys.has(comboKey(c)));
+  const MIN_COMBO_TOTAL = 2.00; // minimum össz kombi odds
+  const freshCombos = buildCombos(validatedComboLegs, matchList)
+    .filter(c => !existingKeys.has(comboKey(c)))
+    .filter(c => {
+      const totalOdds = (c.legs || []).reduce((p, l) => p * parseFloat(l.odds || 1), 1);
+      if (totalOdds < MIN_COMBO_TOTAL) {
+        console.log(`Kombi kiszűrve (össz odds ${totalOdds.toFixed(2)} < ${MIN_COMBO_TOTAL}): ${(c.legs||[]).map(l=>l.match).join(", ")}`);
+        return false;
+      }
+      return true;
+    });
   if (freshCombos.length) { history = [...freshCombos, ...history]; saveHistory(); }
   comboTips = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
 
