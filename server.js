@@ -1,4 +1,4 @@
-// server.js v2.33 | 2026-09-09
+// server.js v2.34 | 2026-09-09
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -1675,14 +1675,15 @@ app.post("/api/refresh", async (req, res) => {
 
 app.patch("/api/history/:id", (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const { result, note, comboPayout, odds, legs, pick } = req.body;
+  const { result, note, comboPayout, odds, legs, pick, market } = req.body;
 
-  // Note / odds / pick / legs szerkesztés
-  if (note !== undefined || odds !== undefined || legs !== undefined || pick !== undefined) {
+  // Note / odds / pick / market / legs szerkesztés
+  if (note !== undefined || odds !== undefined || legs !== undefined || pick !== undefined || market !== undefined) {
     const patch = {};
-    if (note !== undefined) patch.note = note;
-    if (odds !== undefined) patch.odds = parseFloat(odds);
-    if (pick !== undefined) patch.pick = pick;
+    if (note   !== undefined) patch.note   = note;
+    if (odds   !== undefined) patch.odds   = parseFloat(odds);
+    if (pick   !== undefined) patch.pick   = pick;
+    if (market !== undefined) patch.market = market;
     if (legs !== undefined) {
       patch.legs = legs;
       const totalOdds = legs.reduce((p, l) => p * parseFloat(l.odds || 1), 1);
