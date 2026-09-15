@@ -1,4 +1,4 @@
-// server.js v2.35 | 2026-09-15
+// server.js v2.36 | 2026-09-15
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -2296,22 +2296,22 @@ if (!ADMIN_PWD) {
 // ── football-data.org: standings cache ──────────────────────────────────────
 // Liga kódok: football-data.org competition code → Odds API sport key pattern
 const FD_COMP_MAP = {
-  "PL":  ["soccer_epl"],
-  "PD":  ["soccer_spain_la_liga"],
-  "BL1": ["soccer_germany_bundesliga"],
-  "SA":  ["soccer_italy_serie_a"],
-  "FL1": ["soccer_france_ligue_one"],
-  "PPL": ["soccer_portugal_primeira_liga"],
-  "TL":  ["soccer_turkey_super_league"],
-  "ELC": ["soccer_efl_champ"],
-  "EL1": ["soccer_england_league1"],
-  "DED": ["soccer_netherlands_eredivisie"],
-  "BSA": ["soccer_brazil_campeonato"],
-  "PL1": ["soccer_poland_ekstraklasa"],
+  "PL":  ["premier league"],
+  "PD":  ["la liga"],
+  "BL1": ["bundesliga"],
+  "SA":  ["serie a"],
+  "FL1": ["ligue 1"],
+  "PPL": ["primeira liga"],
+  "TL":  ["török szuperliga", "super lig"],
+  "ELC": ["championship"],
+  "EL1": ["league one"],
+  "DED": ["eredivisie"],
+  "BSA": ["brazil"],
+  "PL1": ["ekstraklasa"],
 };
 
-let _standingsCache = {};      // { compCode: { updatedAt, teams: { teamName: { position, form, scored, conceded } } } }
-const STANDINGS_TTL = 3600000; // 1 óra
+let _standingsCache = {};
+const STANDINGS_TTL = 3600000;
 
 async function fetchStandings(compCode) {
   const now = Date.now();
@@ -2333,7 +2333,7 @@ async function fetchStandings(compCode) {
         position: row.position,
         points:   row.points,
         played:   row.playedGames,
-        form:     row.form || "",           // "W,D,W,L,W" formátum
+        form:     row.form || "",
         scored:   row.goalsFor,
         conceded: row.goalsAgainst,
       };
@@ -2355,15 +2355,14 @@ function _teamNameMatch(fdName, oddsName) {
 }
 
 async function enrichMatchWithStandings(match) {
-  // Meghatározzuk melyik liga ez
-  const sport = match.sport || "";
+  const sport = (match.sport || "").toLowerCase();
   let compCode = null;
-  for (const [code, keys] of Object.entries(FD_COMP_MAP)) {
-    if (keys.some(k => sport.toLowerCase().includes(k.replace("soccer_", "").replace(/_/g, " ")))) {
+  for (const [code, labels] of Object.entries(FD_COMP_MAP)) {
+    if (labels.some(label => sport.includes(label))) {
       compCode = code; break;
     }
   }
-  if (!compCode) return match; // ismeretlen liga → nem gazdagítjuk
+  if (!compCode) return match;
 
   const teams = await fetchStandings(compCode);
   if (!teams) return match;
@@ -2373,11 +2372,7 @@ async function enrichMatchWithStandings(match) {
   const awayData = Object.entries(teams).find(([n]) => _teamNameMatch(n, awayName))?.[1];
 
   if (!homeData && !awayData) return match;
-  return {
-    ...match,
-    homeStandings: homeData || null,
-    awayStandings: awayData || null,
-  };
+  return { ...match, homeStandings: homeData || null, awayStandings: awayData || null };
 }
 
 if (FOOTBALLDATA_TOKEN) {
@@ -2469,7 +2464,7 @@ let lastMatchList = [];
   } catch(e) {}
 })();
 
-app.get("/api/match-list", (req, res) => {
+app.get("/api/match-list", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const tippedMatches = [...new Set(history
     .filter(t => t.result === "pending" && (t.type === "ai" || t.type === "combo" || t.type === "free"))
