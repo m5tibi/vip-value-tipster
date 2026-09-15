@@ -1,4 +1,4 @@
-// server.js v2.34 | 2026-09-09
+// server.js v2.35 | 2026-09-15
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -443,9 +443,18 @@ async function fetchAiTips(matchList, alreadyTipped = []) {
   if (!ANTHROPIC_KEY || !matchList.length) return { singles: [], comboLegs: [] };
   console.log(`AI elemzés: ${matchList.length} meccs`);
 
-  const matchText = matchList.map(m =>
-    `- ${m.sport} | ${m.match} | Kezdés: ${m.commence}\n  Valós odds: ${m.odds.map(o => `${o.market} / ${o.name}: ${o.odds} (${o.bookmaker})`).join(", ")}`
-  ).join("\n");
+  const matchText = matchList.map(m => {
+    const oddsStr = m.odds.map(o => `${o.market} / ${o.name}: ${o.odds} (${o.bookmaker})`).join(", ");
+    let standingsStr = "";
+    if (m.homeStandings || m.awayStandings) {
+      const fmt = (d, name) => d
+        ? `${name}: ${d.position}. hely | ${d.points}p | Forma: ${(d.form||"").replace(/,/g,"")} | Lőtt: ${d.scored} | Kapott: ${d.conceded}`
+        : `${name}: nincs adat`;
+      const [homeName, awayName] = (m.match || "").split(" vs ");
+      standingsStr = `\n  Tabella/Forma: ${fmt(m.homeStandings, homeName)} | ${fmt(m.awayStandings, awayName)}`;
+    }
+    return `- ${m.sport} | ${m.match} | Kezdés: ${m.commence}\n  Valós odds: ${oddsStr}${standingsStr}`;
+  }).join("\n");
 
   const skipNote = alreadyTipped.length
     ? `\nEZEKRE A MECCSEKRE MÁR VAN TIPP – NE szerepeljen sem SINGLE tippként, sem KOMBI LÁBKÉNT: ${alreadyTipped.join("; ")}\n`
@@ -777,7 +786,9 @@ async function fetchAndProcess() {
   }
   console.log(`Ligák átnézve (ingyenes): ${scannedLeagues} · odds-hívás (fizetős, ~3 kredit/liga): ${oddsCalls} · feldolgozható meccs: ${matchList.length}`);
 
-  const { singles, comboLegs, freeTip } = await fetchAiTips(matchList, [...tippedMatches]);
+  // Standings gazdagítás (football-data.org, ha elérhető)
+  const enrichedList = await Promise.all(matchList.map(m => enrichMatchWithStandings(m)));
+  const { singles, comboLegs, freeTip } = await fetchAiTips(enrichedList, [...tippedMatches]);
 
   // Backstop: a már ma tippelt meccsekre ne kerüljön újabb SINGLE (a prompt mellett is szűrünk)
   const newAiTips = singles.filter(t => !tippedMatches.has(t.match));
@@ -2282,7 +2293,95 @@ app.listen(PORT, () => {
 if (!ADMIN_PWD) {
   console.warn("⚠️  FIGYELEM: ADMIN_PASSWORD nincs beállítva – az admin végpontok (törlés, eredményjelölés, stat-küldés, frissítés) VÉDTELENEK! Állítsd be a Render Environment Variables között.");
 }
+// ── football-data.org: standings cache ──────────────────────────────────────
+// Liga kódok: football-data.org competition code → Odds API sport key pattern
+const FD_COMP_MAP = {
+  "PL":  ["soccer_epl"],
+  "PD":  ["soccer_spain_la_liga"],
+  "BL1": ["soccer_germany_bundesliga"],
+  "SA":  ["soccer_italy_serie_a"],
+  "FL1": ["soccer_france_ligue_one"],
+  "PPL": ["soccer_portugal_primeira_liga"],
+  "TL":  ["soccer_turkey_super_league"],
+  "ELC": ["soccer_efl_champ"],
+  "EL1": ["soccer_england_league1"],
+  "DED": ["soccer_netherlands_eredivisie"],
+  "BSA": ["soccer_brazil_campeonato"],
+  "PL1": ["soccer_poland_ekstraklasa"],
+};
+
+let _standingsCache = {};      // { compCode: { updatedAt, teams: { teamName: { position, form, scored, conceded } } } }
+const STANDINGS_TTL = 3600000; // 1 óra
+
+async function fetchStandings(compCode) {
+  const now = Date.now();
+  if (_standingsCache[compCode] && now - _standingsCache[compCode].updatedAt < STANDINGS_TTL) {
+    return _standingsCache[compCode].teams;
+  }
+  if (!FOOTBALLDATA_TOKEN) return null;
+  try {
+    const r = await fetch(`https://api.football-data.org/v4/competitions/${compCode}/standings`, {
+      headers: { "X-Auth-Token": FOOTBALLDATA_TOKEN }
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const table = (j.standings || []).find(s => s.type === "TOTAL")?.table || [];
+    const teams = {};
+    for (const row of table) {
+      const name = row.team?.name || "";
+      teams[name] = {
+        position: row.position,
+        points:   row.points,
+        played:   row.playedGames,
+        form:     row.form || "",           // "W,D,W,L,W" formátum
+        scored:   row.goalsFor,
+        conceded: row.goalsAgainst,
+      };
+    }
+    _standingsCache[compCode] = { updatedAt: now, teams };
+    console.log(`[standings] ${compCode}: ${table.length} csapat betöltve`);
+    return teams;
+  } catch (e) {
+    console.warn(`[standings] ${compCode} hiba:`, e.message);
+    return null;
+  }
+}
+
+function _teamNameMatch(fdName, oddsName) {
+  if (!fdName || !oddsName) return false;
+  const n = s => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const a = n(fdName), b = n(oddsName);
+  return a === b || a.includes(b) || b.includes(a);
+}
+
+async function enrichMatchWithStandings(match) {
+  // Meghatározzuk melyik liga ez
+  const sport = match.sport || "";
+  let compCode = null;
+  for (const [code, keys] of Object.entries(FD_COMP_MAP)) {
+    if (keys.some(k => sport.toLowerCase().includes(k.replace("soccer_", "").replace(/_/g, " ")))) {
+      compCode = code; break;
+    }
+  }
+  if (!compCode) return match; // ismeretlen liga → nem gazdagítjuk
+
+  const teams = await fetchStandings(compCode);
+  if (!teams) return match;
+
+  const [homeName, awayName] = (match.match || "").split(" vs ");
+  const homeData = Object.entries(teams).find(([n]) => _teamNameMatch(n, homeName))?.[1];
+  const awayData = Object.entries(teams).find(([n]) => _teamNameMatch(n, awayName))?.[1];
+
+  if (!homeData && !awayData) return match;
+  return {
+    ...match,
+    homeStandings: homeData || null,
+    awayStandings: awayData || null,
+  };
+}
+
 if (FOOTBALLDATA_TOKEN) {
+
   (async () => {
     try {
       const r = await fetch("https://api.football-data.org/v4/competitions", { headers: { "X-Auth-Token": FOOTBALLDATA_TOKEN } });
@@ -2395,6 +2494,8 @@ app.get("/api/match-list", (req, res) => {
     const hoursAgo = (now - d.getTime()) / 3600000;
     return hoursAgo < 2;  // max 2 óra múltban tartunk meg
   });
-  console.log(`[match-list] ${freshMatches.length} friss meccs visszaadva (${lastMatchList.length - freshMatches.length} kiszűrve)`);  
-  res.json({ matches: freshMatches, tippedMatches, tippedPicks, generatedAt: new Date().toISOString() });
+  console.log(`[match-list] ${freshMatches.length} friss meccs visszaadva (${lastMatchList.length - freshMatches.length} kiszűrve)`);
+  // Standings gazdagítás a mondomatutit AI generátor számára
+  const enrichedMatches = await Promise.all(freshMatches.map(m => enrichMatchWithStandings(m)));
+  res.json({ matches: enrichedMatches, tippedMatches, tippedPicks, generatedAt: new Date().toISOString() });
 });
