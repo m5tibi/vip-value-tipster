@@ -1,4 +1,4 @@
-// server.js v2.36 | 2026-09-15
+// server.js v2.37 | 2026-09-15
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -2351,7 +2351,7 @@ function _teamNameMatch(fdName, oddsName) {
   if (!fdName || !oddsName) return false;
   const n = s => s.toLowerCase().replace(/[^a-z0-9]/g, "");
   const a = n(fdName), b = n(oddsName);
-  return a === b || a.includes(b) || b.includes(a);
+  return a === b || (a.length >= 4 && a.includes(b)) || (b.length >= 4 && b.includes(a));
 }
 
 async function enrichMatchWithStandings(match) {
