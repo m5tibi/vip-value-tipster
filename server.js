@@ -1,4 +1,4 @@
-// server.js v2.37 | 2026-09-15
+// server.js v2.38 | 2026-09-15
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -2485,7 +2485,8 @@ app.get("/api/match-list", async (req, res) => {
     if (!match) return true;
     const [,mm,dd,hh,min] = match;
     // Budapest (UTC+2) → UTC korrekció
-    const d = new Date(`2026-${mm}-${dd}T${hh}:${min}:00+02:00`);
+    const year = new Date().getFullYear();
+    const d = new Date(`${year}-${mm}-${dd}T${hh}:${min}:00+02:00`);
     const hoursAgo = (now - d.getTime()) / 3600000;
     return hoursAgo < 2;  // max 2 óra múltban tartunk meg
   });
