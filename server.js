@@ -1,4 +1,4 @@
-// server.js v2.38 | 2026-09-15
+// server.js v2.39 | 2026-09-15
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -996,6 +996,8 @@ async function regulationScore(game, cache) {
 // won / lost / push / half_won / half_lost, vagy null ha nem értelmezhető.
 function settleMarket(market, pick, homeTeam, awayTeam, homeScore, awayScore) {
   const mk = (market || "").toLowerCase();
+  // Fogadáskészítő (bet builder): manuális kiértékelés szükséges
+  if (mk.includes("fogadáskészítő") || mk.includes("fogadaskeszito") || mk.includes("bet builder")) return null;
   // A pick csapatneve az AI-tól jön ("Molde"), a valós név az odds API-tól ("Molde FK") –
   // ezért laza (normalizált) névegyezést használunk, nem szigorú ===-t.
   const pickIsHome = () => nameSim(normTeam(pick), normTeam(homeTeam));
