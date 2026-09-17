@@ -1,4 +1,4 @@
-// server.js v2.39 | 2026-09-15
+// server.js v2.40 | 2026-09-15
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -1769,7 +1769,24 @@ app.post("/api/admin/login", (req, res) => {
 });
 
 // Tipp jóváhagyása (ettől lesz publikus)
-app.patch("/api/history/:id/approve", (req, res) => {
+// VIP tipp → Free tipp konverzió
+app.post("/api/history/:id/make-free", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const id = req.params.id;
+  const tip = history.find(t => t.id === id);
+  if (!tip) return res.status(404).json({ ok: false, error: "Tipp nem található" });
+  if (tip.type === "free") return res.status(400).json({ ok: false, error: "Már free tipp" });
+
+  // Típus váltás: ai → free
+  history  = history.map(t => t.id === id ? { ...t, type: "free", approved: true } : t);
+  aiTips   = aiTips.filter(t => t.id !== id);
+  freeTips = [...history.filter(t => t.id === id), ...freeTips];
+  saveHistory();
+  console.log(`[make-free] ${tip.match} átalakítva free tippé`);
+  res.json({ ok: true });
+});
+
+
   if (!requireAdmin(req, res)) return;
   const id = req.params.id;
   const set = t => t.id === id ? { ...t, approved: true } : t;
