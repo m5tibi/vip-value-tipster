@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- tippek.html v1.5 | 2026-09-09 -->
+<!-- tippek.html v1.6 | 2026-09-15 -->
 <html lang="hu">
 <head>
 <meta charset="UTF-8" />
@@ -569,8 +569,9 @@ function adminTipControls(t) {
     ? `<span style="color:#69f0ae;font-size:11px;font-weight:700">✅ Jóváhagyva (publikus)</span>`
     : `<span style="color:#ffb74d;font-size:11px;font-weight:700">${"⏳ Jóváhagyásra vár (rejtett)"}</span>`;
   const approveBtn = approved ? "" : `<button class="btn-won" style="font-size:11px;padding:4px 10px" onclick="approveTip('${t.id}')">✅ Jóváhagyás</button>`;
+  const makeFreeBtn = t.type !== "free" ? `<button style="background:#00c853;color:#000;border:none;font-size:11px;padding:4px 10px;border-radius:6px;font-weight:700;cursor:pointer" onclick="makeFree('${t.id}')">🆓 Free-nek</button>` : "";
   return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #2a3550">
-    ${badge}${approveBtn}
+    ${badge}${approveBtn}${makeFreeBtn}
     <button class="btn-del" style="font-size:11px;padding:4px 10px" onclick="deleteTip('${t.id}')">🗑️ Törlés</button>
     <button class="btn-push" style="font-size:11px;padding:4px 10px" onclick="editNote('${t.id}',this)">✏️ Szerkesztés</button>
   </div>`;
@@ -1261,6 +1262,15 @@ async function deleteTip(id) {
   await loadTips();
   await loadHistory();
   showStatus("🗑️ Tipp törölve");
+}
+
+async function makeFree(id) {
+  if (!confirm("Free tippként publikálod ezt a tippet?")) return;
+  const r = await fetch(`/api/history/${encodeURIComponent(id)}/make-free`, {
+    method: "POST", headers: adminHeaders()
+  });
+  if (r.ok) { showStatus("🆓 Free tippként publikálva!"); await loadHistory(); await loadTips(); }
+  else showStatus("❌ Hiba: " + await r.text(), true);
 }
 
 async function approveTip(id) {
