@@ -1,4 +1,4 @@
-// server.js v2.40 | 2026-09-15
+// server.js v2.41 | 2026-09-17
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -1787,9 +1787,8 @@ app.post("/api/history/:id/make-free", (req, res) => {
 });
 
 
+app.patch("/api/history/:id/approve", (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const id = req.params.id;
-  const set = t => t.id === id ? { ...t, approved: true } : t;
   history   = history.map(set);
   aiTips    = aiTips.map(set);
   comboTips = comboTips.map(set);
