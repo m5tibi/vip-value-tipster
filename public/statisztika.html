@@ -235,8 +235,8 @@ let currentPeriod = 'all'; // 'all' | 'YYYY-MM'
 
 function RESULT_LABELS() {
   return {
-    won: window.t('stat.r_won'), lost: window.t('stat.r_lost'), push: window.t('stat.r_push'),
-    half_won: window.t('stat.r_half_won'), half_lost: window.t('stat.r_half_lost'), pending: window.t('stat.r_pending')
+    won: window.t?.('stat.r_won'), lost: window.t?.('stat.r_lost'), push: window.t?.('stat.r_push'),
+    half_won: window.t?.('stat.r_half_won'), half_lost: window.t?.('stat.r_half_lost'), pending: window.t?.('stat.r_pending')
   };
 }
 const RESULT_CLASS = {
@@ -364,9 +364,12 @@ function renderTable(tips) {
 
   // DEBUG renderTable
   const dbEl = document.getElementById('debug-panel');
-  if (dbEl) dbEl.textContent += ` | renderTable: ${filtered.length} (AI:${filtered.filter(t=>t.type==='ai').length} Kombi:${filtered.filter(t=>t.type==='combo').length}) period:${currentPeriod} filter:${currentFilter}`;
+  if (dbEl) {
+    const first3 = filtered.slice(0,3).map(t=>`${t.type}/${t.result}/${(t.match||'kombi').slice(0,15)}`).join(' | ');
+    dbEl.textContent += ` | renderTable: ${filtered.length} (AI:${filtered.filter(t=>t.type==='ai').length} Kombi:${filtered.filter(t=>t.type==='combo').length}) period:${currentPeriod} filter:${currentFilter} | Top3: ${first3}`;
+  }
 
-  if (!filtered.length) { el.innerHTML = `<div class="empty">${window.t('stat.no_filter')}</div>`; return; }
+  if (!filtered.length) { el.innerHTML = `<div class="empty">${window.t?.('stat.no_filter')}</div>`; return; }
 
   const rows = filtered.map(t => {
     const pl = tipProfit(t);
@@ -390,8 +393,11 @@ function renderTable(tips) {
     <tbody>${rows}</tbody>
   </table>
   <p style="font-size:11px;color:var(--muted);margin-top:12px;text-align:right">
-    ${settled.length} ${window.t("stat.settled_count")}
+    ${settled.length} ${window.t?.("stat.settled_count") || "lezárt tipp"}
   </p>`;
+  // DEBUG tr count
+  const dbEl2 = document.getElementById('debug-panel');
+  if (dbEl2) dbEl2.textContent += ` | DOM tr: ${el.querySelectorAll('tbody tr').length}`;
 }
 
 function setFilter(f, btn) {
@@ -409,14 +415,14 @@ function setPeriod(period, btn) {
   const chartTitleEl = document.querySelector('.chart-title');
   const titleNode = chartTitleEl.childNodes[0];
   if (period === 'all') {
-    titleNode.textContent = window.t('stat.chart_title');
+    titleNode.textContent = window.t?.('stat.chart_title');
     // All-time: szerver oldali stats (single forrás)
     fetch('/api/public-stats').then(r=>r.json()).then(d => {
       updateScoreboard({ settled: d.settled, winRate: d.winRate, profit: d.profit, roi: d.roi });
     }).catch(() => updateScoreboard(calcStats(getPeriodTips())));
   } else {
     const [year, month] = period.split('-');
-    titleNode.textContent = `${year} ${monthName(parseInt(month, 10) - 1)} – ${window.t('stat.chart_title')}`;
+    titleNode.textContent = `${year} ${monthName(parseInt(month, 10) - 1)} – ${window.t?.('stat.chart_title')}`;
     updateScoreboard(calcStats(getPeriodTips()));
   }
 
@@ -459,7 +465,7 @@ function drawChart(tips) {
     ctx.fillStyle = '#5d7a96';
     ctx.font = '13px Inter,sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(window.t('stat.no_data'), W/2, H/2);
+    ctx.fillText(window.t?.('stat.no_data'), W/2, H/2);
     document.getElementById('chart-current').textContent = '–';
     document.getElementById('chart-current').style.color = '#5d7a96';
     return;
@@ -521,7 +527,7 @@ function drawChart(tips) {
   ctx.fill();
 
   document.getElementById('chart-current').textContent =
-    (cum >= 0 ? '+' : '') + cum.toFixed(2) + ' ' + window.t('stat.unit');
+    (cum >= 0 ? '+' : '') + cum.toFixed(2) + ' ' + window.t?.('stat.unit');
   document.getElementById('chart-current').style.color = isPositive ? '#00e676' : '#ef4444';
 }
 
@@ -580,7 +586,7 @@ async function loadData() {
     renderTable(allTips);
   } catch(e) {
     document.getElementById('tips-table').innerHTML =
-      `<div class="empty">${window.t('stat.load_err')}</div>`;
+      `<div class="empty">${window.t?.('stat.load_err')}</div>`;
   }
 }
 
