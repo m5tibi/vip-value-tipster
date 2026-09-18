@@ -1,4 +1,4 @@
-// server.js v2.44 | 2026-09-17
+// server.js v2.45 | 2026-09-18
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -1698,7 +1698,8 @@ app.patch("/api/history/:id", (req, res) => {
     if (pick   !== undefined) patch.pick   = pick;
     if (market !== undefined) patch.market = market;
     if (legs !== undefined) {
-      patch.legs = legs;
+      patch.legs  = legs;
+      patch.legN  = legs.length;
       const totalOdds = legs.reduce((p, l) => p * parseFloat(l.odds || 1), 1);
       patch.totalOdds = parseFloat(totalOdds.toFixed(2));
     }
