@@ -268,7 +268,18 @@ function tipProfit(t) {
 
 function formatDate(d) {
   if (!d) return '–';
-  const dt = new Date(d);
+  let dt = new Date(d);
+  if (isNaN(dt)) {
+    // HU locale: "2026. 09. 16. 23:39:19"
+    const hu = String(d).match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/);
+    if (hu) dt = new Date(+hu[1], +hu[2]-1, +hu[3]);
+  }
+  if (isNaN(dt)) {
+    // "09. 17. 21:00" formátum
+    const md = String(d).match(/^(\d{2})\.\s*(\d{2})/);
+    if (md) dt = new Date(new Date().getFullYear(), +md[1]-1, +md[2]);
+  }
+  if (isNaN(dt)) return String(d).slice(0, 10);
   return dt.toLocaleDateString(window.getLang()==='en'?'en-GB':'hu-HU', { month:'short', day:'numeric' });
 }
 
@@ -518,9 +529,26 @@ async function loadData() {
     const hist    = await histRes.json();
     const pubStats = await pubRes.json().catch(() => null);
 
+    // Dátum parse segédfüggvény (HU locale + ISO + MM.DD HH:MM formátumok)
+    function parseAnyDate(s) {
+      if (!s) return 0;
+      const d = new Date(s);
+      if (!isNaN(d)) return d.getTime();
+      const hu = String(s).match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})[\.\s]+(\d{1,2}):(\d{2})/);
+      if (hu) return new Date(+hu[1], +hu[2]-1, +hu[3], +hu[4], +hu[5]).getTime();
+      const md = String(s).match(/^(\d{2})\.\s*(\d{2})[\.\s]+(\d{2}):(\d{2})/);
+      if (md) return new Date(new Date().getFullYear(), +md[1]-1, +md[2], +md[3], +md[4]).getTime();
+      return 0;
+    }
+
     allTips = (Array.isArray(hist) ? hist : [])
       .filter(t => t.type !== 'value' && (t.approved !== false || (t.result && t.result !== 'pending')))
-      .sort((a,b) => (b.addedAt||b.commence||'').localeCompare(a.addedAt||a.commence||''));
+      .sort((a,b) => {
+        // Meccs dátuma szerint rendezünk (commence), fallback: addedAt
+        const da = parseAnyDate(a.commence) || parseAnyDate(a.addedAt);
+        const db = parseAnyDate(b.commence) || parseAnyDate(b.addedAt);
+        return db - da; // legújabb meccs előre
+      });
 
     buildPeriodPicker(allTips);
 
