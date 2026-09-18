@@ -512,7 +512,7 @@ function drawChart(tips) {
 async function loadData() {
   try {
     const [histRes, pubRes] = await Promise.all([
-      fetch('/api/history'),
+      fetch('/api/history', { headers: { 'X-Admin-Password': localStorage.getItem('vbt_admin') || '' } }),
       fetch('/api/public-stats')
     ]);
     const hist    = await histRes.json();
@@ -520,9 +520,7 @@ async function loadData() {
 
     allTips = (Array.isArray(hist) ? hist : [])
       .filter(t => t.type !== 'value' && (t.approved !== false || (t.result && t.result !== 'pending')))
-      .sort((a,b) => (b.commence||b.addedAt||'').localeCompare(a.commence||a.addedAt||''));
-
-    buildPeriodPicker(allTips);
+      .sort((a,b) => (b.addedAt||b.commence||'').localeCompare(a.addedAt||a.commence||''));
 
     buildPeriodPicker(allTips);
 
