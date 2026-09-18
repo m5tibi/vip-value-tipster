@@ -1,4 +1,4 @@
-// server.js v2.45 | 2026-09-18
+// server.js v2.46 | 2026-09-18
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -1564,7 +1564,10 @@ app.get("/api/history", (req, res) => {
   const approved = history.filter(isApproved);
   const freshUserHist = req.user ? (usersDb.findById(req.user.id) || req.user) : req.user;
   if (auth.hasAccess(freshUserHist)) return res.json(approved);
-  const settledOnly = approved.filter(t => t.result && t.result !== "pending");
+  // Track record: minden lezárt tipp látható, bejelentkezés nélkül is
+  const settledOnly = history.filter(t =>
+    t.result && t.result !== "pending" && t.type !== "value"
+  );
   res.json(settledOnly);
 });
 
