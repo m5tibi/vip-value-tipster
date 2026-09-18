@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- tippek.html v1.8 | 2026-09-17 -->
+<!-- tippek.html v1.9 | 2026-09-18 -->
 <html lang="hu">
 <head>
 <meta charset="UTF-8" />
@@ -834,6 +834,10 @@ function renderHistory() {
   }
 
   // Egy korábbi hónap: napokra bontva, összecsukva (alapból zárva).
+  // Aktuális hónap és év kiszámítása az automatikus kinyitáshoz
+  const todayMK      = monthKeyOf(todayKey());
+  const currentYear  = yearOf(todayMK);
+
   function makeMonthSection(monthKey, tips) {
     const id = "ms-"+(dayCounter++);
     const byDay = {};
@@ -848,22 +852,24 @@ function renderHistory() {
     const meta  = isAdmin() ? (tips.length+" tipp · ✅"+mWon+" ❌"+mLost+pChip) : (tips.length+" tipp");
     const inner = Object.keys(byDay).sort((a,b)=>b.localeCompare(a))
       .map(day=>makeDaySection(day, byDay[day], false)).join("");
+    // Aktuális hónap automatikusan kinyílik
+    const isCurrentMo = monthKey === todayMK;
     return `
     <div class="month-section">
       <div class="month-toggle" onclick="toggleDay('${id}')">
         <span class="month-label">🗓️ ${monthLabel(monthKey)}</span>
         <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">
           <span class="day-meta">${meta}</span>
-          <span class="day-arrow" id="arr-${id}">▼</span>
+          <span class="day-arrow${isCurrentMo?" open":""}" id="arr-${id}">${isCurrentMo?"▲":"▼"}</span>
         </span>
       </div>
-      <div class="month-content" id="${id}" style="display:none">
+      <div class="month-content" id="${id}" style="display:${isCurrentMo?"block":"none"}">
         ${inner}
       </div>
     </div>`;
   }
 
-  // Egy év: hónapokra bontva, összecsukva (alapból zárva).
+  // Egy év: hónapokra bontva, aktuális év automatikusan kinyílik.
   function makeYearSection(yearStr, monthKeys, doneByDay) {
     const id = "ys-"+(dayCounter++);
     const yearTips = [];
@@ -884,15 +890,17 @@ function renderHistory() {
         .forEach(d => mTips.push(...doneByDay[d]));
       return makeMonthSection(mk, mTips);
     }).join("");
+    // Aktuális év automatikusan kinyílik
+    const isCurrentYr = yearStr === currentYear;
     return `<div style="margin-bottom:6px">
       <div onclick="toggleDay('${id}')" style="background:#0a1520;border:1px solid #1a2f4a;border-radius:8px;padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
         <span style="font-weight:700;color:#dce8f5;font-size:14px">📆 ${yearStr}</span>
         <span style="display:flex;align-items:center;gap:8px">
           <span style="font-size:12px;color:#5d7a96">${yearTips.length} tipp${isAdmin() ? " · ✅"+yWon+" ❌"+yLost+pChip : ""}</span>
-          <span class="day-arrow" id="arr-${id}">▼</span>
+          <span class="day-arrow${isCurrentYr?" open":""}" id="arr-${id}">${isCurrentYr?"▲":"▼"}</span>
         </span>
       </div>
-      <div id="${id}" style="display:none;padding-left:8px;margin-top:4px">${inner}</div>
+      <div id="${id}" style="display:${isCurrentYr?"block":"none"};padding-left:8px;margin-top:4px">${inner}</div>
     </div>`;
   }
 
