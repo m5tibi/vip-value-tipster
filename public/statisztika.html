@@ -361,6 +361,11 @@ function renderTable(tips) {
   const el = document.getElementById('tips-table');
   const filtered = currentFilter === 'all' ? tips : tips.filter(t => t.result === currentFilter);
   const settled  = filtered.filter(t => t.result && t.result !== 'pending');
+
+  // DEBUG renderTable
+  const dbEl = document.getElementById('debug-panel');
+  if (dbEl) dbEl.textContent += ` | renderTable: ${filtered.length} (AI:${filtered.filter(t=>t.type==='ai').length} Kombi:${filtered.filter(t=>t.type==='combo').length}) period:${currentPeriod} filter:${currentFilter}`;
+
   if (!filtered.length) { el.innerHTML = `<div class="empty">${window.t('stat.no_filter')}</div>`; return; }
 
   const rows = filtered.map(t => {
