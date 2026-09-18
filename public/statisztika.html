@@ -549,6 +549,21 @@ async function loadData() {
         return db - da;
       });
 
+    // DEBUG: ideiglenesen megmutatjuk a szervertől kapott adatokat
+    const rawArr = Array.isArray(hist) ? hist : [];
+    const debugEl = document.getElementById('tips-table');
+    const aiCount   = rawArr.filter(t => t.type === 'ai').length;
+    const comboCount = rawArr.filter(t => t.type === 'combo').length;
+    const freeCount  = rawArr.filter(t => t.type === 'free').length;
+    const settledAi  = rawArr.filter(t => t.type === 'ai' && t.result && t.result !== 'pending').length;
+    const settledCombo = rawArr.filter(t => t.type === 'combo' && t.result && t.result !== 'pending').length;
+    debugEl.innerHTML = `<div style="color:#90caf9;font-size:12px;padding:12px;background:#0d1b2a;border-radius:8px">
+      🔍 Szerver válasz: ${rawArr.length} tip összesen<br>
+      AI singles: ${aiCount} (lezárt: ${settledAi}) | Kombik: ${comboCount} (lezárt: ${settledCombo}) | Free: ${freeCount}<br>
+      allTips (szűrt): ${allTips.length}<br>
+      Admin header küldve: ${!!localStorage.getItem('vbt_admin')}
+    </div>`;
+
     buildPeriodPicker(allTips);
 
     // All-time scoreboard: szerver oldali számítás (single forrás)
