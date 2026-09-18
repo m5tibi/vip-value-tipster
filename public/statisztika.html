@@ -294,7 +294,7 @@ function getYearMonth(dateStr) {
 
 function getPeriodTips() {
   if (currentPeriod === 'all') return allTips;
-  return allTips.filter(t => getYearMonth(t.commence || t.addedAt) === currentPeriod);
+  return allTips.filter(t => getYearMonth(t.addedAt || t.commence) === currentPeriod);
 }
 
 function calcStats(tips) {
@@ -410,7 +410,7 @@ function setPeriod(period, btn) {
 }
 
 function buildPeriodPicker(tips) {
-  const months = [...new Set(tips.map(t => getYearMonth(t.commence || t.addedAt)).filter(Boolean))].sort().reverse();
+  const months = [...new Set(tips.map(t => getYearMonth(t.addedAt || t.commence)).filter(Boolean))].sort().reverse();
 
   const bar = document.getElementById('period-bar');
   months.forEach(m => {
