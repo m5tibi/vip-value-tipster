@@ -549,17 +549,14 @@ async function loadData() {
         return db - da;
       });
 
-    // DEBUG panel – külön elem, nem íródik felül
+    // DEBUG
     const rawArr = Array.isArray(hist) ? hist : [];
-    const aiS  = rawArr.filter(t=>t.type==='ai').length;
-    const aiSs = rawArr.filter(t=>t.type==='ai'&&t.result&&t.result!=='pending').length;
-    const cbS  = rawArr.filter(t=>t.type==='combo').length;
-    const cbSs = rawArr.filter(t=>t.type==='combo'&&t.result&&t.result!=='pending').length;
-    const frS  = rawArr.filter(t=>t.type==='free').length;
-    let dbEl = document.getElementById('debug-panel');
-    if (!dbEl) { dbEl = document.createElement('div'); dbEl.id='debug-panel'; document.querySelector('.container')?.prepend(dbEl); }
-    dbEl.style.cssText='color:#90caf9;font-size:12px;padding:10px;background:#0d1b2a;border-radius:8px;margin-bottom:12px';
-    dbEl.innerHTML=`🔍 Szerver: ${rawArr.length} tip | AI: ${aiS} (lezárt:${aiSs}) | Kombi: ${cbS} (lezárt:${cbSs}) | Free: ${frS} | allTips: ${allTips.length} | Admin: ${!!localStorage.getItem('vbt_admin')}`;
+    document.getElementById('debug-panel')?.remove();
+    const dbDiv = document.createElement('div');
+    dbDiv.id = 'debug-panel';
+    dbDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#0d2233;color:#90caf9;font-size:11px;padding:6px 12px;text-align:center';
+    dbDiv.textContent = `🔍 Szerver: ${rawArr.length} | AI: ${rawArr.filter(t=>t.type==='ai').length} (lezárt:${rawArr.filter(t=>t.type==='ai'&&t.result&&t.result!=='pending').length}) | Kombi: ${rawArr.filter(t=>t.type==='combo').length} | allTips: ${allTips.length} | Admin: ${!!localStorage.getItem('vbt_admin')}`;
+    document.body.prepend(dbDiv);
 
     buildPeriodPicker(allTips);
 
