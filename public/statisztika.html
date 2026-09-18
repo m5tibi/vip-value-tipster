@@ -560,15 +560,18 @@ async function loadData() {
         return db - da;
       });
 
-    // DEBUG
+   // DEBUG
     const rawArr = Array.isArray(hist) ? hist : [];
     document.getElementById('debug-panel')?.remove();
-    const dbDiv = document.createElement('div');
-    dbDiv.id = 'debug-panel';
-    dbDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#0d2233;color:#90caf9;font-size:11px;padding:6px 12px;text-align:center';
-    dbDiv.textContent = `🔍 Szerver: ${rawArr.length} | AI: ${rawArr.filter(t=>t.type==='ai').length} (lezárt:${rawArr.filter(t=>t.type==='ai'&&t.result&&t.result!=='pending').length}) | Kombi: ${rawArr.filter(t=>t.type==='combo').length} | allTips: ${allTips.length} | Admin: ${!!localStorage.getItem('vbt_admin')}`;
-    document.body.prepend(dbDiv);
-
+    
+    // Csak akkor hozza létre a panelt, ha a felhasználó admin
+    if (localStorage.getItem('vbt_admin')) {
+      const dbDiv = document.createElement('div');
+      dbDiv.id = 'debug-panel';
+      dbDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#0d2233;color:#90caf9;font-size:11px;padding:6px 12px;text-align:center';
+      dbDiv.textContent = `🔍 Szerver: ${rawArr.length} | AI: ${rawArr.filter(t=>t.type==='ai').length} (lezárt:${rawArr.filter(t=>t.type==='ai'&&t.result&&t.result!=='pending').length}) | Kombi: ${rawArr.filter(t=>t.type==='combo').length} | allTips: ${allTips.length} | Admin: true`;
+      document.body.prepend(dbDiv);
+    }
     buildPeriodPicker(allTips);
 
     // All-time scoreboard: szerver oldali számítás (single forrás)
