@@ -1,4 +1,4 @@
-// server.js v2.43 | 2026-09-17
+// server.js v2.44 | 2026-09-17
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -1806,9 +1806,9 @@ app.patch("/api/free-tips/:id/result", (req, res) => {
   const { result } = req.body;
   const VALID = ["won","lost","push","half_won","half_lost","pending"];
   if (!VALID.includes(result)) return res.status(400).json({ ok: false, error: "Érvénytelen eredmény" });
-  const patch = { result, settledAt: result !== "pending" ? nowHu() : undefined };
+  const patch = { result, approved: true, settledAt: result !== "pending" ? nowHu() : undefined };
   history   = history.map(t => t.id === id ? { ...t, ...patch } : t);
-  freeTips  = freeTips.map(t => t.id === id ? { ...t, ...patch } : t);
+  freeTips  = history.filter(t => t.type === "free" && (!t.result || t.result === "pending"));
   saveHistory();
   res.json({ ok: true });
 });
