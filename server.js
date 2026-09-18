@@ -1,4 +1,4 @@
-// server.js v2.42 | 2026-09-17
+// server.js v2.43 | 2026-09-17
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -1799,7 +1799,21 @@ app.patch("/api/history/:id/approve", (req, res) => {
   res.json({ ok: true });
 });
 
-// Jóváhagyott, még el nem küldött tippek kézi kiküldése Telegramra + e-mailben
+// Free tipp kézi eredmény beállítás
+app.patch("/api/free-tips/:id/result", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const id = req.params.id;
+  const { result } = req.body;
+  const VALID = ["won","lost","push","half_won","half_lost","pending"];
+  if (!VALID.includes(result)) return res.status(400).json({ ok: false, error: "Érvénytelen eredmény" });
+  const patch = { result, settledAt: result !== "pending" ? nowHu() : undefined };
+  history   = history.map(t => t.id === id ? { ...t, ...patch } : t);
+  freeTips  = freeTips.map(t => t.id === id ? { ...t, ...patch } : t);
+  saveHistory();
+  res.json({ ok: true });
+});
+
+// Free tipp jóváhagyás
 app.post("/api/tips/send", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const singlesToSend = history.filter(t => t.type === "ai"    && isApproved(t) && !t.sent && (!t.result || t.result === "pending"));
