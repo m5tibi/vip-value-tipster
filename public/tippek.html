@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- tippek.html v1.6 | 2026-09-15 -->
+<!-- tippek.html v1.7 | 2026-09-17 -->
 <html lang="hu">
 <head>
 <meta charset="UTF-8" />
@@ -725,7 +725,7 @@ function subStats(tips) {
 
 function renderHistory() {
   // ── Kombi szekció: csak jóváhagyott kombik az előzményekben ──────────
-  const isApprovedH = t => t.approved !== false;
+  const isApprovedH = t => t.approved !== false || (t.result && t.result !== "pending");
   const isFoci = t => t.type === "free" || /soccer|foci|⚽/i.test((t.sport||"")+" "+(t.sportLabel||""));
   const combos = history.filter(t => t.type === "combo" && isApprovedH(t));
   const cStats = document.getElementById("combo-stats");
