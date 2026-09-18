@@ -281,7 +281,10 @@ function getYearMonth(dateStr) {
   // HU locale: "2026. 7. 30. 11:27:25" vagy "2026. 07. 30."
   const hu = s.match(/^(\d{4})\.\s*(\d{1,2})\./);
   if (hu) return `${hu[1]}-${String(hu[2]).padStart(2,'0')}`;
-  // Fallback: new Date() (Chrome/Firefox-on működik)
+  // Commence csak hónap.nap: "09. 17. 21:00" → hozzáadja az évet
+  const cm = s.match(/^(\d{2})\.\s*(\d{2})/);
+  if (cm) return `${new Date().getFullYear()}-${String(+cm[1]).padStart(2,'0')}`;
+  // Fallback: new Date()
   try {
     const d = new Date(s);
     if (!isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
@@ -291,7 +294,7 @@ function getYearMonth(dateStr) {
 
 function getPeriodTips() {
   if (currentPeriod === 'all') return allTips;
-  return allTips.filter(t => getYearMonth(t.addedAt || t.commence) === currentPeriod);
+  return allTips.filter(t => getYearMonth(t.commence || t.addedAt) === currentPeriod);
 }
 
 function calcStats(tips) {
@@ -355,7 +358,7 @@ function renderTable(tips) {
     const plText  = t.result === 'pending' ? '–' : (pl >= 0 ? '+' : '') + pl.toFixed(2);
     const rc = RESULT_CLASS[t.result] || 'pending';
     return `<tr>
-      <td class="td-date">${formatDate(t.addedAt || t.commence)}</td>
+      <td class="td-date">${formatDate(t.commence || t.addedAt)}</td>
       <td class="td-match">${t.type==='combo'?`<span style="color:var(--gold);font-size:11px;font-weight:700">🎰 Kombi (${(t.legs||[]).length} láb)</span>`:t.type==='free'?`<span style="background:rgba(0,230,118,.15);color:#00e676;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;margin-right:6px">🆓</span>${t.match||'–'}`:t.match||'–'}</td>
       <td class="td-pick">${t.type==='combo'?`<span style="color:var(--muted);font-size:11px">${(t.legs||[]).map(l=>l.pick).join(' + ')}</span>`:`<span style="color:var(--muted);font-size:11px">${t.market||''}</span><br/>${t.pick||''}`}</td>
       <td class="td-odds">${parseFloat(t.odds).toFixed(2)}</td>
@@ -407,7 +410,7 @@ function setPeriod(period, btn) {
 }
 
 function buildPeriodPicker(tips) {
-  const months = [...new Set(tips.map(t => getYearMonth(t.addedAt || t.commence)).filter(Boolean))].sort().reverse();
+  const months = [...new Set(tips.map(t => getYearMonth(t.commence || t.addedAt)).filter(Boolean))].sort().reverse();
 
   const bar = document.getElementById('period-bar');
   months.forEach(m => {
@@ -517,7 +520,9 @@ async function loadData() {
 
     allTips = (Array.isArray(hist) ? hist : [])
       .filter(t => t.type !== 'value' && (t.approved !== false || (t.result && t.result !== 'pending')))
-      .sort((a,b) => (b.addedAt||b.commence||'').localeCompare(a.addedAt||a.commence||''));
+      .sort((a,b) => (b.commence||b.addedAt||'').localeCompare(a.commence||a.addedAt||''));
+
+    buildPeriodPicker(allTips);
 
     buildPeriodPicker(allTips);
 
