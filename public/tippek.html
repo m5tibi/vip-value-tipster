@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- tippek.html v1.9 | 2026-09-18 -->
+<!-- tippek.html v1.10 | 2026-09-18 -->
 <html lang="hu">
 <head>
 <meta charset="UTF-8" />
@@ -834,14 +834,37 @@ function renderHistory() {
   }
 
   // Egy korábbi hónap: napokra bontva, összecsukva (alapból zárva).
-  // Aktuális hónap és év kiszámítása az automatikus kinyitáshoz
+  // Meccs dátuma: commence alapján csoportosítunk (nem addedAt), mert az a tényleges nap
+  function getMatchDay(t) {
+    // commence formátum: "09. 17. 21:00" → "2026. 09. 17."
+    const c = t.commence || "";
+    const cm = String(c).match(/^(\d{2})\.\s*(\d{2})/);
+    if (cm) {
+      const year = new Date().getFullYear();
+      return `${year}. ${cm[1]}. ${cm[2]}.`;
+    }
+    // Fallback: addedAt
+    return getDay(t.addedAt);
+  }
   const todayMK      = monthKeyOf(todayKey());
   const currentYear  = yearOf(todayMK);
+
+  // Meccs dátuma: commence alapján (nem addedAt), ez a helyes csoportosítás
+  function getCommenceDay(t) {
+    const c = String(t.commence || "");
+    const cm = c.match(/^(\d{2})\.\s*(\d{2})/);
+    if (cm) {
+      const yr = new Date().getFullYear();
+      const mo = cm[1].padStart(2,"0"), dy = cm[2].padStart(2,"0");
+      return getDay(`${yr}. ${mo}. ${dy}.`);
+    }
+    return getDay(t.addedAt);
+  }
 
   function makeMonthSection(monthKey, tips) {
     const id = "ms-"+(dayCounter++);
     const byDay = {};
-    tips.forEach(t=>{ const d=getDay(t.addedAt); if(!byDay[d]) byDay[d]=[]; byDay[d].push(t); });
+    tips.forEach(t=>{ const d=getCommenceDay(t); if(!byDay[d]) byDay[d]=[]; byDay[d].push(t); });
     const mWon  = tips.filter(t=>t.result==="won").length;
     const mLost = tips.filter(t=>t.result==="lost").length;
     const st    = subStats(tips);
@@ -910,8 +933,20 @@ function renderHistory() {
     const done    = tipsArr.filter(t=>t.result&&t.result!=="pending");
     const pendingByDay = {};
     pending.forEach(t=>{ const d=getDay(t.addedAt); if(!pendingByDay[d]) pendingByDay[d]=[]; pendingByDay[d].push(t); });
+    // Lezárt tippeket meccs dátuma (commence) szerint csoportosítjuk, nem generálás dátuma szerint
+    function getGroupDay(t) {
+      const c = t.commence || "";
+      // "09. 17. 21:00" vagy "09.17 21:00" formátum → év hozzáadásával
+      const cm = c.match(/^(\d{2})\.\s*(\d{2})/);
+      if (cm) {
+        const yr = new Date().getFullYear();
+        const d = new Date(yr, +cm[1]-1, +cm[2]);
+        if (!isNaN(d)) return getDay(`${yr}. ${String(+cm[1]).padStart(2,"0")}. ${String(+cm[2]).padStart(2,"0")}.`);
+      }
+      return getDay(t.addedAt);
+    }
     const doneByDay = {};
-    done.forEach(t=>{ const d=getDay(t.addedAt); if(!doneByDay[d]) doneByDay[d]=[]; doneByDay[d].push(t); });
+    done.forEach(t=>{ const d=getGroupDay(t); if(!doneByDay[d]) doneByDay[d]=[]; doneByDay[d].push(t); });
 
     let html = "";
     if (pending.length) {
