@@ -542,12 +542,11 @@ async function loadData() {
     }
 
     allTips = (Array.isArray(hist) ? hist : [])
-      .filter(t => t.type !== 'value' && (t.approved !== false || (t.result && t.result !== 'pending')))
+      .filter(t => t.type !== 'value' && t.result && t.result !== 'pending')
       .sort((a,b) => {
-        // Meccs dátuma szerint rendezünk (commence), fallback: addedAt
         const da = parseAnyDate(a.commence) || parseAnyDate(a.addedAt);
         const db = parseAnyDate(b.commence) || parseAnyDate(b.addedAt);
-        return db - da; // legújabb meccs előre
+        return db - da;
       });
 
     buildPeriodPicker(allTips);
