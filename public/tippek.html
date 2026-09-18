@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- tippek.html v1.7 | 2026-09-17 -->
+<!-- tippek.html v1.8 | 2026-09-17 -->
 <html lang="hu">
 <head>
 <meta charset="UTF-8" />
@@ -732,11 +732,12 @@ function renderHistory() {
   cStats.style.display = combos.length ? "" : "none";
 
   // Singles és free tippek (kombik NE kerüljenek bele – azok külön jelennek meg)
+  // Lezárt tippek mindig láthatóak, függetlenül a sport mezőtől
   const H = history.filter(t =>
     isApprovedH(t) &&
     t.type !== "value" &&
     t.type !== "combo" &&
-    isFoci(t)
+    (isFoci(t) || (t.result && t.result !== "pending"))
   );
 
   const won      = H.filter(t=>t.result==="won").length;
