@@ -322,7 +322,7 @@ function calcStats(tips) {
 }
 
 let CURRENT_ME = { user: null, isAdmin: false };
-function isAdminUser() { return !!CURRENT_ME.isAdmin || !!(CURRENT_ME.user && CURRENT_ME.user.isAdmin) || localStorage.getItem("vbt_admin") === "1"; }
+function isAdminUser() { return !!CURRENT_ME.isAdmin || !!(CURRENT_ME.user && CURRENT_ME.user.isAdmin); }
 
 function updateScoreboard(stats) {
   const adminPass = isAdminUser();
