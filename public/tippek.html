@@ -454,6 +454,9 @@ function applyAdminUI() {
   }
   const tools = document.getElementById('admin-tools');
   if (tools) tools.style.display = admin ? 'flex' : 'none';
+  // Live stats bar: adminnak megmutatjuk, másoknak elrejtjük
+  const lsBarEl = document.getElementById('live-stats-bar');
+  if (lsBarEl) lsBarEl.style.display = admin ? 'flex' : 'none';
   // Megerősítő sáv: csak belépett, még meg nem erősített e-mailnél
   const vb = document.getElementById('verify-banner');
   if (vb) vb.style.display = (ME.user && ME.user.emailVerified === false) ? '' : 'none';
@@ -814,7 +817,7 @@ function renderHistory() {
     }
 
     const lsBar = document.getElementById("live-stats-bar");
-    if (lsBar && _isAdm) {
+    if (lsBar) {
       lsBar.style.display = "flex";
       const lsWr  = document.getElementById("ls-wr");
       const lsPr  = document.getElementById("ls-profit");
