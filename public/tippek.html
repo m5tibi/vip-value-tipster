@@ -319,7 +319,7 @@ function showAdminStats() {
   document.querySelectorAll(".admin-only-stat").forEach(e => e.style.display = "");
 }
 
-function isAdmin() { return !!ME.isAdmin || localStorage.getItem('vbt_admin') === '1'; }
+function isAdmin() { return !!ME.isAdmin || !!(ME.user && ME.user.isAdmin) || localStorage.getItem('vbt_admin') === '1'; }
 function getAdminPwd() { return localStorage.getItem('vbt_admin_pwd') || ''; }
 function b64pwd(p) {
   try { return btoa(String.fromCharCode(...new TextEncoder().encode(p||''))); } catch(e) { return ''; }

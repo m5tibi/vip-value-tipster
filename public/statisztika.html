@@ -321,8 +321,11 @@ function calcStats(tips) {
   return { settled: settled.length, winRate, profit: parseFloat(profit.toFixed(2)), roi };
 }
 
+let CURRENT_ME = { user: null, isAdmin: false };
+function isAdminUser() { return !!CURRENT_ME.isAdmin || !!(CURRENT_ME.user && CURRENT_ME.user.isAdmin) || localStorage.getItem("vbt_admin") === "1"; }
+
 function updateScoreboard(stats) {
-  const adminPass = localStorage.getItem("vbt_admin") === "1";
+  const adminPass = isAdminUser();
   const sc = document.getElementById("scoreboard");
   const ch = document.getElementById("chart-section");
   if (!adminPass) {
@@ -446,7 +449,7 @@ function buildPeriodPicker(tips) {
 }
 
 function drawChart(tips) {
-  if (localStorage.getItem("vbt_admin") !== "1") return;
+  if (!isAdminUser()) return;
   const canvas = document.getElementById('profit-chart');
   const ctx    = canvas.getContext('2d');
   const dpr    = window.devicePixelRatio || 1;
@@ -530,7 +533,15 @@ function drawChart(tips) {
   document.getElementById('chart-current').style.color = isPositive ? '#00e676' : '#ef4444';
 }
 
+async function loadAdminIdentity() {
+  try {
+    const r = await fetch("/api/auth/me", { cache: "no-store" });
+    CURRENT_ME = await r.json();
+  } catch (e) { CURRENT_ME = { user: null, isAdmin: false }; }
+}
+
 async function loadData() {
+  await loadAdminIdentity();
   try {
     const [histRes, pubRes] = await Promise.all([
       fetch('/api/history', { headers: { 'X-Admin-Password': localStorage.getItem('vbt_admin') || '' } }),
