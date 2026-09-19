@@ -1543,10 +1543,13 @@ app.get("/api/tips", (req, res) => {
   const admin = isAdminReq(req);
   const freshUserTips = req.user ? (usersDb.findById(req.user.id) || req.user) : req.user;
   if (!admin && !auth.hasAccess(freshUserTips)) {
+    // Az ingyenes tippek minden látogató számára elérhetők.
+    // Az előfizetés csak az AI- és a kombitippeket védi.
     return res.status(req.user ? 402 : 401).json({
-      error: req.user ? "Aktív előfizetés szükséges." : "Belépés szükséges a tippek megtekintéséhez.",
+      error: req.user ? "Aktív előfizetés szükséges." : "Belépés szükséges a prémium tippek megtekintéséhez.",
       needLogin: !req.user, needSubscription: !!req.user,
       aiTips: [], comboTips: [],
+      freeTips: freeTips.filter(isApproved),
     });
   }
   res.json({
