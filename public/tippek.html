@@ -764,8 +764,9 @@ function renderHistory() {
   document.getElementById("h-lost").textContent   = lost + lostCombos;
   document.getElementById("h-push").textContent   = push + halfWon + halfLost + pushCombos;
 
-  // Top bar: aktuális hónap adatai a helyi history alapján (ugyanaz mint a track record kártyák)
-  if (isAdmin()) {
+  // Top bar: aktuális hónap adatai (admin-only)
+  {
+    const _isAdm = isAdmin();
     const now = new Date();
     const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
     const monthName = now.toLocaleDateString('hu-HU', { month: 'long', year: 'numeric' });
@@ -804,14 +805,16 @@ function renderHistory() {
     const col   = mProfit >= 0 ? "#00e676" : "#ef9a9a";
     const sign  = v => (v >= 0 ? '+' : '') + parseFloat(v).toFixed(2);
 
-    document.getElementById("h-wr").textContent     = mWR + '%';
-    document.getElementById("h-profit").textContent = sign(mProfit);
-    document.getElementById("h-profit").style.color = col;
-    document.getElementById("h-roi").textContent    = sign(mROI) + '%';
-    document.getElementById("h-roi").style.color    = col;
+    if (_isAdm) {
+      document.getElementById("h-wr").textContent     = mWR + '%';
+      document.getElementById("h-profit").textContent = sign(mProfit);
+      document.getElementById("h-profit").style.color = col;
+      document.getElementById("h-roi").textContent    = sign(mROI) + '%';
+      document.getElementById("h-roi").style.color    = col;
+    }
 
     const lsBar = document.getElementById("live-stats-bar");
-    if (lsBar) {
+    if (lsBar && _isAdm) {
       lsBar.style.display = "flex";
       const lsWr  = document.getElementById("ls-wr");
       const lsPr  = document.getElementById("ls-profit");
