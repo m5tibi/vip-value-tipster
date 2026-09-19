@@ -820,7 +820,11 @@ function renderHistory() {
 
     const lsBar = document.getElementById("live-stats-bar");
     if (lsBar) {
-      lsBar.style.display = "flex";
+      // Biztonsági védelem: a sávot csak hitelesített admin láthatja.
+      // A korábbi, feltétel nélküli display:flex felülírta az admin-only CSS-t.
+      lsBar.style.display = _isAdm ? "flex" : "none";
+      lsBar.setAttribute("aria-hidden", _isAdm ? "false" : "true");
+      if (!_isAdm) return;
       const lsWr  = document.getElementById("ls-wr");
       const lsPr  = document.getElementById("ls-profit");
       const lsRoi = document.getElementById("ls-roi");
