@@ -322,7 +322,7 @@ function calcStats(tips) {
 }
 
 function updateScoreboard(stats) {
-  const adminPass = localStorage.getItem("vbt_admin");
+  const adminPass = localStorage.getItem("vbt_admin") === "1";
   const sc = document.getElementById("scoreboard");
   const ch = document.getElementById("chart-section");
   if (!adminPass) {
@@ -446,7 +446,7 @@ function buildPeriodPicker(tips) {
 }
 
 function drawChart(tips) {
-  if (!localStorage.getItem("vbt_admin")) return;
+  if (localStorage.getItem("vbt_admin") !== "1") return;
   const canvas = document.getElementById('profit-chart');
   const ctx    = canvas.getContext('2d');
   const dpr    = window.devicePixelRatio || 1;
