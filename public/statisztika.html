@@ -376,7 +376,7 @@ function renderTable(tips) {
     return `<tr>
       <td class="td-date">${formatDate(t.commence || t.addedAt)}</td>
       <td class="td-match">${t.type==='combo'
-        ? `<span class="badge combo">🎰 ${window.t?.('stat.combo')||'Kombi'} (${t.legN || (t.legs||[]).length} ${window.t?.('stat.leg')||'láb'})</span><br/><span style="font-size:11px;color:var(--muted)">${(t.legs||[]).map(l=>l.pick).join(' + ')}</span>`
+        ? `<span class="badge combo">🎰 Kombi (${t.legN || (t.legs||[]).length} láb)</span><br/><span style="font-size:11px;color:var(--muted)">${(t.legs||[]).map(l=>l.pick).join(' + ')}</span>`
         : t.type==='free' ? `<span class="badge push">🆓</span> ${t.match||'–'}`
         : t.match||'–'}</td>
       <td class="td-pick">${t.type==='combo'
