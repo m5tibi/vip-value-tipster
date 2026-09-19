@@ -824,7 +824,7 @@ function renderHistory() {
       // A korábbi, feltétel nélküli display:flex felülírta az admin-only CSS-t.
       lsBar.style.display = _isAdm ? "flex" : "none";
       lsBar.setAttribute("aria-hidden", _isAdm ? "false" : "true");
-      if (!_isAdm) return;
+      if (_isAdm) {
       const lsWr  = document.getElementById("ls-wr");
       const lsPr  = document.getElementById("ls-profit");
       const lsRoi = document.getElementById("ls-roi");
@@ -833,6 +833,7 @@ function renderHistory() {
       if (lsPr)  { lsPr.textContent = sign(mProfit); lsPr.style.color = col; }
       if (lsRoi) { lsRoi.textContent = sign(mROI) + '%'; lsRoi.style.color = col; }
       if (lsSt)  { lsSt.textContent = `${monthSettled.length} lezárt · ${monthName}`; }
+      }
     }
   }
 
