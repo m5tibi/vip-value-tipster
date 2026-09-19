@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- tippek.html v1.10 | 2026-09-18 -->
+<!-- tippek.html v1.11 | 2026-09-18 -->
 <html lang="hu">
 <head>
 <meta charset="UTF-8" />
@@ -764,42 +764,65 @@ function renderHistory() {
   document.getElementById("h-lost").textContent   = lost + lostCombos;
   document.getElementById("h-push").textContent   = push + halfWon + halfLost + pushCombos;
 
-  // Profit/ROI/WinRate: /api/public-stats-ból (egységes forrás)
-  const statsUrl = isAdmin() ? "/api/admin/stats" : "/api/public-stats";
-  fetch(statsUrl, isAdmin() ? {headers: adminHeaders()} : {}).then(r=>r.json()).then(d => {
-    const p   = d.profit ?? profit;
-    const r2  = d.roi ?? roi;
-    const wr2 = d.winRate != null ? d.winRate + "%" : wr;
-    const col = p >= 0 ? "#69f0ae" : "#ef9a9a";
-    if (isAdmin()) {
-      document.getElementById("h-wr").textContent     = wr2;
-      document.getElementById("h-profit").textContent = (p >= 0 ? "+" : "") + parseFloat(p).toFixed(2);
-      document.getElementById("h-profit").style.color = col;
-      document.getElementById("h-roi").textContent    = r2 != null ? (p >= 0 ? "+" : "") + r2 + "%" : "–";
-      document.getElementById("h-roi").style.color    = col;
+  // Top bar: aktuális hónap adatai a helyi history alapján (ugyanaz mint a track record kártyák)
+  if (isAdmin()) {
+    const now = new Date();
+    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const monthName = now.toLocaleDateString('hu-HU', { month: 'long', year: 'numeric' });
+
+    // Aktuális hónap lezárt tippjei (commence vagy addedAt alapján)
+    function tipMonth(t) {
+      const c = t.commence || t.addedAt || '';
+      const md = String(c).match(/^(\d{2})\.\s*(\d{2})/);
+      if (md) return `${now.getFullYear()}-${md[1]}`;
+      const hu = String(c).match(/(\d{4})\.\s*(\d{1,2})\./);
+      if (hu) return `${hu[1]}-${String(hu[2]).padStart(2,'0')}`;
+      const iso = String(c).match(/^(\d{4})-(\d{2})/);
+      if (iso) return `${iso[1]}-${iso[2]}`;
+      return null;
     }
+    const SETTLED_R = ['won','lost','push','half_won','half_lost'];
+    const monthSettled = history.filter(t =>
+      SETTLED_R.includes(t.result) && isApproved(t) && tipMonth(t) === currentMonthKey
+    );
+    const mWon  = monthSettled.filter(t => t.result === 'won').length;
+    const mHW   = monthSettled.filter(t => t.result === 'half_won').length;
+    const mLost = monthSettled.filter(t => t.result === 'lost').length;
+    const mHL   = monthSettled.filter(t => t.result === 'half_lost').length;
+    const decN  = mWon + mLost + mHW + mHL;
+    const mWR   = decN ? (((mWon + mHW * 0.5) / decN) * 100).toFixed(1) : '0.0';
+    let mProfit = 0;
+    monthSettled.forEach(t => {
+      const o = parseFloat(t.odds) || 1;
+      if (t.result === 'won')       mProfit += o - 1;
+      else if (t.result === 'lost') mProfit -= 1;
+      else if (t.result === 'half_won')  mProfit += (o - 1) / 2;
+      else if (t.result === 'half_lost') mProfit -= 0.5;
+      else if (t.type === 'combo' && t.result === 'won') mProfit += parseFloat(t.comboPayout||0) - 1;
+    });
+    const mROI  = decN ? (mProfit / decN * 100).toFixed(1) : '0.0';
+    const col   = mProfit >= 0 ? "#00e676" : "#ef9a9a";
+    const sign  = v => (v >= 0 ? '+' : '') + parseFloat(v).toFixed(2);
+
+    document.getElementById("h-wr").textContent     = mWR + '%';
+    document.getElementById("h-profit").textContent = sign(mProfit);
+    document.getElementById("h-profit").style.color = col;
+    document.getElementById("h-roi").textContent    = sign(mROI) + '%';
+    document.getElementById("h-roi").style.color    = col;
+
     const lsBar = document.getElementById("live-stats-bar");
-    if (lsBar && isAdmin()) {
+    if (lsBar) {
       lsBar.style.display = "flex";
       const lsWr  = document.getElementById("ls-wr");
       const lsPr  = document.getElementById("ls-profit");
       const lsRoi = document.getElementById("ls-roi");
       const lsSt  = document.getElementById("ls-settled");
-      if (lsWr)  { lsWr.textContent = wr2; lsWr.style.color = p >= 0 ? "#00e676" : "#ef9a9a"; }
-      if (lsPr)  { lsPr.textContent = (p >= 0 ? "+" : "") + parseFloat(p).toFixed(2); lsPr.style.color = p >= 0 ? "#f59e0b" : "#ef9a9a"; }
-      if (lsRoi) { lsRoi.textContent = r2 != null ? (p >= 0 ? "+" : "") + r2 + "%" : "–"; lsRoi.style.color = p >= 0 ? "#00e676" : "#ef9a9a"; }
-      if (lsSt)  { lsSt.textContent = (d.settled ?? settled.length) + " " + window.t("tips.settled_basis"); }
+      if (lsWr)  { lsWr.textContent = mWR + '%'; lsWr.style.color = col; }
+      if (lsPr)  { lsPr.textContent = sign(mProfit); lsPr.style.color = col; }
+      if (lsRoi) { lsRoi.textContent = sign(mROI) + '%'; lsRoi.style.color = col; }
+      if (lsSt)  { lsSt.textContent = `${monthSettled.length} lezárt · ${monthName}`; }
     }
-  }).catch(() => {
-    if (!isAdmin()) return;
-    // Fallback: helyi számítás
-    const col = profit >= 0 ? "#69f0ae" : "#ef9a9a";
-    document.getElementById("h-wr").textContent     = wr;
-    document.getElementById("h-profit").textContent = settled.length ? (profit >= 0 ? "+" : "") + profit.toFixed(2) : "–";
-    document.getElementById("h-profit").style.color = col;
-    document.getElementById("h-roi").textContent    = roi !== "–" ? (profit >= 0 ? "+" : "") + roi + "%" : "–";
-    document.getElementById("h-roi").style.color    = col;
-  });
+  }
 
   const el = document.getElementById("history-list");
 
