@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- tippek.html v1.11 | 2026-09-18 -->
+<!-- tippek.html v1.12 | 2026-09-19 -->
 <html lang="hu">
 <head>
 <meta charset="UTF-8" />
@@ -23,7 +23,6 @@
   .tabs { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
   .tab { background: #0d1b2a; color: #80cbc4; border: 1px solid #1e3a2f; border-radius: 8px; padding: 7px 18px; font-weight: 700; font-size: 14px; cursor: pointer; }
   .tab.active { background: #00e676; color: #07111d; border-color: #00e676; }
-  /* A belépett e-mail cím ne feszítse szét a fejlécet mobilon */
   #user-email { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   @media (max-width: 520px) {
     .tabs { gap: 6px; }
@@ -84,7 +83,7 @@
   .month-label { font-size: 13px; font-weight: 700; color: #b39ddb; }
   .month-content { padding: 6px 6px 2px; }
   .stats-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
-button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:#546e7a;cursor:pointer;transition:all .15s}button.lang-toggle:hover{border-color:#00e676;color:#00e676}
+  button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:#546e7a;cursor:pointer;transition:all .15s}button.lang-toggle:hover{border-color:#00e676;color:#00e676}
 </style>
 <script src="/lang.js"></script>
 </head>
@@ -99,8 +98,6 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
     </div>
   </div>
 
-  
-  <!-- Upgrade banner (csak nem-előfizetőknek, ha PAID_MODE be van kapcsolva) -->
   <div id="upgrade-banner" style="display:none;background:linear-gradient(135deg,#0d1f0d,#0a1520);
        border:1px solid rgba(0,230,118,.25);border-radius:12px;padding:28px 20px;
        margin-bottom:16px;text-align:center">
@@ -132,7 +129,6 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
   </div>
 <div id="tg-status" class="tg-status" style="display:none"></div>
 
-  <!-- Belépés / Regisztráció -->
   <div id="auth-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;align-items:center;justify-content:center;padding:16px">
     <div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:12px;padding:22px;width:min(380px,100%)">
       <div id="auth-title" style="font-weight:700;color:#00e676;font-size:17px;margin-bottom:4px" data-i18n="tips.auth_title_login">Belépés</div>
@@ -169,7 +165,6 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
     </div>
   </div>
 
-  <!-- E-mail megerősítő emlékeztető -->
   <div id="verify-banner" style="display:none;background:#1a1a0d;border:1px solid #7a6a1f;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#ffe082">
     <span data-i18n="tips.verify_banner">📧 Erősítsd meg az e-mail címed! Elküldtük a megerősítő linket.</span>
     <a href="#" onclick="event.preventDefault();resendVerification()" style="color:#00e676;font-weight:700;text-decoration:none;margin-left:6px" data-i18n="tips.resend">Újraküldés</a>
@@ -191,7 +186,6 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
     </span>
   </div>
 
-  <!-- Kinyitható leírás -->
   <div style="margin-bottom:14px;background:#0d1b2a;border:1px solid #1e3a2f;border-radius:10px;overflow:hidden">
     <div onclick="var b=document.getElementById('guide-body');var a=document.getElementById('guide-arr');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▼':'▲'"
          style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer">
@@ -222,14 +216,12 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
     </div>
   </div>
 
-  <!-- TIPS TAB -->
   <div id="tab-tips">
     <div class="toolbar">
       <div class="last-update" id="last-update" data-i18n="tips.no_analysis">Még nem futott elemzés</div>
       <button class="btn-send" id="btn-send-tips" onclick="sendTips()" style="display:none">📤 Jóváhagyottak küldése</button>
       <button class="btn-refresh" id="btn-refresh" onclick="refresh()" style="display:none">🔄 Frissítés most</button>
     </div>
-    <!-- Free tip section (admin sees pending, users see approved) -->
   <div id="free-tip-section" style="margin-bottom:16px"></div>
   <div class="section-title" style="color:#b39ddb" data-i18n="tips.single_title">🤖 Single tippek</div>
     <div class="section-sub" data-i18n="tips.single_sub">Valós web keresés alapján, forma és statisztika elemzéssel</div>
@@ -242,7 +234,6 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
     </div>
   </div>
 
-  <!-- HISTORY TAB -->
   <div id="tab-history-panel" style="display:none">
     <div class="stats-header">
       <div style="font-weight:700;color:#00e676;font-size:16px" data-i18n="tips.history_stats">📊 Előzmény & statisztika</div>
@@ -288,7 +279,6 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
 </div>
 
 <script>
-// Safety fallback – ha lang.js nem töltődött be
 if (typeof window.t !== "function") {
   window.t = function(k, fb) { return fb || k.split(".").pop(); };
   window.getLang = function() { return "hu"; };
@@ -299,11 +289,9 @@ let aiTips = [], comboTips = [], history = [], currentFreeTips = [];
 let msRemaining = 0;
 let dayCounter = 0;
 
-// ── Felhasználó / jogosultság állapot ──
 let ME = { user: null, hasAccess: false, paidMode: false, isAdmin: false };
-let authMode = 'login';   // 'login' | 'register'
+let authMode = 'login';
 
-// Visszafelé kompatibilis admin-jelszó (régi ?admin=... mód; a session mellett megmarad)
 (function(){
   var p = new URLSearchParams(window.location.search).get('admin');
   if (p) {
@@ -330,7 +318,6 @@ function adminHeaders(json) {
   return h;
 }
 
-// ── Belépés / regisztráció ──
 function openAuthModal(mode) {
   authMode = mode || 'login';
   applyAuthModal();
@@ -352,7 +339,7 @@ function applyAuthModal() {
   document.getElementById('auth-pwd').autocomplete = reg ? 'new-password' : 'current-password';
   document.getElementById('auth-switch-text').textContent = reg ? window.t('tips.has_account') : window.t('tips.no_account');
   document.getElementById('auth-switch-link').textContent = reg ? window.t('tips.login_link') : window.t('tips.reg_free');
-  document.getElementById('auth-consent').style.display = reg ? '' : 'none';   // ÁSZF csak regisztrációnál
+  document.getElementById('auth-consent').style.display = reg ? '' : 'none';
   document.getElementById('auth-forgot').style.display  = reg ? 'none' : '';
 }
 
@@ -380,12 +367,11 @@ async function authSubmit() {
     });
     const d = await r.json().catch(()=>({}));
     if (!r.ok) return showErr(d.error || ('Hiba (HTTP ' + r.status + ')'));
-    // Böngésző jelszómentés kérése (PasswordCredential API)
     if (window.PasswordCredential && !reg) {
       try {
         const cred = new window.PasswordCredential({ id: email, password: pwd });
         await navigator.credentials.store(cred);
-      } catch(e) { /* nem támogatott böngészőben csendben tér vissza */ }
+      } catch(e) {}
     }
     closeAuthModal();
     await refreshMe();
@@ -429,7 +415,6 @@ async function userLogout() {
   showStatus('🚪 Kijelentkeztél');
 }
 
-// Ki vagyok? – ez vezérli az egész felület láthatóságát
 async function refreshMe() {
   try {
     const r = await fetch('/api/auth/me', { cache: 'no-store' });
@@ -438,7 +423,6 @@ async function refreshMe() {
   applyAdminUI();
 }
 
-// Admin + felhasználói UI láthatóság
 function applyAdminUI() {
   const admin  = isAdmin();
   const loggedIn = !!ME.user || admin;
@@ -454,10 +438,8 @@ function applyAdminUI() {
   }
   const tools = document.getElementById('admin-tools');
   if (tools) tools.style.display = admin ? 'flex' : 'none';
-  // Live stats bar: adminnak megmutatjuk, másoknak elrejtjük
   const lsBarEl = document.getElementById('live-stats-bar');
   if (lsBarEl) lsBarEl.style.display = admin ? 'flex' : 'none';
-  // Megerősítő sáv: csak belépett, még meg nem erősített e-mailnél
   const vb = document.getElementById('verify-banner');
   if (vb) vb.style.display = (ME.user && ME.user.emailVerified === false) ? '' : 'none';
 }
@@ -514,12 +496,10 @@ function actionBtns(t) {
   const allBtns = `<button class="btn-won" onclick="setResult('${t.id}','won')">✅</button>
      <button class="btn-lost" onclick="setResult('${t.id}','lost')">❌</button>${pb}`;
   if (!t.result || t.result === "pending") {
-    // Még nem értékelt: teljes szöveges gombok
     const pbFull = needsPush(t.market) ? pb : "";
     return `<button class="btn-won" onclick="setResult('${t.id}','won')">✅ Nyert</button>
             <button class="btn-lost" onclick="setResult('${t.id}','lost')">❌ Vesztett</button>${pbFull}`;
   }
-  // Már ki van értékelve: kompakt javítás gombok
   return `<span style="font-size:10px;color:#546e7a;margin-right:4px">Javítás:</span>${allBtns}`;
 }
 
@@ -539,19 +519,19 @@ function getDay(addedAt) {
 
 const HU_MONTHS = ["január","február","március","április","május","június","július","augusztus","szeptember","október","november","december"];
 function monthKeyOf(dayKey) {
-  const p = dayKey.split(" ");                 // ["2026.","07.","02."]
-  return p.length>=2 ? p[0]+" "+p[1] : dayKey; // "2026. 07."
+  const p = dayKey.split(" ");
+  return p.length>=2 ? p[0]+" "+p[1] : dayKey;
 }
 function monthLabel(monthKey) {
   const p = monthKey.split(" ");
   const y = (p[0]||"").replace(".","");
   const mNum = parseInt((p[1]||"").replace(".",""),10);
   const name = HU_MONTHS[mNum-1] || (p[1]||"");
-  return y+". "+name;                          // "2026. július"
+  return y+". "+name;
 }
 
 function yearOf(monthKey) {
-  return (monthKey.split(" ")[0] || "").replace(".", "");  // "2026. 07." → "2026"
+  return (monthKey.split(" ")[0] || "").replace(".", "");
 }
 
 function todayKey() {
@@ -570,7 +550,7 @@ function adminTipControls(t) {
   const approved = t.approved !== false;
   const badge = approved
     ? `<span style="color:#69f0ae;font-size:11px;font-weight:700">✅ Jóváhagyva (publikus)</span>`
-    : `<span style="color:#ffb74d;font-size:11px;font-weight:700">${"⏳ Jóváhagyásra vár (rejtett)"}</span>`;
+    : `<span style="color:#ffb74d;font-size:11px;font-weight:700">⏳ Jóváhagyásra vár (rejtett)</span>`;
   const approveBtn = approved ? "" : `<button class="btn-won" style="font-size:11px;padding:4px 10px" onclick="approveTip('${t.id}')">✅ Jóváhagyás</button>`;
   const makeFreeBtn = t.type !== "free" ? `<button style="background:#00c853;color:#000;border:none;font-size:11px;padding:4px 10px;border-radius:6px;font-weight:700;cursor:pointer" onclick="makeFree('${t.id}')">🆓 Free-nek</button>` : "";
   return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #2a3550">
@@ -642,7 +622,6 @@ function renderFreeTipSection() {
   const el = document.getElementById("free-tip-section");
   if (!el) return;
   const admin = isAdmin();
-  // currentFreeTips a /api/tips-ből jön: admin esetén unapproved-okat is tartalmaz
   const tips = currentFreeTips;
   if (!tips || !tips.length) { el.innerHTML = ""; return; }
 
@@ -650,7 +629,6 @@ function renderFreeTipSection() {
     const approvedBadge = tip.approved !== false
       ? `<span style="background:rgba(0,230,118,.15);color:#00e676;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">✅ JÓVÁHAGYVA</span>`
       : `<span style="background:rgba(245,158,11,.15);color:#f59e0b;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">⏳ JÓVÁHAGYÁSRA VÁR</span>`;
-    // Admin: jóváhagyatlannak adminTipControls, jóváhagyottnak csak törlés gomb
     let adminBtns = "";
     if (admin) {
       if (tip.approved === false) {
@@ -661,7 +639,6 @@ function renderFreeTipSection() {
         </div>`;
       }
     }
-    const commenceStr = tip.commence ? `🕐 ${tip.commence}` : "";
     const commenceDateStr = (() => {
       if (!tip.commence) return "";
       const c = String(tip.commence);
@@ -678,7 +655,6 @@ function renderFreeTipSection() {
       ${adminBtns}
     </div>`;
   }).join("") + `<div style="height:4px"></div>`;
-  // Section header outside the map
   el.innerHTML = `<div style="margin-bottom:6px;font-size:11px;font-weight:700;color:#00e676;text-transform:uppercase;letter-spacing:.5px">🆓 Ingyenes napi tipp${tips.length>1?" ("+tips.length+")":""}</div>` + el.innerHTML;
 }
 
@@ -705,10 +681,9 @@ function tipProfit(t) {
     case "half_won":  return (o-1)/2;
     case "lost":      return -1;
     case "half_lost": return -0.5;
-    default:          return 0;   // push / pending
+    default:          return 0;
   }
 }
-// Profit tetszőleges tippre (kombit is kezel: comboPayout - 1)
 function tipProfitAny(t) {
   if (t.type === "combo") {
     if (!["won","lost","push"].includes(t.result)) return 0;
@@ -727,15 +702,12 @@ function subStats(tips) {
 }
 
 function renderHistory() {
-  // ── Kombi szekció: csak jóváhagyott kombik az előzményekben ──────────
   const isApprovedH = t => t.approved !== false || (t.result && t.result !== "pending");
   const isFoci = t => t.type === "free" || /soccer|foci|⚽/i.test((t.sport||"")+" "+(t.sportLabel||""));
   const combos = history.filter(t => t.type === "combo" && isApprovedH(t));
   const cStats = document.getElementById("combo-stats");
   cStats.style.display = combos.length ? "" : "none";
 
-  // Singles és free tippek (kombik NE kerüljenek bele – azok külön jelennek meg)
-  // Lezárt tippek mindig láthatóak, függetlenül a sport mezőtől
   const H = history.filter(t =>
     isApprovedH(t) &&
     t.type !== "value" &&
@@ -760,21 +732,19 @@ function renderHistory() {
   const lostCombos = combos.filter(t=>t.result==="lost").length;
   const pushCombos = combos.filter(t=>t.result==="push").length;
   const pend   = H.filter(t=>!t.result||t.result==="pending").length + pendCombos;
-  // Alap számok a helyi adatból (azonnal látható)
+
   document.getElementById("h-total").textContent  = H.length + combos.length;
   document.getElementById("h-pend").textContent   = pend;
   document.getElementById("h-won").textContent    = won + wonCombos;
   document.getElementById("h-lost").textContent   = lost + lostCombos;
   document.getElementById("h-push").textContent   = push + halfWon + halfLost + pushCombos;
 
-  // Top bar: aktuális hónap adatai (admin-only)
   {
     const _isAdm = isAdmin();
     const now = new Date();
     const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
     const monthName = now.toLocaleDateString('hu-HU', { month: 'long', year: 'numeric' });
 
-    // Aktuális hónap lezárt tippjei (commence vagy addedAt alapján)
     const tipMonth = t => {
       const c = t.commence || t.addedAt || '';
       const md = String(c).match(/^(\d{2})\.\s*(\d{2})/);
@@ -853,47 +823,39 @@ function renderHistory() {
         <span class="day-label">${label}</span>
         <span style="display:flex;align-items:center;gap:6px">
           <span class="day-meta">${meta}</span>
-          <span class="day-arrow ${defaultOpen?"open":""}" id="arr-${id}">▼</span>
+          <span class="day-arrow open" id="arr-${id}">▲</span>
         </span>
       </div>
-      <div class="day-content" id="${id}" style="display:${defaultOpen?"":"none"}">
+      <div class="day-content" id="${id}" style="display:block">
         ${sorted.map(t=>tipHTML(t,true)).join("")}
       </div>
     </div>`;
   }
 
-  // Egy korábbi hónap: napokra bontva, összecsukva (alapból zárva).
-  // Meccs dátuma: commence alapján csoportosítunk (nem addedAt), mert az a tényleges nap
   function getMatchDay(t) {
-    // commence formátum: "09. 17. 21:00" → "2026. 09. 17."
     const c = t.commence || "";
     const cm = String(c).match(/^(\d{2})\.\s*(\d{2})/);
     if (cm) {
       const year = new Date().getFullYear();
       return `${year}. ${cm[1]}. ${cm[2]}.`;
     }
-    // Fallback: addedAt
     return getDay(t.addedAt);
   }
-  const todayMK      = monthKeyOf(todayKey());
-  const currentYear  = yearOf(todayMK);
 
-  // Meccs dátuma: commence alapján (nem addedAt), ez a helyes csoportosítás
-  function getCommenceDay(t) {
-    const c = String(t.commence || "");
+  function getGroupDay(t) {
+    const c = t.commence || "";
     const cm = c.match(/^(\d{2})\.\s*(\d{2})/);
     if (cm) {
       const yr = new Date().getFullYear();
-      const mo = cm[1].padStart(2,"0"), dy = cm[2].padStart(2,"0");
-      return getDay(`${yr}. ${mo}. ${dy}.`);
+      return getDay(`${yr}. ${cm[1]}. ${cm[2]}.`);
     }
-    return getDay(t.addedAt);
+    return getDay(t.addedAt || t.commence);
   }
 
   function makeMonthSection(monthKey, tips) {
     const id = "ms-"+(dayCounter++);
     const byDay = {};
-    tips.forEach(t=>{ const d=getCommenceDay(t); if(!byDay[d]) byDay[d]=[]; byDay[d].push(t); });
+    tips.forEach(t=>{ const d=getGroupDay(t); if(!byDay[d]) byDay[d]=[]; byDay[d].push(t); });
     const mWon  = tips.filter(t=>t.result==="won").length;
     const mLost = tips.filter(t=>t.result==="lost").length;
     const st    = subStats(tips);
@@ -903,25 +865,22 @@ function renderHistory() {
       : "";
     const meta  = isAdmin() ? (tips.length+" tipp · ✅"+mWon+" ❌"+mLost+pChip) : (tips.length+" tipp");
     const inner = Object.keys(byDay).sort((a,b)=>b.localeCompare(a))
-      .map(day=>makeDaySection(day, byDay[day], false)).join("");
-    // Aktuális hónap automatikusan kinyílik
-    const isCurrentMo = monthKey === todayMK;
+      .map(day=>makeDaySection(day, byDay[day], true)).join("");
     return `
     <div class="month-section">
       <div class="month-toggle" onclick="toggleDay('${id}')">
         <span class="month-label">🗓️ ${monthLabel(monthKey)}</span>
         <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">
           <span class="day-meta">${meta}</span>
-          <span class="day-arrow${isCurrentMo?" open":""}" id="arr-${id}">${isCurrentMo?"▲":"▼"}</span>
+          <span class="day-arrow open" id="arr-${id}">▲</span>
         </span>
       </div>
-      <div class="month-content" id="${id}" style="display:${isCurrentMo?"block":"none"}">
+      <div class="month-content" id="${id}" style="display:block">
         ${inner}
       </div>
     </div>`;
   }
 
-  // Egy év: hónapokra bontva, aktuális év automatikusan kinyílik.
   function makeYearSection(yearStr, monthKeys, doneByDay) {
     const id = "ys-"+(dayCounter++);
     const yearTips = [];
@@ -942,38 +901,24 @@ function renderHistory() {
         .forEach(d => mTips.push(...doneByDay[d]));
       return makeMonthSection(mk, mTips);
     }).join("");
-    // Aktuális év automatikusan kinyílik
-    const isCurrentYr = yearStr === currentYear;
     return `<div style="margin-bottom:6px">
       <div onclick="toggleDay('${id}')" style="background:#0a1520;border:1px solid #1a2f4a;border-radius:8px;padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
         <span style="font-weight:700;color:#dce8f5;font-size:14px">📆 ${yearStr}</span>
         <span style="display:flex;align-items:center;gap:8px">
           <span style="font-size:12px;color:#5d7a96">${yearTips.length} tipp${isAdmin() ? " · ✅"+yWon+" ❌"+yLost+pChip : ""}</span>
-          <span class="day-arrow${isCurrentYr?" open":""}" id="arr-${id}">${isCurrentYr?"▲":"▼"}</span>
+          <span class="day-arrow open" id="arr-${id}">▲</span>
         </span>
       </div>
-      <div id="${id}" style="display:${isCurrentYr?"block":"none"};padding-left:8px;margin-top:4px">${inner}</div>
+      <div id="${id}" style="display:block;padding-left:8px;margin-top:4px">${inner}</div>
     </div>`;
   }
 
-  // Egy tipplista (single VAGY kombi) nap/hónap szerinti rendszerezett HTML-je.
   function groupedHtml(tipsArr, kind) {
     const pending = tipsArr.filter(t=>!t.result||t.result==="pending");
     const done    = tipsArr.filter(t=>t.result&&t.result!=="pending");
     const pendingByDay = {};
     pending.forEach(t=>{ const d=getDay(t.addedAt); if(!pendingByDay[d]) pendingByDay[d]=[]; pendingByDay[d].push(t); });
-    // Lezárt tippeket meccs dátuma (commence) szerint csoportosítjuk, nem generálás dátuma szerint
-    function getGroupDay(t) {
-      const c = t.commence || "";
-      // "09. 17. 21:00" vagy "09.17 21:00" formátum → év hozzáadásával
-      const cm = c.match(/^(\d{2})\.\s*(\d{2})/);
-      if (cm) {
-        const yr = new Date().getFullYear();
-        const d = new Date(yr, +cm[1]-1, +cm[2]);
-        if (!isNaN(d)) return getDay(`${yr}. ${String(+cm[1]).padStart(2,"0")}. ${String(+cm[2]).padStart(2,"0")}.`);
-      }
-      return getDay(t.addedAt);
-    }
+    
     const doneByDay = {};
     done.forEach(t=>{ const d=getGroupDay(t); if(!doneByDay[d]) doneByDay[d]=[]; doneByDay[d].push(t); });
 
@@ -981,13 +926,11 @@ function renderHistory() {
     if (pending.length) {
       html += `<div class="section-header" style="background:#0d2a3a;color:#90caf9">⏳ Folyamatban lévő ${kind} tippek</div>`;
       Object.keys(pendingByDay).sort((a,b)=>b.localeCompare(a)).forEach(day => {
-        const isRecent = day === TODAY || day === YESTERDAY;
-        html += makeDaySection(day, pendingByDay[day], isRecent);
+        html += makeDaySection(day, pendingByDay[day], true);
       });
     }
     if (done.length) {
       html += `<div class="section-header" style="background:#0d1b2a;color:#80cbc4;margin-top:8px">📋 ${window.t("tips.closed")} ${kind} ${window.t("tips.tips_word")}</div>`;
-      // Év → hónap → nap hierarchia, minden szint alapból csukva
       const monthsToDays = {};
       Object.keys(doneByDay).forEach(day => {
         const mk = monthKeyOf(day);
@@ -1007,24 +950,18 @@ function renderHistory() {
     return html;
   }
 
-  // Free tipp: ha van jóváhagyott és folyamatban lévő, mutassuk kiemelve az előzményekben
-  // (mindenki láthatja, nem csak előfizetők)
   const freePending = H.filter(t => t.type === "free" && (!t.result || t.result === "pending"));
-  const HnoFree = H.filter(t => t.type !== "free");
   const hasFreePending = freePending.length > 0 || currentFreeTips.some(ft => !ft.result || ft.result === "pending");
 
   let freeSection = "";
   if (hasFreePending) {
     const allFreePending = freePending.length ? freePending : currentFreeTips.filter(ft => !ft.result || ft.result === "pending");
-    const ft = allFreePending[0];
     freeSection = `
       <div class="section-header" style="background:#071a10;color:#00e676;margin-bottom:4px">🆓 Ingyenes napi tipp – folyamatban</div>
       ${allFreePending.map(f => renderFreeTipCard(f)).join('<div style="height:6px"></div>')}
       <div style="height:8px"></div>`;
   }
 
-  // A history listában H-t mutatjuk (free tippeket is), de a pending free tippek
-  // már kiemelve vannak fentebb (freeSection) – a napi szekcióban csak a done-ok látszanak
   const HforList = H.filter(t => t.type !== "free" || (t.result && t.result !== "pending"));
   dayCounter = 0;
   el.innerHTML = freeSection + (HforList.length ? groupedHtml(HforList, "single") : (hasFreePending ? "" : '<div class="empty">Még nincsenek rögzített foci tippek.</div>'));
@@ -1035,8 +972,9 @@ function renderHistory() {
 function toggleDay(id) {
   const c = document.getElementById(id);
   const a = document.getElementById("arr-"+id);
+  if (!c || !a) return;
   const open = c.style.display!=="none";
-  c.style.display = open?"none":"";
+  c.style.display = open?"none":"block";
   a.classList.toggle("open",!open);
 }
 
@@ -1060,23 +998,16 @@ async function refresh() {
 let tipsEverLoaded = false;
 let tipsRetryDelay = 3000;
 let tipsErrLogged  = false;
-// Zárolt nézet: nincs belépve (vagy nincs előfizetés) → felhívás a tippek helyett
+
 function renderFreeTipCard(t) {
   const o = parseFloat(t.odds).toFixed(2);
   const lang = window.getLang ? window.getLang() : 'hu';
-  const locale = lang === 'en' ? 'en-GB' : 'hu-HU';
-  // Dátum és kezdési idő formázása
   let dateStr = '';
   let timeStr = '';
-  // commence formátuma: "07. 30. 19:00" (huTime: hó. nap. óra:perc, év nélkül)
-  // addedAt formátuma: "2026. 7. 30. 11:27:25" (nowHu)
   try {
     const c = String(t.commence || '');
-    // Idő kinyerése: első "HH:MM" minta
     const mTime = c.match(/(\d{1,2}):(\d{2})/);
     if (mTime) timeStr = mTime[1].padStart(2,'0') + ':' + mTime[2];
-    // Dátum a commence-ből: "07. 30. 19:00" → hó=07, nap=30
-    // Év az addedAt-ból: "2026. 7. 30. ..." → "2026"
     const mDate = c.match(/^(\d{2})\. (\d{1,2})\./);
     if (mDate) {
       const mo  = parseInt(mDate[1], 10);
@@ -1087,7 +1018,6 @@ function renderFreeTipCard(t) {
       const moName = (lang === 'en' ? EN_MO : HU_MO)[mo - 1] || mo + '.';
       dateStr = lang === 'en' ? `${day} ${moName} ${yr}` : `${yr}. ${moName} ${day}.`;
     } else if (t.addedAt) {
-      // fallback: addedAt dátum részéből
       const parts = t.addedAt.split(' ');
       dateStr = parts.slice(0,3).join(' ');
     }
@@ -1133,7 +1063,6 @@ function renderLocked(needSubscription, freeTips) {
     return;
   }
 
-  // Előfizető nélküli, de belépett user → ingyenes tipp + paywall
   const freePart = freeTips && freeTips.length
     ? freeTips.map(ft => `<div style="margin-bottom:6px;font-size:11px;font-weight:700;color:#00e676;text-transform:uppercase;letter-spacing:.5px">${window.t('tips.free_badge')}</div>${renderFreeTipCard(ft)}`).join('<div style="height:8px"></div>')
     : `<div style="color:#5d7a96;font-size:13px;text-align:center;padding:16px 0">${window.t('tips.free_tip_none')}</div>`;
@@ -1153,7 +1082,6 @@ function renderLocked(needSubscription, freeTips) {
 async function loadTips() {
   try {
     const r = await fetch("/api/tips", { cache: "no-store", headers: isAdmin()?adminHeaders():{} });
-    // Nincs belépve / nincs előfizetés → nem hiba: felhívást mutatunk a tippek helyett
     if (r.status === 401 || r.status === 402) {
       aiTips = []; comboTips = [];
       tipsEverLoaded = true;
@@ -1172,11 +1100,9 @@ async function loadTips() {
     document.getElementById("last-update").textContent="Frissítve: "+new Date().toLocaleTimeString(window.getLang()==="en"?"en-GB":"hu-HU");
     renderTips();
   } catch(e) {
-    // Egyszer logolunk, nem árasztjuk el a konzolt. A meglévő tippeket NEM ürítjük.
     if (!tipsErrLogged) { console.warn("A /api/tips jelenleg nem elérhető ("+e.message+"), újrapróbálkozás a háttérben."); tipsErrLogged = true; }
     const lu = document.getElementById("last-update");
     if (lu && !tipsEverLoaded) lu.textContent = "⚠️ Szerver nem elérhető – újrapróbálkozás…";
-    // Amíg még sose sikerült, növekvő szünettel próbálkozunk (3→6→12…→max 60s), nem 3 mp-enként.
     if (!tipsEverLoaded) {
       setTimeout(loadTips, tipsRetryDelay);
       tipsRetryDelay = Math.min(tipsRetryDelay * 2, 60000);
@@ -1211,7 +1137,6 @@ async function setComboResult(id, result) {
   }
 }
 
-
 function adminFreeBtns(t) {
   var id = t.id;
   var isPending = (t.result === "pending" || !t.result);
@@ -1242,7 +1167,6 @@ async function setFreeResult(id, result) {
 }
 
 async function editNote(id, btn) {
-  // Keresés az összes tipp tömbben
   const allTips = [...(currentFreeTips||[]), ...(aiTips||[]), ...(comboTips||[]), ...(history||[])];
   const tipData = allTips.find(t => t.id === id);
   const isCombo = tipData && (tipData.type === "combo" || (tipData.legs && tipData.legs.length > 0));
@@ -1253,7 +1177,7 @@ async function editNote(id, btn) {
       const leg = tipData.legs[i];
       const newPick = prompt(`${i+1}/${tipData.legs.length}. láb – ${leg.match}\nPick (hagyd ÜRESEN a láb TÖRLÉSÉHEZ):`, leg.pick);
       if (newPick === null) return;
-      if (newPick.trim() === "") continue; // üres = törlés
+      if (newPick.trim() === "") continue;
       const newOddsStr = prompt(`${i+1}. láb odds:`, String(leg.odds));
       if (newOddsStr === null) return;
       const newOdds = parseFloat(newOddsStr.replace(",","."));
@@ -1273,7 +1197,6 @@ async function editNote(id, btn) {
     return;
   }
 
-  // Single / free szerkesztés
   const currentNote  = tipData ? (tipData.note   || "") : "";
   const currentOdds  = tipData ? String(tipData.odds  || "") : "";
   const currentPick  = tipData ? (tipData.pick   || "") : "";
@@ -1363,18 +1286,15 @@ async function sendTips() {
 
 async function loadStatus() {}
 
-// Indulás: előbb megnézzük, ki van belépve, aztán töltünk
 (async () => {
   await refreshMe();
   await loadTips();
   await loadHistory();
 })();
-// Önjavító frissítés: percenként, és amikor a fül újra aktív lesz (pl. deploy után).
 setInterval(() => { if (document.visibilityState === "visible") loadTips(); }, 60000);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") loadTips(); });
 </script>
 
-<!-- Tagok modal -->
 <div id="users-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;overflow-y:auto;padding:20px">
   <div style="max-width:700px;margin:0 auto;background:#0c1a2e;border:1px solid #1a2f4a;border-radius:14px;padding:24px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
@@ -1414,7 +1334,6 @@ async function showUsers() {
             <th style="text-align:left;padding:6px 8px;border-bottom:1px solid #1a2f4a">Csomag</th>
             <th style="text-align:left;padding:6px 8px;border-bottom:1px solid #1a2f4a">Lejárat</th>
             <th style="text-align:left;padding:6px 8px;border-bottom:1px solid #1a2f4a">Lemondva</th>
-            <th style="text-align:left;padding:6px 8px;border-bottom:1px solid #1a2f4a">Lemondva</th>
             <th style="padding:6px 8px;border-bottom:1px solid #1a2f4a"></th>
           </tr>
         </thead>
@@ -1442,7 +1361,6 @@ async function showUsers() {
 }
 
 function setPlanPro(id) {
-  // Default: 1 month from today
   const defaultDate = new Date(Date.now() + 31*24*60*60*1000).toISOString().slice(0,10);
   const dateStr = prompt('Lejárat dátuma (ÉÉÉÉ-HH-NN):', defaultDate);
   if (!dateStr) return;
@@ -1460,7 +1378,6 @@ async function setPlan(id, plan, paidUntil) {
   await showUsers();
 }
 
-
 async function syncStripe() {
   showStatus("🔄 Stripe szinkronizálás...");
   const r = await fetch('/api/admin/sync-stripe', { method: 'POST', headers: adminHeaders(true) });
@@ -1468,7 +1385,6 @@ async function syncStripe() {
   showStatus(d.ok ? `✅ ${d.updated} tag frissítve Stripe-ból` : '❌ Hiba: ' + d.error);
   if (d.ok) await showUsers();
 }
-
 </script>
 </body>
 </html>
