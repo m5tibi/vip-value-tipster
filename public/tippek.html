@@ -740,7 +740,10 @@ function renderHistory() {
     isApprovedH(t) &&
     t.type !== "value" &&
     t.type !== "combo" &&
-    (isFoci(t) || (t.result && t.result !== "pending"))
+    // Az előzményekben minden nem érték-alapú, nem kombi tipp jelenjen meg.
+    // A korábbi szűrés a hiányzó/eltérő sportmező miatt a folyamatban lévő
+    // tippeket teljesen elrejtette.
+    true
   );
 
   const won      = H.filter(t=>t.result==="won").length;
@@ -1166,6 +1169,9 @@ async function loadTips() {
     aiTips    = Array.isArray(d.aiTips)?d.aiTips:[];
     comboTips = Array.isArray(d.comboTips)?d.comboTips:[];
     currentFreeTips = Array.isArray(d.freeTips) ? d.freeTips : (d.freeTip ? [d.freeTip] : []);
+    // A free tippek külön szekcióban vannak; ezt sikeres betöltés után is
+    // frissíteni kell, különösen előfizetői és admin nézetben.
+    renderFreeTipSection();
     tipsEverLoaded = true;
     tipsRetryDelay = 3000;
     tipsErrLogged  = false;
