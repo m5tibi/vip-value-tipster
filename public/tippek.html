@@ -738,7 +738,6 @@ function renderHistory() {
   // Lezárt tippek mindig láthatóak, függetlenül a sport mezőtől
   const H = history.filter(t =>
     isApprovedH(t) &&
-    t.type !== "value" &&
     t.type !== "combo" &&
     // Az előzményekben minden nem érték-alapú, nem kombi tipp jelenjen meg.
     // A korábbi szűrés a hiányzó/eltérő sportmező miatt a folyamatban lévő
