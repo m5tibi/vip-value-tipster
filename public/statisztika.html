@@ -361,43 +361,6 @@ function renderTable(tips) {
   const el = document.getElementById('tips-table');
   const filtered = currentFilter === 'all' ? tips : tips.filter(t => t.result === currentFilter);
   const settled  = filtered.filter(t => t.result && t.result !== 'pending');
-
-  // DEBUG renderTable
-  const dbEl = document.getElementById('debug-panel');
-  if (dbEl) {
-    const first3 = filtered.slice(0,3).map(t=>`${t.type}/${t.result}/${(t.match||'kombi').slice(0,15)}`).join(' | ');
-    dbEl.textContent += ` | renderTable: ${filtered.length} (AI:${filtered.filter(t=>t.type==='ai').length} Kombi:${filtered.filter(t=>t.type==='combo').length}) period:${currentPeriod} filter:${currentFilter} | Top3: ${first3}`;
-  }
-
-  if (!filtered.length) { el.innerHTML = `<div class="empty">${window.t?.('stat.no_filter')}</div>`; return; }
-
-  const rows = filtered.map(t => {
-    const pl = tipProfit(t);
-    const plClass = pl > 0 ? 'pos' : pl < 0 ? 'neg' : 'zero';
-    const plText  = t.result === 'pending' ? '–' : (pl >= 0 ? '+' : '') + pl.toFixed(2);
-    const rc = RESULT_CLASS[t.result] || 'pending';
-    return `<tr style="${t.type==='ai'?'background:rgba(255,0,0,0.15)':t.type==='free'?'background:rgba(0,230,118,0.08)':''}">
-      <td class="td-date">${formatDate(t.commence || t.addedAt)}</td>
-      <td class="td-match">${t.type==='combo'?`<span style="color:var(--gold);font-size:11px;font-weight:700">🎰 Kombi (${(t.legs||[]).length} láb)</span>`:t.type==='free'?`<span style="background:rgba(0,230,118,.15);color:#00e676;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;margin-right:6px">🆓</span>${t.match||'–'}`:t.match||'–'}</td>
-      <td class="td-pick">${t.type==='combo'?`<span style="color:var(--muted);font-size:11px">${(t.legs||[]).map(l=>l.pick).join(' + ')}</span>`:`<span style="color:var(--muted);font-size:11px">${t.market||''}</span><br/>${t.pick||''}`}</td>
-      <td class="td-odds">${parseFloat(t.odds).toFixed(2)}</td>
-      <td><span class="badge ${rc}">${RESULT_LABELS()[t.result] || '–'}</span></td>
-      <td class="td-pl ${plClass}">${plText}</td>
-    </tr>`;
-  }).join('');
-
-  el.innerHTML = `<table>
-    <thead><tr>
-      <th data-i18n='stat.th_date'>Dátum</th><th data-i18n='stat.th_match'>Meccs</th><th data-i18n='stat.th_pick'>Tipp</th><th data-i18n='stat.th_odds'>Odds</th><th data-i18n='stat.th_result'>Eredmény</th><th style='text-align:right' data-i18n='stat.th_pl'>P/L</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-  <p style="font-size:11px;color:var(--muted);margin-top:12px;text-align:right">
-    ${settled.length} ${window.t?.("stat.settled_count") || "lezárt tipp"}
-  </p>`;
-  // DEBUG tr count
-  const dbEl2 = document.getElementById('debug-panel');
-  if (dbEl2) dbEl2.textContent += ` | DOM tr: ${el.querySelectorAll('tbody tr').length}`;
 }
 
 function setFilter(f, btn) {
@@ -555,23 +518,17 @@ async function loadData() {
     allTips = (Array.isArray(hist) ? hist : [])
       .filter(t => t.type !== 'value' && t.result && t.result !== 'pending')
       .sort((a,b) => {
-        const da = parseAnyDate(a.commence) || parseAnyDate(a.addedAt);
-        const db = parseAnyDate(b.commence) || parseAnyDate(b.addedAt);
-        return db - da;
+        // Meccs dátuma: singleknél commence, kombinál az utolsó láb commence-e
+        function tipDate(t) {
+          if (t.type === 'combo' && Array.isArray(t.legs) && t.legs.length) {
+            const legDates = t.legs.map(l => parseAnyDate(l.commence)).filter(Boolean);
+            if (legDates.length) return Math.max(...legDates);
+          }
+          return parseAnyDate(t.commence) || parseAnyDate(t.addedAt);
+        }
+        return tipDate(b) - tipDate(a);
       });
 
-   // DEBUG
-    const rawArr = Array.isArray(hist) ? hist : [];
-    document.getElementById('debug-panel')?.remove();
-    
-    // Csak akkor hozza létre a panelt, ha a felhasználó admin
-    if (localStorage.getItem('vbt_admin')) {
-      const dbDiv = document.createElement('div');
-      dbDiv.id = 'debug-panel';
-      dbDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#0d2233;color:#90caf9;font-size:11px;padding:6px 12px;text-align:center';
-      dbDiv.textContent = `🔍 Szerver: ${rawArr.length} | AI: ${rawArr.filter(t=>t.type==='ai').length} (lezárt:${rawArr.filter(t=>t.type==='ai'&&t.result&&t.result!=='pending').length}) | Kombi: ${rawArr.filter(t=>t.type==='combo').length} | allTips: ${allTips.length} | Admin: true`;
-      document.body.prepend(dbDiv);
-    }
     buildPeriodPicker(allTips);
 
     // All-time scoreboard: szerver oldali számítás (single forrás)
