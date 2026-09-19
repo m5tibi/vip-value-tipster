@@ -622,8 +622,35 @@ function renderFreeTipSection() {
   const el = document.getElementById("free-tip-section");
   if (!el) return;
   const admin = isAdmin();
-  const tips = currentFreeTips;
-  if (!tips || !tips.length) { el.innerHTML = ""; return; }
+  
+  // Összegyűjtjük az összes elérhető free tippet a history-ból vagy a currentFreeTips-ből
+  const tips = (history || []).filter(t => t.type === "free").concat(currentFreeTips || []);
+  // Duplikátumok kiszűrése ID alapján
+  const uniqueTips = [...new Map(tips.map(item => [item.id, item])).values()];
+
+  if (!uniqueTips.length) { el.innerHTML = ""; return; }
+
+  el.innerHTML = `<div style="margin-bottom:6px;font-size:11px;font-weight:700;color:#00e676;text-transform:uppercase;letter-spacing:.5px">🆓 Ingyenes napi tipp (${uniqueTips.length})</div>` + 
+  uniqueTips.map(tip => {
+    const approvedBadge = tip.approved !== false
+      ? `<span style="background:rgba(0,230,118,.15);color:#00e676;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">✅ JÓVÁHAGYVA</span>`
+      : `<span style="background:rgba(245,158,11,.15);color:#f59e0b;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">⏳ JÓVÁHAGYÁSRA VÁR</span>`;
+    
+    let adminBtns = "";
+    if (admin) {
+      adminBtns = `<div style="margin-top:10px">${adminTipControls(tip)}</div>`;
+    }
+
+    return `<div style="background:#071a10;border:2px solid #00e676;border-radius:12px;padding:18px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        ${admin ? approvedBadge : ""}
+        <span style="color:#5d7a96;font-size:11px">${tip.addedAt || ""}</span>
+      </div>
+      ${renderFreeTipCard(tip)}
+      ${adminBtns}
+    </div>`;
+  }).join("") + `<div style="height:4px"></div>`;
+}
 
   el.innerHTML = tips.map(tip => {
     const approvedBadge = tip.approved !== false
