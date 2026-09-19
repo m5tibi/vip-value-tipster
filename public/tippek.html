@@ -789,7 +789,7 @@ function renderHistory() {
     };
     const SETTLED_R = ['won','lost','push','half_won','half_lost'];
     const monthSettled = history.filter(t =>
-      SETTLED_R.includes(t.result) && isApproved(t) && tipMonth(t) === currentMonthKey
+      SETTLED_R.includes(t.result) && isApprovedH(t) && tipMonth(t) === currentMonthKey
     );
     const mWon  = monthSettled.filter(t => t.result === 'won').length;
     const mHW   = monthSettled.filter(t => t.result === 'half_won').length;
