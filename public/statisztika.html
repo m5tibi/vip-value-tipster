@@ -361,6 +361,42 @@ function renderTable(tips) {
   const el = document.getElementById('tips-table');
   const filtered = currentFilter === 'all' ? tips : tips.filter(t => t.result === currentFilter);
   const settled  = filtered.filter(t => t.result && t.result !== 'pending');
+
+  if (!filtered.length) { el.innerHTML = `<div class="empty">${window.t?.('stat.no_filter') || 'Nincs találat.'}</div>`; return; }
+
+  const rl = { won: '✅ Nyert', lost: '❌ Veszített', push: '↩️ Visszajár', half_won: '½✅ Fél nyert', half_lost: '½❌ Fél veszett', pending: '⏳...' };
+  const RC = { won:'won', lost:'lost', push:'push', half_won:'half_won', half_lost:'half_lost' };
+
+  const rows = filtered.map(t => {
+    const pl      = tipProfit(t);
+    const plClass = pl > 0 ? 'pos' : pl < 0 ? 'neg' : 'zero';
+    const plText  = t.result === 'pending' ? '–' : (pl >= 0 ? '+' : '') + pl.toFixed(2);
+    const rc      = RC[t.result] || 'pending';
+    const rText   = rl[t.result] || '–';
+    return `<tr>
+      <td class="td-date">${formatDate(t.commence || t.addedAt)}</td>
+      <td class="td-match">${t.type==='combo'
+        ? `<span class="badge combo">🎰 ${window.t?.('stat.combo')||'Kombi'} (${t.legN || (t.legs||[]).length} ${window.t?.('stat.leg')||'láb'})</span><br/><span style="font-size:11px;color:var(--muted)">${(t.legs||[]).map(l=>l.pick).join(' + ')}</span>`
+        : t.type==='free' ? `<span class="badge push">🆓</span> ${t.match||'–'}`
+        : t.match||'–'}</td>
+      <td class="td-pick">${t.type==='combo'
+        ? `<span style="font-size:11px;color:var(--muted)">${(t.legs||[]).map(l=>(l.match||'').split(' vs ')[0]).join(' + ')}</span>`
+        : `<span class="market-badge" style="font-size:10px;color:var(--muted);display:block">${t.market||''}</span>${t.pick||''}`}</td>
+      <td class="td-odds">${parseFloat(t.odds||0).toFixed(2)}</td>
+      <td class="td-result"><span class="badge ${rc}">${rText}</span></td>
+      <td class="td-pl ${plClass}">${plText}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `<table>
+    <thead><tr>
+      <th data-i18n='stat.th_date'>Dátum</th><th data-i18n='stat.th_match'>Meccs</th><th data-i18n='stat.th_pick'>Tipp</th><th data-i18n='stat.th_odds'>Odds</th><th data-i18n='stat.th_result'>Eredmény</th><th style='text-align:right' data-i18n='stat.th_pl'>P/L</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <p style="font-size:11px;color:var(--muted);margin-top:12px;text-align:right">
+    ${settled.length} ${window.t?.("stat.settled_count") || "lezárt tipp"}
+  </p>`;
 }
 
 function setFilter(f, btn) {
