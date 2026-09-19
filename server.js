@@ -1568,7 +1568,7 @@ app.get("/api/history", (req, res) => {
   if (auth.hasAccess(freshUserHist)) return res.json(approved);
   // Track record: minden lezárt tipp látható, bejelentkezés nélkül is
   const settledOnly = history.filter(t =>
-    t.result && t.result !== "pending" && t.type !== "value"
+    t.result && t.result !== "pending"
   );
   res.json(settledOnly);
 });
