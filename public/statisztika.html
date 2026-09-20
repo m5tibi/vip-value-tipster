@@ -146,6 +146,11 @@
     .period-wrap{padding:0 12px;margin:16px auto 0}
     .period-bar{gap:6px}
     .period-btn{font-size:11px;padding:5px 10px;border-radius:6px}
+    /* Dátum a meccs neve felett, mobilon */
+    .td-match-mobile-date{display:block;font-size:10px;color:var(--muted);margin-bottom:2px;white-space:nowrap}
+  }
+  @media(min-width:601px){
+    .td-match-mobile-date{display:none}
   }
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:#5d7a96;cursor:pointer;transition:all .15s}button.lang-toggle:hover{border-color:#00e676;color:#00e676}
@@ -378,7 +383,7 @@ function renderTable(tips) {
     const rText   = rl[t.result] || '–';
     return `<tr>
       <td class="td-date">${formatDate(t.commence || t.addedAt)}</td>
-      <td class="td-match">${t.type==='combo'
+      <td class="td-match"><span class="td-match-mobile-date">${formatDate(t.commence || t.addedAt)}</span>${t.type==='combo'
         ? `<span class="badge combo">🎰 Kombi (${t.legN || (t.legs||[]).length} láb)</span><br/><span style="font-size:11px;color:var(--muted)">${(t.legs||[]).map(l=>l.pick).join(' + ')}</span>`
         : t.type==='free' ? `<span class="badge push">🆓</span> ${t.match||'–'}`
         : t.match||'–'}</td>
