@@ -573,8 +573,9 @@ function adminTipControls(t) {
     : `<span style="color:#ffb74d;font-size:11px;font-weight:700">${"⏳ Jóváhagyásra vár (rejtett)"}</span>`;
   const approveBtn = approved ? "" : `<button class="btn-won" style="font-size:11px;padding:4px 10px" onclick="approveTip('${t.id}')">✅ Jóváhagyás</button>`;
   const makeFreeBtn = t.type !== "free" ? `<button style="background:#00c853;color:#000;border:none;font-size:11px;padding:4px 10px;border-radius:6px;font-weight:700;cursor:pointer" onclick="makeFree('${t.id}')">🆓 Free-nek</button>` : "";
+  const mondomatutitBtn = `<button id="mm-btn-${t.id}" style="background:#6B46C1;color:#fff;border:none;font-size:11px;padding:4px 10px;border-radius:6px;font-weight:700;cursor:pointer" onclick="pushToMondomatutit('${t.id}')">→ Mondomatutit</button>`;
   return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #2a3550">
-    ${badge}${approveBtn}${makeFreeBtn}
+    ${badge}${approveBtn}${makeFreeBtn}${mondomatutitBtn}
     <button class="btn-del" style="font-size:11px;padding:4px 10px" onclick="deleteTip('${t.id}')">🗑️ Törlés</button>
     <button class="btn-push" style="font-size:11px;padding:4px 10px" onclick="editNote('${t.id}',this)">✏️ Szerkesztés</button>
   </div>`;
@@ -1372,6 +1373,32 @@ async function sendTips() {
 }
 
 async function loadStatus() {}
+
+// ── Mondomatutit push ─────────────────────────────────────
+async function pushToMondomatutit(tipId) {
+  const btn = document.getElementById("mm-btn-" + tipId);
+  if (btn) { btn.disabled = true; btn.textContent = "Küldés..."; }
+  try {
+    const r = await fetch("/api/admin/push-to-mondomatutit", {
+      method:  "POST",
+      headers: { ...adminHeaders(), "Content-Type": "application/json" },
+      body:    JSON.stringify({ tipId })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.ok) {
+      showStatus("✅ Átküldve Mondomatutitnak! (id: " + (d.mondomatutit_id || "?") + ")");
+      if (btn) { btn.textContent = "✓ Átküldve"; btn.style.background = "#276749"; }
+    } else {
+      const msg = d.error || ("HTTP " + r.status);
+      showStatus("❌ Mondomatutit hiba: " + msg, "#ef9a9a");
+      if (btn) { btn.textContent = "❌ Hiba"; btn.disabled = false; btn.style.background = "#7f0000"; }
+      console.error("[mondomatutit push]", msg);
+    }
+  } catch(e) {
+    showStatus("❌ Hálózati hiba: " + e.message, "#ef9a9a");
+    if (btn) { btn.textContent = "❌ Hiba"; btn.disabled = false; }
+  }
+}
 
 // Indulás: előbb megnézzük, ki van belépve, aztán töltünk
 (async () => {
