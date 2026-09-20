@@ -27,6 +27,8 @@
   #user-email { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #refresh-range-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.8); z-index: 600; align-items: center; justify-content: center; padding: 16px; }
   #refresh-range-modal.open { display: flex; }
+  #preview-modal { display: none; }
+  #preview-modal.open { display: flex; }
 
   @media (max-width: 520px) {
     .tabs { gap: 6px; }
@@ -230,6 +232,7 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
     <div class="toolbar">
       <div class="last-update" id="last-update" data-i18n="tips.no_analysis">Még nem futott elemzés</div>
       <button class="btn-send" id="btn-send-tips" onclick="sendTips()" style="display:none">📤 Jóváhagyottak küldése</button>
+      <button class="btn-send" id="btn-preview" onclick="openPreviewModal()" style="display:none">🔍 Meccsek</button>
       <button class="btn-refresh" id="btn-refresh" style="display:none">🔄 Frissítés most</button>
     </div>
     <!-- Free tip section (admin sees pending, users see approved) -->
@@ -447,6 +450,7 @@ function applyAdminUI() {
   const loggedIn = !!ME.user || admin;
   const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
   show('btn-refresh', admin);
+  show('btn-preview', admin);
   show('btn-send-tips', admin);
   show('btn-login',  !loggedIn);
   show('btn-logout', loggedIn);
@@ -1390,6 +1394,66 @@ async function sendTips() {
 
 async function loadStatus() {}
 
+// ── Meccsek előnézete modal ────────────────────────────────────
+function openPreviewModal() {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const from = new Date(tomorrow); from.setHours(0, 0, 0, 0);
+  const to   = new Date(tomorrow); to.setHours(23, 59, 0, 0);
+  document.getElementById('prv-from').value = _dtLocal(from);
+  document.getElementById('prv-to').value   = _dtLocal(to);
+  document.getElementById('prv-results').innerHTML = '';
+  document.getElementById('preview-modal').classList.add('open');
+}
+
+function closePreviewModal() {
+  document.getElementById('preview-modal').classList.remove('open');
+}
+
+async function doPreview() {
+  const fromVal = document.getElementById('prv-from').value;
+  const toVal   = document.getElementById('prv-to').value;
+  if (!fromVal || !toVal) return;
+  const fromTs = new Date(fromVal).toISOString();
+  const toTs   = new Date(toVal).toISOString();
+  const resultsEl = document.getElementById('prv-results');
+  resultsEl.innerHTML = '<div style="color:#78909c;padding:16px 0">🔄 Lekérdezés folyamatban...</div>';
+  try {
+    const r = await fetch('/api/admin/preview-matches', {
+      method: 'POST',
+      headers: { ...adminHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fromTs, toTs })
+    });
+    const d = await r.json();
+    if (!r.ok) { resultsEl.innerHTML = `<div style="color:#ef9a9a">❌ Hiba: ${d.error}</div>`; return; }
+    const { matches = [], scanned = 0, oddsHits = 0 } = d;
+    if (!matches.length) {
+      resultsEl.innerHTML = `<div style="color:#78909c;padding:12px 0">Nincs meccs ebben az időablakban.<br><small style="font-size:11px">${scanned} liga átnézve · ${oddsHits} odds lekérés</small></div>`;
+      return;
+    }
+    resultsEl.innerHTML = `
+      <div style="font-size:11px;color:#546e7a;margin-bottom:10px">${scanned} liga átnézve · ${oddsHits} odds lekérés · ${matches.length} meccs</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="border-bottom:1px solid #1e3a2f">
+            <th style="text-align:left;padding:6px 8px;color:#546e7a">Kezdés</th>
+            <th style="text-align:left;padding:6px 8px;color:#546e7a">Meccs</th>
+            <th style="text-align:left;padding:6px 8px;color:#546e7a">1X2 odds</th>
+          </tr></thead>
+          <tbody>
+            ${matches.map(m => `<tr style="border-bottom:1px solid rgba(30,58,47,.4)">
+              <td style="padding:7px 8px;white-space:nowrap;color:#80cbc4">🕐 ${m.commenceHu}</td>
+              <td style="padding:7px 8px;color:#e2e8f0;font-weight:600">${m.match}<br><span style="font-size:10px;color:#546e7a">${m.sport}</span></td>
+              <td style="padding:7px 8px;color:#b39ddb;font-size:11px">${m.odds || '–'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } catch(e) {
+    resultsEl.innerHTML = `<div style="color:#ef9a9a">❌ Hálózati hiba: ${e.message}</div>`;
+  }
+}
+
 // ── Időintervallum-választó modal (Frissítés most) ────────────
 function _dtLocal(date) {
   const p = n => String(n).padStart(2, '0');
@@ -1459,8 +1523,12 @@ async function pushToMondomatutit(tipId) {
   // hogy egy esetleges hiba se akadályozza meg a gomb működését.
   const btnRefresh = document.getElementById('btn-refresh');
   if (btnRefresh) btnRefresh.addEventListener('click', openRefreshModal);
+  const btnPreview = document.getElementById('btn-preview');
+  if (btnPreview) btnPreview.addEventListener('click', openPreviewModal);
   const mo = document.getElementById('refresh-range-modal');
   if (mo) mo.addEventListener('click', e => { if (e.target === mo) closeRefreshModal(); });
+  const pmo = document.getElementById('preview-modal');
+  if (pmo) pmo.addEventListener('click', e => { if (e.target === pmo) closePreviewModal(); });
 
   try { await refreshMe(); } catch(e) { console.error('[init] refreshMe:', e); }
   try { await loadTips(); } catch(e) { console.error('[init] loadTips:', e); }
@@ -1567,8 +1635,37 @@ async function syncStripe() {
 }
 
 </script>
-<!-- ── Időintervallum-választó modal ───────────────────────── -->
+<!-- ── Meccsek előnézete modal ─────────────────────────────── -->
 </div><!-- /users-modal (lezárás) -->
+<div id="preview-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:600;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">
+  <div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:14px;padding:24px;width:min(640px,100%);margin:20px auto;box-shadow:0 8px 32px rgba(0,0,0,.6)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:17px;font-weight:700;color:#00e676">🔍 Elérhető meccsek</div>
+      <button onclick="closePreviewModal()" style="background:none;border:none;color:#546e7a;font-size:22px;cursor:pointer;line-height:1">✕</button>
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap">
+      <div style="flex:1;min-width:140px">
+        <label style="display:block;font-size:11px;font-weight:700;color:#80cbc4;margin-bottom:5px">ETTŐL</label>
+        <input type="datetime-local" id="prv-from"
+          style="width:100%;box-sizing:border-box;padding:9px 10px;border-radius:8px;border:1px solid #1e3a2f;background:#07111d;color:#e0e0e0;font-size:13px;color-scheme:dark">
+      </div>
+      <div style="flex:1;min-width:140px">
+        <label style="display:block;font-size:11px;font-weight:700;color:#80cbc4;margin-bottom:5px">EDDIG</label>
+        <input type="datetime-local" id="prv-to"
+          style="width:100%;box-sizing:border-box;padding:9px 10px;border-radius:8px;border:1px solid #1e3a2f;background:#07111d;color:#e0e0e0;font-size:13px;color-scheme:dark">
+      </div>
+      <button onclick="doPreview()"
+        style="padding:9px 18px;border-radius:8px;border:none;background:#00e676;color:#060e1b;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap">
+        🔍 Keresés
+      </button>
+    </div>
+
+    <div id="prv-results"></div>
+  </div>
+</div>
+
+<!-- ── Időintervallum-választó modal ───────────────────────── -->
 <div id="refresh-range-modal">
   <div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:14px;padding:24px;width:min(400px,100%);box-shadow:0 8px 32px rgba(0,0,0,.6)">
     <div style="font-size:17px;font-weight:700;color:#00e676;margin-bottom:6px">🕐 Időintervallum</div>
