@@ -227,7 +227,7 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
     <div class="toolbar">
       <div class="last-update" id="last-update" data-i18n="tips.no_analysis">Még nem futott elemzés</div>
       <button class="btn-send" id="btn-send-tips" onclick="sendTips()" style="display:none">📤 Jóváhagyottak küldése</button>
-      <button class="btn-refresh" id="btn-refresh" onclick="refresh()" style="display:none">🔄 Frissítés most</button>
+      <button class="btn-refresh" id="btn-refresh" onclick="openRefreshModal()" style="display:none">🔄 Frissítés most</button>
     </div>
     <!-- Free tip section (admin sees pending, users see approved) -->
   <div id="free-tip-section" style="margin-bottom:16px"></div>
@@ -1058,14 +1058,17 @@ function toggleDay(id) {
   a.classList.toggle("open",!open);
 }
 
-async function refresh() {
+async function refresh(fromTs = null, toTs = null) {
   const btn = document.getElementById("btn-refresh");
   btn.disabled=true; btn.textContent="Elemzés folyamatban...";
   try {
+    const body = {password: getAdminPwd()};
+    if (fromTs) body.fromTs = fromTs;
+    if (toTs)   body.toTs   = toTs;
     const r = await fetch("/api/refresh", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({password: getAdminPwd()})
+      body: JSON.stringify(body)
     });
     const d = await r.json();
     if (d.error) { showStatus("⛔ " + d.error, "#ef9a9a"); }
@@ -1384,6 +1387,40 @@ async function sendTips() {
 
 async function loadStatus() {}
 
+// ── Időintervallum-választó modal (Frissítés most) ────────────
+function _dtLocal(date) {
+  // date → "ÉÉÉÉ-HH-NN THH:PP" alakra (datetime-local inputhoz)
+  const p = n => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${p(date.getMonth()+1)}-${p(date.getDate())}T${p(date.getHours())}:${p(date.getMinutes())}`;
+}
+
+function openRefreshModal() {
+  // Alapértelmezett: holnap 10:00 – holnap 23:00
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const from = new Date(tomorrow); from.setHours(10, 0, 0, 0);
+  const to   = new Date(tomorrow); to.setHours(23, 0, 0, 0);
+  document.getElementById('rng-from').value = _dtLocal(from);
+  document.getElementById('rng-to').value   = _dtLocal(to);
+  document.getElementById('refresh-range-modal').style.display = 'flex';
+  document.getElementById('rng-from').focus();
+}
+
+function closeRefreshModal() {
+  document.getElementById('refresh-range-modal').style.display = 'none';
+}
+
+async function doRefresh() {
+  const fromVal = document.getElementById('rng-from').value;
+  const toVal   = document.getElementById('rng-to').value;
+  if (!fromVal || !toVal) { showStatus('⚠️ Add meg mindkét időpontot!', '#ffe082'); return; }
+  const fromTs = new Date(fromVal).toISOString();
+  const toTs   = new Date(toVal).toISOString();
+  if (new Date(toTs) <= new Date(fromTs)) { showStatus('⚠️ A végső időpont korábbi a kezdőnél!', '#ef9a9a'); return; }
+  closeRefreshModal();
+  await refresh(fromTs, toTs);
+}
+
 // ── Mondomatutit push ─────────────────────────────────────
 async function pushToMondomatutit(tipId) {
   const btn = document.getElementById("mm-btn-" + tipId);
@@ -1517,5 +1554,34 @@ async function syncStripe() {
 }
 
 </script>
+<!-- ── Időintervallum-választó modal ───────────────────────── -->
+<div id="refresh-range-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:14px;padding:24px;width:min(400px,100%);box-shadow:0 8px 32px rgba(0,0,0,.6)">
+    <div style="font-size:17px;font-weight:700;color:#00e676;margin-bottom:6px">🕐 Időintervallum</div>
+    <div style="font-size:12px;color:#78909c;margin-bottom:20px">Melyik időszakra keressen meccseket és generáljon tippeket?</div>
+
+    <label style="display:block;font-size:11px;font-weight:700;color:#80cbc4;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">Ettől</label>
+    <input type="datetime-local" id="rng-from"
+      style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid #1e3a2f;background:#07111d;color:#e0e0e0;font-size:14px;margin-bottom:14px;color-scheme:dark">
+
+    <label style="display:block;font-size:11px;font-weight:700;color:#80cbc4;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">Eddig</label>
+    <input type="datetime-local" id="rng-to"
+      style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid #1e3a2f;background:#07111d;color:#e0e0e0;font-size:14px;margin-bottom:6px;color-scheme:dark">
+
+    <div style="font-size:11px;color:#37474f;margin-bottom:20px">💡 Pl. holnap 12:00 – holnap 23:00, hogy csak a délutáni/esti meccseket nézze.</div>
+
+    <div style="display:flex;gap:10px">
+      <button onclick="closeRefreshModal()"
+        style="flex:1;padding:11px;border-radius:8px;border:1px solid #1e3a2f;background:transparent;color:#78909c;font-weight:700;font-size:14px;cursor:pointer">
+        Mégse
+      </button>
+      <button onclick="doRefresh()"
+        style="flex:2;padding:11px;border-radius:8px;border:none;background:#00e676;color:#060e1b;font-weight:700;font-size:14px;cursor:pointer">
+        🔄 Generálás
+      </button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
