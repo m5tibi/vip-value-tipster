@@ -709,9 +709,12 @@ function buildCombos(legs, matchList = []) {
 const isApproved = t => t.approved !== false;
 
 // ── Fő frissítő ───────────────────────────────────────────
-async function fetchAndProcess() {
+async function fetchAndProcess(fromTs = null, toTs = null) {
   const now   = new Date();
-  console.log(`Elemzés indul: ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}`);
+  // Időablak: ha nincs megadva, a következő WINDOW_HOURS óra (alapértelmezés)
+  const fromDate = fromTs ? new Date(fromTs) : now;
+  const toDate   = toTs   ? new Date(toTs)   : new Date(now.getTime() + WINDOW_HOURS * 3600000);
+  console.log(`Elemzés indul: ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })} | Ablak: ${fromDate.toLocaleString("hu-HU", {timeZone:"Europe/Budapest"})} – ${toDate.toLocaleString("hu-HU", {timeZone:"Europe/Budapest"})}`);
 
   // Minden MÉG LE NEM ZÁRT (pending) single tipp meccse – dátumtól függetlenül.
   // Így egy előre (pl. tegnap) felvett, még el nem kezdődött meccsre nem ad újabb tippet.
@@ -723,16 +726,16 @@ async function fetchAndProcess() {
   let scannedLeagues = 0, oddsCalls = 0;
   for (const [sportKey, meta] of Object.entries(SPORT_MAP)) {
     try {
-      // 1) INGYENES esemény-lekérdezés (/events = 0 kredit): van-e meccs a köv. 24 órában?
+      // 1) INGYENES esemény-lekérdezés (/events = 0 kredit): van-e meccs az időablakban?
       const er = await fetch(`https://api.the-odds-api.com/v4/sports/${sportKey}/events?apiKey=${ODDS_API_KEY}&dateFormat=iso`);
       scannedLeagues++;
       if (!er.ok) continue;
       const events = await er.json();
       const hasUpcoming = (Array.isArray(events) ? events : []).some(e => {
-        const h = (new Date(e.commence_time) - now) / 3600000;
-        return h >= 0 && h <= WINDOW_HOURS;
+        const ct = new Date(e.commence_time);
+        return ct >= fromDate && ct <= toDate;
       });
-      if (!hasUpcoming) continue;   // nincs közelgő meccs → NEM kérünk (drága) oddsot
+      if (!hasUpcoming) continue;   // nincs meccs az időablakban → NEM kérünk (drága) oddsot
 
       // 2) Csak most kérünk oddsot (3 kredit/liga), mert van közelgő meccs
       const url   = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h,totals,spreads&oddsFormat=decimal&dateFormat=iso`;
@@ -741,8 +744,8 @@ async function fetchAndProcess() {
       if (!r.ok) continue;
       const games = await r.json();
       for (const game of games) {
-        const hoursUntil = (new Date(game.commence_time) - now) / 3600000;
-        if (hoursUntil < 0 || hoursUntil > WINDOW_HOURS) continue;
+        const ct = new Date(game.commence_time);
+        if (ct < fromDate || ct > toDate) continue;
         // (Nincs meccs-kihagyás: a teljes lista kell a kombi lábakhoz is; a single
         //  duplikátumot a prompt + a válasz utólagos szűrése kezeli.)
 
@@ -1707,8 +1710,14 @@ app.get("/api/public-stats", (req, res) => {
 
 app.post("/api/refresh", async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  await fetchAndProcess();
-  res.json({ ok: true, aiTips: aiTips.length });
+  const { fromTs, toTs } = req.body || {};
+  try {
+    await fetchAndProcess(fromTs || null, toTs || null);
+    res.json({ ok: true, aiTips: aiTips.length });
+  } catch(e) {
+    console.error("[refresh] Hiba:", e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.patch("/api/history/:id", (req, res) => {
