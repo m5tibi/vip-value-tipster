@@ -801,13 +801,23 @@ function renderHistory() {
     let mProfit = 0;
     monthSettled.forEach(t => {
       const o = parseFloat(t.odds) || 1;
-      if (t.result === 'won')       mProfit += o - 1;
-      else if (t.result === 'lost') mProfit -= 1;
-      else if (t.result === 'half_won')  mProfit += (o - 1) / 2;
-      else if (t.result === 'half_lost') mProfit -= 0.5;
-      else if (t.type === 'combo' && t.result === 'won') mProfit += parseFloat(t.comboPayout||0) - 1;
+      // Kombikhoz comboPayout-ot használunk (mint a statisztika.html /api/admin/stats endpointja)
+      if (t.type === 'combo') {
+        const cp = parseFloat(t.comboPayout);
+        if      (t.result === 'won')       mProfit += isNaN(cp) ? o - 1 : cp - 1;
+        else if (t.result === 'lost')      mProfit -= 1;
+        else if (t.result === 'half_won')  mProfit += (o - 1) / 2;
+        else if (t.result === 'half_lost') mProfit -= 0.5;
+        // push: 0
+      } else {
+        if      (t.result === 'won')       mProfit += o - 1;
+        else if (t.result === 'lost')      mProfit -= 1;
+        else if (t.result === 'half_won')  mProfit += (o - 1) / 2;
+        else if (t.result === 'half_lost') mProfit -= 0.5;
+      }
     });
-    const mROI  = decN ? (mProfit / decN * 100).toFixed(1) : '0.0';
+    // ROI nevező: monthSettled.length (pusht is beleértve) – azonos a statisztika.html-lel
+    const mROI  = monthSettled.length ? (mProfit / monthSettled.length * 100).toFixed(1) : '0.0';
     const col   = mProfit >= 0 ? "#00e676" : "#ef9a9a";
     const sign  = v => (v >= 0 ? '+' : '') + parseFloat(v).toFixed(2);
 
