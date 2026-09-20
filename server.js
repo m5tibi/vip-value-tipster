@@ -2531,6 +2531,71 @@ async function fetchMatchListOnly() {
   return newList;
 }
 
+// ── Meccsek előnézete (tippgenerálás nélkül) ─────────────────────────────────
+// Admin megnézheti milyen meccsek vannak az Odds API-ban egy adott időablakban,
+// mielőtt dönt, hogy érdemes-e generálni.
+app.post("/api/admin/preview-matches", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const { fromTs, toTs } = req.body || {};
+  const now      = new Date();
+  const fromDate = fromTs ? new Date(fromTs) : now;
+  const toDate   = toTs   ? new Date(toTs)   : new Date(now.getTime() + WINDOW_HOURS * 3600000);
+
+  const matches = [];
+  let scanned = 0, oddsHits = 0;
+  try {
+    for (const [sportKey, meta] of Object.entries(SPORT_MAP)) {
+      try {
+        // 1) Ingyenes events check (0 kredit)
+        const er = await fetch(
+          `https://api.the-odds-api.com/v4/sports/${sportKey}/events?apiKey=${ODDS_API_KEY}&dateFormat=iso`
+        );
+        scanned++;
+        if (!er.ok) continue;
+        const events = await er.json();
+        const hasInWindow = (Array.isArray(events) ? events : []).some(e => {
+          const ct = new Date(e.commence_time);
+          return ct >= fromDate && ct <= toDate;
+        });
+        if (!hasInWindow) continue;
+
+        // 2) Odds lekérés (3 kredit/liga) – csak ha van meccs az ablakban
+        const r = await fetch(
+          `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h&oddsFormat=decimal&dateFormat=iso`
+        );
+        oddsHits++;
+        if (!r.ok) continue;
+        const games = await r.json();
+        for (const g of (Array.isArray(games) ? games : [])) {
+          const ct = new Date(g.commence_time);
+          if (ct < fromDate || ct > toDate) continue;
+          const h2h = (g.bookmakers || [])
+            .flatMap(bk => (bk.markets || [])
+              .filter(m => m.key === "h2h")
+              .flatMap(m => (m.outcomes || []).map(o => ({ name: o.name, odds: o.price, bk: bk.title })))
+            );
+          const best = {};
+          for (const o of h2h) {
+            if (!best[o.name] || o.odds > best[o.name].odds) best[o.name] = o;
+          }
+          const oddsStr = Object.values(best).map(o => `${o.name} ${o.odds.toFixed(2)}`).join(" · ");
+          matches.push({
+            sport:   meta.label,
+            match:   `${g.home_team} vs ${g.away_team}`,
+            commence: g.commence_time,
+            commenceHu: huTime(g.commence_time),
+            odds:    oddsStr
+          });
+        }
+      } catch(e) {}
+    }
+    matches.sort((a, b) => new Date(a.commence) - new Date(b.commence));
+    res.json({ ok: true, matches, scanned, oddsHits });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post("/api/refresh-odds-only", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
