@@ -1455,15 +1455,16 @@ async function pushToMondomatutit(tipId) {
 
 // Indulás: előbb megnézzük, ki van belépve, aztán töltünk
 (async () => {
-  await refreshMe();
-  await loadTips();
-  await loadHistory();
-  // Frissítés gomb: modal megnyitása
+  // Event listenerek bekötése azonnal — nem várjuk meg az async műveleteket,
+  // hogy egy esetleges hiba se akadályozza meg a gomb működését.
   const btnRefresh = document.getElementById('btn-refresh');
   if (btnRefresh) btnRefresh.addEventListener('click', openRefreshModal);
-  // Modal háttér-kattintásra bezár
   const mo = document.getElementById('refresh-range-modal');
   if (mo) mo.addEventListener('click', e => { if (e.target === mo) closeRefreshModal(); });
+
+  try { await refreshMe(); } catch(e) { console.error('[init] refreshMe:', e); }
+  try { await loadTips(); } catch(e) { console.error('[init] loadTips:', e); }
+  try { await loadHistory(); } catch(e) { console.error('[init] loadHistory:', e); }
 })();
 // Önjavító frissítés: percenként, és amikor a fül újra aktív lesz (pl. deploy után).
 setInterval(() => { if (document.visibilityState === "visible") loadTips(); }, 60000);
