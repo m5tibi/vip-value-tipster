@@ -25,6 +25,9 @@
   .tab.active { background: #00e676; color: #07111d; border-color: #00e676; }
   /* A belépett e-mail cím ne feszítse szét a fejlécet mobilon */
   #user-email { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #refresh-range-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.8); z-index: 600; align-items: center; justify-content: center; padding: 16px; }
+  #refresh-range-modal.open { display: flex; }
+
   @media (max-width: 520px) {
     .tabs { gap: 6px; }
     .tab { padding: 7px 12px; font-size: 13px; }
@@ -227,7 +230,7 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
     <div class="toolbar">
       <div class="last-update" id="last-update" data-i18n="tips.no_analysis">Még nem futott elemzés</div>
       <button class="btn-send" id="btn-send-tips" onclick="sendTips()" style="display:none">📤 Jóváhagyottak küldése</button>
-      <button class="btn-refresh" id="btn-refresh" onclick="openRefreshModal()" style="display:none">🔄 Frissítés most</button>
+      <button class="btn-refresh" id="btn-refresh" style="display:none">🔄 Frissítés most</button>
     </div>
     <!-- Free tip section (admin sees pending, users see approved) -->
   <div id="free-tip-section" style="margin-bottom:16px"></div>
@@ -1389,25 +1392,28 @@ async function loadStatus() {}
 
 // ── Időintervallum-választó modal (Frissítés most) ────────────
 function _dtLocal(date) {
-  // date → "ÉÉÉÉ-HH-NN THH:PP" alakra (datetime-local inputhoz)
   const p = n => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${p(date.getMonth()+1)}-${p(date.getDate())}T${p(date.getHours())}:${p(date.getMinutes())}`;
 }
 
 function openRefreshModal() {
-  // Alapértelmezett: holnap 10:00 – holnap 23:00
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const from = new Date(tomorrow); from.setHours(10, 0, 0, 0);
   const to   = new Date(tomorrow); to.setHours(23, 0, 0, 0);
-  document.getElementById('rng-from').value = _dtLocal(from);
-  document.getElementById('rng-to').value   = _dtLocal(to);
-  document.getElementById('refresh-range-modal').style.display = 'flex';
-  document.getElementById('rng-from').focus();
+  const fi = document.getElementById('rng-from');
+  const ti = document.getElementById('rng-to');
+  const mo = document.getElementById('refresh-range-modal');
+  if (!fi || !ti || !mo) { console.error('[modal] Hiányzó elem!'); return; }
+  fi.value = _dtLocal(from);
+  ti.value = _dtLocal(to);
+  mo.classList.add('open');
+  fi.focus();
 }
 
 function closeRefreshModal() {
-  document.getElementById('refresh-range-modal').style.display = 'none';
+  const mo = document.getElementById('refresh-range-modal');
+  if (mo) mo.classList.remove('open');
 }
 
 async function doRefresh() {
@@ -1452,6 +1458,12 @@ async function pushToMondomatutit(tipId) {
   await refreshMe();
   await loadTips();
   await loadHistory();
+  // Frissítés gomb: modal megnyitása
+  const btnRefresh = document.getElementById('btn-refresh');
+  if (btnRefresh) btnRefresh.addEventListener('click', openRefreshModal);
+  // Modal háttér-kattintásra bezár
+  const mo = document.getElementById('refresh-range-modal');
+  if (mo) mo.addEventListener('click', e => { if (e.target === mo) closeRefreshModal(); });
 })();
 // Önjavító frissítés: percenként, és amikor a fül újra aktív lesz (pl. deploy után).
 setInterval(() => { if (document.visibilityState === "visible") loadTips(); }, 60000);
@@ -1555,7 +1567,7 @@ async function syncStripe() {
 
 </script>
 <!-- ── Időintervallum-választó modal ───────────────────────── -->
-<div id="refresh-range-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;align-items:center;justify-content:center;padding:16px">
+<div id="refresh-range-modal">
   <div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:14px;padding:24px;width:min(400px,100%);box-shadow:0 8px 32px rgba(0,0,0,.6)">
     <div style="font-size:17px;font-weight:700;color:#00e676;margin-bottom:6px">🕐 Időintervallum</div>
     <div style="font-size:12px;color:#78909c;margin-bottom:20px">Melyik időszakra keressen meccseket és generáljon tippeket?</div>
