@@ -71,17 +71,17 @@
   .empty { text-align: center; color: #37474f; padding: 30px; font-size: 14px; }
   .section-header { font-weight: 700; font-size: 14px; margin: 16px 0 8px; padding: 8px 12px; border-radius: 8px; }
   .day-section { margin-bottom: 6px; border: 1px solid #1e3a2f; border-radius: 10px; overflow: hidden; }
-  .day-toggle { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #0d1b2a; cursor: pointer; user-select: none; }
+  .day-toggle { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 10px 14px; background: #0d1b2a; cursor: pointer; user-select: none; }
   .day-toggle:hover { background: #112233; }
-  .day-label { font-size: 13px; font-weight: 700; color: #80cbc4; }
-  .day-meta { font-size: 11px; color: #546e7a; margin-right: 8px; }
-  .day-arrow { color: #546e7a; font-size: 11px; transition: transform 0.2s; }
+  .day-label { font-size: 13px; font-weight: 700; color: #80cbc4; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .day-meta { font-size: 11px; color: #546e7a; margin-right: 4px; white-space: nowrap; }
+  .day-arrow { color: #546e7a; font-size: 11px; transition: transform 0.2s; flex-shrink: 0; }
   .day-arrow.open { transform: rotate(180deg); }
   .day-content { padding: 10px 10px 4px; }
   .month-section { margin: 8px 0 6px; border: 1px solid #2a3550; border-radius: 10px; overflow: hidden; }
-  .month-toggle { display: flex; justify-content: space-between; align-items: center; padding: 11px 14px; background: #101a30; cursor: pointer; user-select: none; }
+  .month-toggle { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 11px 14px; background: #101a30; cursor: pointer; user-select: none; }
   .month-toggle:hover { background: #16223d; }
-  .month-label { font-size: 13px; font-weight: 700; color: #b39ddb; }
+  .month-label { font-size: 13px; font-weight: 700; color: #b39ddb; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .month-content { padding: 6px 6px 2px; }
   .stats-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
 button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:#546e7a;cursor:pointer;transition:all .15s}button.lang-toggle:hover{border-color:#00e676;color:#00e676}
@@ -869,7 +869,7 @@ function renderHistory() {
     <div class="day-section">
       <div class="day-toggle" onclick="toggleDay('${id}')">
         <span class="day-label">${label}</span>
-        <span style="display:flex;align-items:center;gap:6px">
+        <span style="display:flex;align-items:center;gap:6px;flex-shrink:0">
           <span class="day-meta">${meta}</span>
           <span class="day-arrow ${defaultOpen?"open":""}" id="arr-${id}">▼</span>
         </span>
@@ -928,7 +928,7 @@ function renderHistory() {
     <div class="month-section">
       <div class="month-toggle" onclick="toggleDay('${id}')">
         <span class="month-label">🗓️ ${monthLabel(monthKey)}</span>
-        <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+        <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0">
           <span class="day-meta">${meta}</span>
           <span class="day-arrow${isCurrentMo?" open":""}" id="arr-${id}">${isCurrentMo?"▲":"▼"}</span>
         </span>
@@ -963,10 +963,10 @@ function renderHistory() {
     // Aktuális év automatikusan kinyílik
     const isCurrentYr = yearStr === currentYear;
     return `<div style="margin-bottom:6px">
-      <div onclick="toggleDay('${id}')" style="background:#0a1520;border:1px solid #1a2f4a;border-radius:8px;padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-weight:700;color:#dce8f5;font-size:14px">📆 ${yearStr}</span>
-        <span style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:12px;color:#5d7a96">${yearTips.length} tipp${isAdmin() ? " · ✅"+yWon+" ❌"+yLost+pChip : ""}</span>
+      <div onclick="toggleDay('${id}')" style="background:#0a1520;border:1px solid #1a2f4a;border-radius:8px;padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:6px">
+        <span style="font-weight:700;color:#dce8f5;font-size:14px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📆 ${yearStr}</span>
+        <span style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <span style="font-size:12px;color:#5d7a96;white-space:nowrap">${yearTips.length} tipp${isAdmin() ? " · ✅"+yWon+" ❌"+yLost+pChip : ""}</span>
           <span class="day-arrow${isCurrentYr?" open":""}" id="arr-${id}">${isCurrentYr?"▲":"▼"}</span>
         </span>
       </div>
