@@ -197,6 +197,8 @@ const SPORT_MAP = {
   "soccer_france_ligue_two":             { sport: "soccer", label: "⚽ Ligue 2" },
   // Egyéb európai élvonalak
   "soccer_netherlands_eredivisie":       { sport: "soccer", label: "⚽ Eredivisie" },
+  "soccer_scotland_premiership":         { sport: "soccer", label: "⚽ Skót Premiership" },
+  "soccer_romania_liga1":               { sport: "soccer", label: "⚽ Román Liga 1" },
   "soccer_portugal_primeira_liga":       { sport: "soccer", label: "⚽ Primeira Liga" },
   "soccer_belgium_first_div":            { sport: "soccer", label: "⚽ Belga élvonal" },
   "soccer_turkey_super_league":          { sport: "soccer", label: "⚽ Török Szuperliga" },
