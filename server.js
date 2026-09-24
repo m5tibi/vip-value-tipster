@@ -1914,6 +1914,16 @@ async function pushTipToMondomatutit(tip) {
     ? `[AI] Kombi – össz odds ${tip.odds}`
     : `[AI${tip.type === "free" ? " FREE" : ""}] ${tip.match} – ${mktPrefix}${tip.pick} @ ${tip.odds}${commenceStr}`;
 
+  // ai_note összeállítása – kombikhoz a lábakat is beleírjuk,
+  // mert a mondomatutit ai_tips_review.html '\nLábak:\n' szeparátorral jeleníti meg őket.
+  let aiNote = tip.note || "";
+  if (tip.type === "combo" && Array.isArray(tip.legs) && tip.legs.length) {
+    const legsStr = tip.legs.map(l =>
+      `  • ${l.match}: ${l.pick} @ ${l.odds}` + (l.commence ? ` 🕐 ${l.commence}` : "")
+    ).join("\n");
+    aiNote = (aiNote ? aiNote + "\n\n" : "") + `Lábak:\n${legsStr}`;
+  }
+
   const body = {
     tipp_neve:   tippNeve,
     eredo_odds:  tip.odds,
@@ -1922,7 +1932,7 @@ async function pushTipToMondomatutit(tip) {
     ai_pick:     tip.pick    || "",
     ai_market:   tip.market  || "1X2",
     ai_commence: commence,
-    ai_note:     tip.note    || "",
+    ai_note:     aiNote,
     ai_legs:     aiLegs,
     target_date: targetDate
   };
