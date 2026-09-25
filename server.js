@@ -472,7 +472,7 @@ ${matchText}
 ${skipNote}
 KÉT dolgot adj – MINDKETTŐ KÖTELEZŐ:
 
-1) "tippek": 4-6 ERŐS single tipp (két platform számára – több jobb, mint kevesebb!).
+1) "tippek": 6-8 ERŐS single tipp (két platform számára – minimum 6, ha van elég meccs!).
    - MECCSENKÉNT LEGFELJEBB 1 single tipp – a legerősebb piacot válaszd az adott meccsre.
    - CSAK legalább ${MIN_SINGLE_ODDS} oddsú single tippet adj – az ennél alacsonyabb oddsú kimenetet NE tedd single tippnek (a nagyon alacsony oddsúak a kombi lábak közé valók).
    - Lehetőleg KÜLÖNBÖZŐ meccsekről legyenek – minél több meccs, annál jobb.
