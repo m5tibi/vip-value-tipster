@@ -470,6 +470,22 @@ async function fetchAiTips(matchList, alreadyTipped = []) {
 Mai meccsek (valós bookmaker oddsokkal):
 ${matchText}
 ${skipNote}
+NYELV – MINDEN MEZŐT MAGYARUL ADJ MEG:
+- Nemzeti csapatneveknél használd a magyar nevet: pl. Norway → Norvégia, Denmark → Dánia, Austria → Ausztria, Germany → Németország, France → Franciaország, Portugal → Portugália, Spain → Spanyolország, England → Anglia, Scotland → Skócia, Netherlands → Hollandia stb.
+- Klubcsapatneveknél maradj az eredeti névnél (pl. "Bayer Leverkusen", "Manchester City") – ezeknek nincs magyar nevük.
+- A "market" és "pick" mezőket MINDIG magyarul add meg:
+  * "Over 2.5" → "Több mint 2,5 gól" | "Under 2.5" → "Kevesebb mint 2,5 gól"
+  * "Over 1.5" → "Több mint 1,5 gól" | "Under 1.5" → "Kevesebb mint 1,5 gól"
+  * "Over 3.5" → "Több mint 3,5 gól" | "Under 3.5" → "Kevesebb mint 3,5 gól"
+  * "BTTS Yes" / "BTTS Igen" → "Mindkét csapat betalál"
+  * "BTTS No" / "BTTS Nem" → "Nem talál be mindkét csapat"
+  * "1X2" marad "1X2"
+  * "Asian Handicap" → "Ázsiai hendikep"
+  * "Handicap" → "Hendikep"
+  * "Draw No Bet" → "Döntetlen esetén visszajár"
+  * "Home Win" → "Hazai győzelem" | "Away Win" → "Vendég győzelem" | "Draw" → "Döntetlen"
+- A "note" indoklást természetesen magyarul írd.
+
 KÉT dolgot adj – MINDKETTŐ KÖTELEZŐ:
 
 1) "tippek": 6-8 ERŐS single tipp (két platform számára – minimum 6, ha van elég meccs!).
