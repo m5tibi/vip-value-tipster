@@ -446,9 +446,26 @@ function buildStatsMsg(title) {
 // Visszatér: { singles: [...], comboLegs: [...] }
 async function fetchAiTips(matchList, alreadyTipped = []) {
   if (!ANTHROPIC_KEY || !matchList.length) return { singles: [], comboLegs: [] };
-  console.log(`AI elemzés: ${matchList.length} meccs`);
 
-  const matchText = matchList.map(m => {
+  // Maximum 20 meccs küldése Claude-nak – 28+ meccs esetén a JSON levágódik a token limit miatt.
+  // Prioritás: top ligák előre, azon belül legkorábbi kezdés.
+  const LEAGUE_PRIORITY = [
+    "Premier League","La Liga","Bundesliga","Serie A","Ligue 1","Champions League",
+    "Europa League","Conference League","Eredivisie","Primeira Liga","Championship",
+    "Skót Premiership","Román Liga 1","MLS","Brasileirao","Argentin Primera","Liga MX"
+  ];
+  const sorted = [...matchList].sort((a, b) => {
+    const pa = LEAGUE_PRIORITY.findIndex(l => (a.sport||"").includes(l));
+    const pb = LEAGUE_PRIORITY.findIndex(l => (b.sport||"").includes(l));
+    const ra = pa === -1 ? 99 : pa;
+    const rb = pb === -1 ? 99 : pb;
+    return ra !== rb ? ra - rb : 0;
+  });
+  const capped = sorted.slice(0, 20);
+  if (matchList.length > 20) console.log(`AI elemzés: ${matchList.length} meccsből top 20 küldve (liga prioritás szerint)`);
+  console.log(`AI elemzés: ${capped.length} meccs`);
+
+  const matchText = capped.map(m => {
     const oddsStr = m.odds.map(o => `${o.market} / ${o.name}: ${o.odds} (${o.bookmaker})`).join(", ");
     let standingsStr = "";
     if (m.homeStandings || m.awayStandings) {
@@ -519,7 +536,7 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6", max_tokens: 8000,
+        model: "claude-sonnet-4-6", max_tokens: 16000,
         tools: [{ type: "web_search_20250305", name: "web_search" }],
         messages: [{ role: "user", content: prompt }]
       })
