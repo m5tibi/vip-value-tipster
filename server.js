@@ -2537,18 +2537,58 @@ async function fetchMatchListOnly() {
       for (const g of (Array.isArray(games) ? games : [])) {
         const h = (new Date(g.commence_time) - now) / 3600000;
         if (h < 1.5 || h > WINDOW_HOURS) continue;
-        const odds = [];
-        for (const bk of (g.bookmakers || [])) {
-          for (const mkt of (bk.markets || [])) {
-            for (const oc of (mkt.outcomes || [])) {
-              odds.push({ market: mkt.key, name: oc.name, odds: oc.price, bookmaker: bk.title });
+        // Normalizált odds (ugyanolyan formátum mint fetchAndProcess-ben)
+        const normOdds = [];
+        const validBMs = (g.bookmakers || []).filter(bm => !EXCLUDED_BM.includes(bm.key) && bm.markets?.length > 0);
+        // 1X2
+        const h2hBMs = validBMs.filter(bm => bm.markets.find(m => m.key === "h2h"));
+        if (h2hBMs.length) {
+          const names = h2hBMs[0].markets.find(m => m.key === "h2h").outcomes.map(o => o.name);
+          names.forEach(name => {
+            let best = 0, bestBM = "";
+            for (const bm of h2hBMs) {
+              const o = bm.markets.find(m => m.key === "h2h")?.outcomes?.find(x => x.name === name);
+              if (o && o.price > best) { best = o.price; bestBM = bm.title; }
+            }
+            if (best) normOdds.push({ market: "1X2", name, odds: parseFloat(best.toFixed(2)), bookmaker: bestBM });
+          });
+        }
+        // Over/Under totals
+        const totalsBMs = validBMs.filter(bm => bm.markets.find(m => m.key === "totals"));
+        if (totalsBMs.length) {
+          const best = {};
+          for (const bm of totalsBMs) {
+            for (const o of bm.markets.find(m => m.key === "totals")?.outcomes || []) {
+              if (o.name !== "Over") continue;
+              if (!best[o.point] || o.price > best[o.point].odds)
+                best[o.point] = { market: `Over ${o.point}`, name: `Over ${o.point}`, odds: parseFloat(o.price.toFixed(2)), bookmaker: bm.title };
             }
           }
+          normOdds.push(...Object.values(best));
         }
-        if (!odds.length) continue;
+        // Spreads/Hendikep
+        const spreadsBMs = validBMs.filter(bm => bm.markets.find(m => m.key === "spreads"));
+        if (spreadsBMs.length) {
+          const best = {};
+          for (const bm of spreadsBMs) {
+            for (const o of bm.markets.find(m => m.key === "spreads")?.outcomes || []) {
+              const key = `${o.name}_${o.point}`;
+              if (!best[key] || o.price > best[key].odds)
+                best[key] = { market: `Hendikep ${o.point > 0 ? "+" : ""}${o.point}`, name: `${o.name} ${o.point > 0 ? "+" : ""}${o.point}`, odds: parseFloat(o.price.toFixed(2)), bookmaker: bm.title };
+            }
+          }
+          normOdds.push(...Object.values(best));
+        }
+        if (!normOdds.length) continue;
         const d = new Date(g.commence_time);
         const hStr = d.toLocaleString("hu-HU", { timeZone: "Europe/Budapest", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
-        newList.push({ sport: meta.label, match: `${g.home_team} vs ${g.away_team}`, commence: hStr.replace(",", " ").replace("  ", " "), odds });
+        newList.push({
+          sport: meta.label,
+          match: `${g.home_team} vs ${g.away_team}`,
+          commence: hStr.replace(",", " ").replace("  ", " "),
+          commence_time: g.commence_time,   // ISO – frontend formázáshoz
+          odds: normOdds
+        });
       }
     } catch(e) {}
   }
