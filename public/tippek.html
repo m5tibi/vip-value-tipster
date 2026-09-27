@@ -1168,6 +1168,10 @@ async function loadTips() {
     // Nincs belépve / nincs előfizetés → nem hiba: felhívást mutatunk a tippek helyett
     if (r.status === 401 || r.status === 402) {
       aiTips = []; comboTips = [];
+      // A zárolt nézet maga rajzolja ki a free tippet (paywall fölé) – a felső free szekciót
+      // ürítjük, különben egy korábbi (admin/előfizetői) betöltésből megmaradt tipp duplán látszik.
+      currentFreeTips = [];
+      renderFreeTipSection();
       tipsEverLoaded = true;
       const errData = await r.json().catch(() => ({}));
       renderLocked(r.status === 402, Array.isArray(errData.freeTips) ? errData.freeTips : (errData.freeTip ? [errData.freeTip] : []));
