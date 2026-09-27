@@ -2556,6 +2556,48 @@ async function fetchMatchListOnly() {
   return newList;
 }
 
+// Admin meccs előnézet – tippek.html admin panel hívja (POST /api/admin/preview-matches)
+// Visszaadja az aktuális meccslistát (cache vagy friss lekérés), opcionális Poisson edge-gel.
+app.post("/api/admin/preview-matches", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    // Ha a cache üres vagy nagyon régi (>30 perc), frissítjük
+    const cacheAge = lastMatchListTs ? (Date.now() - lastMatchListTs) / 60000 : 999;
+    if (!lastMatchList.length || cacheAge > 30) {
+      const newList = await fetchMatchListOnly();
+      if (newList && newList.length > 0) {
+        lastMatchList = newList;
+        lastMatchListTs = Date.now();
+        try { require("fs").writeFileSync((process.env.DATA_DIR || "/data") + "/last_match_list.json", JSON.stringify(lastMatchList)); } catch(e) {}
+      }
+    }
+    // Lejárt meccsek kiszűrése
+    const now = Date.now();
+    const fresh = lastMatchList.filter(m => {
+      if (!m.commence) return true;
+      const c = String(m.commence).replace(",", " ");
+      const match = c.match(/(\d{2})\.(\d{2})\.?\s+(\d{2}):(\d{2})/);
+      if (!match) return true;
+      const [,mm,dd,hh,min] = match;
+      const d = new Date(`${new Date().getFullYear()}-${mm}-${dd}T${hh}:${min}:00+02:00`);
+      return (now - d.getTime()) / 3600000 < 2;
+    });
+    // Poisson edge szinkron (cache-ből – ne lassítsa a lekérést)
+    const edgeMap = {};
+    try {
+      const pe = await computePoissonEdge(fresh);
+      for (const [matchName, data] of pe.entries()) {
+        edgeMap[matchName] = { hasValue: data.hasValue, valueMarkets: data.valueMarkets, lambdaHome: data.lambdaHome, lambdaAway: data.lambdaAway };
+      }
+    } catch(e) { console.warn("Poisson preview hiba:", e.message); }
+
+    res.json({ matches: fresh, edgeMap, cachedAgoMin: Math.round(cacheAge), generatedAt: new Date().toISOString() });
+  } catch(e) {
+    console.error("preview-matches hiba:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post("/api/refresh-odds-only", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
@@ -2573,6 +2615,7 @@ app.post("/api/refresh-odds-only", async (req, res) => {
 
 // Meccs lista lekérése (mondomatutit Tipp Manager számára)
 let lastMatchList = [];
+let lastMatchListTs = 0;
 (() => {
   try {
     const saved = JSON.parse(require("fs").readFileSync((process.env.DATA_DIR || "/data") + "/last_match_list.json", "utf8"));
