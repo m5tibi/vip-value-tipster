@@ -549,7 +549,7 @@ async function loadData() {
   await loadAdminIdentity();
   try {
     const [histRes, pubRes] = await Promise.all([
-      fetch('/api/history', { headers: { 'X-Admin-Password': localStorage.getItem('vbt_admin') || '' } }),
+      fetch('/api/history'),
       fetch('/api/public-stats')
     ]);
     const hist    = await histRes.json();

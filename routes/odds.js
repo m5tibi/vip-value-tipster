@@ -5,6 +5,7 @@
 const express = require('express');
 const fetch   = require('node-fetch');
 const router  = express.Router();
+const auth    = require('../auth');
 
 const BASE  = 'https://api.the-odds-api.com/v4';
 const KEY   = process.env.ODDS_API_KEY;
@@ -19,14 +20,14 @@ router.use((req, res, next) => {
   next();
 });
 
-// Token-ellenőrzés – csak akkor lép életbe, ha ODDS_PROXY_TOKEN be van állítva.
-// Így megvédi a fizetős ODDS_API_KEY kvótát attól, hogy bárki használja a proxyt.
-// A tokent add meg ?token=... query paraméterként vagy x-proxy-token headerben.
+// Hozzáférés-ellenőrzés – megvédi a fizetős ODDS_API_KEY kvótát attól, hogy bárki használja a proxyt.
+// Beengedjük: (1) aki ismeri az ODDS_PROXY_TOKEN-t (?token=... vagy x-proxy-token header –
+// külső eszközökhöz), vagy (2) a belépett, tippekhez hozzáféréssel rendelkező felhasználót.
 router.use((req, res, next) => {
-  if (!TOKEN) return next();
   const t = req.get('x-proxy-token') || req.query.token;
-  if (t !== TOKEN) return res.status(403).json({ error: 'Hozzáférés megtagadva — hibás vagy hiányzó proxy token.' });
-  next();
+  if (TOKEN && t === TOKEN) return next();
+  if (auth.hasAccess(req.user)) return next();
+  return res.status(403).json({ error: 'Hozzáférés megtagadva — hibás vagy hiányzó proxy token.' });
 });
 
 // GET /api/odds/sports
@@ -74,8 +75,8 @@ module.exports = router;
 // Render → Environment Variables-be is fel kell venni:
 // ODDS_API_KEY = your_odds_api_key_here
 //
-// Opcionális, de AJÁNLOTT (publikus URL esetén) a proxy védelme:
+// Külső eszközből (pl. claude.ai) való híváshoz:
 // ODDS_PROXY_TOKEN = valami_hosszu_veletlen_string
 // Ekkor a hívásokhoz kell: /api/odds/matches?sport=...&token=valami_hosszu_veletlen_string
-// vagy x-proxy-token header. Ha nincs beállítva, a proxy nyitva marad (visszafelé kompatibilis).
+// vagy x-proxy-token header. Token nélkül csak belépett, jogosult felhasználó érheti el.
 // ─────────────────────────────────────────────

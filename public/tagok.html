@@ -161,10 +161,9 @@ let allMembers = [];
 let currentFilter = 'all';
 let pendingUserId = null;
 
+// Az admin jogosultságot a session cookie hordozza, itt csak a Content-Type-ot állítjuk
 function adminHeaders(json) {
-  const h = { 'X-Admin-Password': localStorage.getItem('vbt_admin') || '' };
-  if (json) h['Content-Type'] = 'application/json';
-  return h;
+  return json ? { 'Content-Type': 'application/json' } : {};
 }
 
 function showStatus(msg, isErr) {
@@ -212,8 +211,8 @@ function renderList() {
     if (!u.emailVerified) metaItems.push('⏳ Nem megerősített');
 
     const actions = isPro
-      ? `<button class="btn btn-danger btn-sm" onclick="setFree('${u.id}','${u.email}')">→ Ingyenes</button>`
-      : `<button class="btn btn-primary btn-sm" onclick="openProModal('${u.id}','${u.email}')">→ Fizető</button>`;
+      ? `<button class="btn btn-danger btn-sm" onclick="setFree('${u.id}')">→ Ingyenes</button>`
+      : `<button class="btn btn-primary btn-sm" onclick="openProModal('${u.id}')">→ Fizető</button>`;
 
     return `<div class="member-card ${cardClass}">
       <div class="member-top">
@@ -258,7 +257,10 @@ async function loadMembers() {
   }
 }
 
-function openProModal(id, email) {
+const emailOf = id => (allMembers.find(u => u.id === id) || {}).email || '';
+
+function openProModal(id) {
+  const email = emailOf(id);
   pendingUserId = id;
   document.getElementById('modal-email').textContent = email;
   const def = new Date(Date.now() + 31*24*60*60*1000).toISOString().slice(0,10);
@@ -278,7 +280,8 @@ async function confirmSetPro() {
   await setPlan(pendingUserId, 'pro', paidUntil);
 }
 
-async function setFree(id, email) {
+async function setFree(id) {
+  const email = emailOf(id);
   if (!confirm(`Biztosan ingyenesre állítod: ${email}?`)) return;
   await setPlan(id, 'free', null);
 }

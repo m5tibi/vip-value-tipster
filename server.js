@@ -11,123 +11,27 @@ const mailer  = require("./mailer");
 
 const app = express();
 
-// ── Stripe ───────────────────────────────────────────────────
-const STRIPE_SECRET  = process.env.STRIPE_SECRET_KEY;
-const STRIPE_WEBHOOK = process.env.STRIPE_WEBHOOK_SECRET;
-const STRIPE_PRICE   = process.env.STRIPE_PRICE_ID;
-const BASE_URL       = (process.env.BASE_URL || "https://90perc.hu").replace(/\/$/, "");
-const stripe = STRIPE_SECRET ? require("stripe")(STRIPE_SECRET) : null;
+const security  = require("./lib/security");
+const { requireAdmin, isAdminReq } = require("./lib/admin");
+const stripeRoutes = require("./routes/stripe");
 
-// Stripe webhook – express.raw BEFORE global json middleware!
-app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
-  if (!stripe) return res.status(500).json({ error: "Stripe nincs konfigurálva" });
-  let event;
-  try {
-    event = stripe.webhooks.constructEvent(req.body, req.headers["stripe-signature"], STRIPE_WEBHOOK);
-  } catch (err) {
-    console.error("Stripe webhook aláírás hiba:", err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
+// Stripe webhook – express.raw a globális json middleware ELŐTT kell legyen!
+app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), stripeRoutes.webhook);
 
-  // Azonnal 200-at küldünk – Stripe ne próbálja újraküldeni (duplikált számla ellen)
-  res.json({ received: true });
-
-  const updateUser = (customerId, email, patch) => {
-    const u = (email && usersDb.findByEmail(email)) || usersDb.findByStripeCustomer(customerId);
-    if (u) { usersDb.update(u.id, patch); return u; }
-    return null;
-  };
-
-  if (event.type === "checkout.session.completed") {
-    const s = event.data.object;
-    let paidUntil = new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString();
-    // Stripe-tól lekérjük a tényleges előfizetési időszak végét
-    if (s.subscription && stripe) {
-      try {
-        const sub = await stripe.subscriptions.retrieve(s.subscription);
-        if (sub.current_period_end) {
-          paidUntil = new Date(sub.current_period_end * 1000).toISOString();
-        }
-      } catch(e) { console.error("Stripe subscription lekérés hiba:", e.message); }
-    }
-    const u = updateUser(s.customer, s.customer_details?.email || s.customer_email, {
-      plan: "pro", stripeCustomerId: s.customer, paidUntil,
-      subscriptionStatus: "active", currentPeriodEnd: paidUntil,
-      stripeSubscriptionId: s.subscription || null
-    });
-    if (u) {
-      console.log(`Stripe ✓ előfizetés aktiválva: ${u.email}, lejár: ${paidUntil}`);
-      mailer.sendPlanActivated(u.email, paidUntil).catch(e => console.error("Email hiba:", e.message));
-    }
-    else console.warn(`Stripe: felhasználó nem található – ${s.customer_details?.email}`);
-  }
-
-  if (event.type === "invoice.payment_succeeded") {
-    const inv = event.data.object;
-    if (inv.billing_reason === "subscription_cycle") {
-      const periodEnd = inv.lines?.data?.[0]?.period?.end;
-      const paidUntil = periodEnd
-        ? new Date(periodEnd * 1000).toISOString()
-        : new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString();
-      const u = updateUser(inv.customer, null, { paidUntil, subscriptionStatus: "active", currentPeriodEnd: paidUntil });
-      if (u) console.log(`Stripe ✓ megújítva: ${u.email}, lejár: ${paidUntil}`);
-    }
-  }
-
-  if (event.type === "customer.subscription.updated") {
-    const sub  = event.data.object;
-    const prev = event.data.previous_attributes || {};
-    console.log(`Stripe subscription.updated – cancel_at_period_end: ${sub.cancel_at_period_end}, status: ${sub.status}, prev keys: [${Object.keys(prev).join(",")}], prev.cancel_at_period_end: ${prev.cancel_at_period_end}`);
-    const justCancelled = sub.cancel_at_period_end &&
-      sub.status === "active" &&
-      ('cancel_at_period_end' in prev || prev.cancel_at_period_end === false);
-    console.log(`  justCancelled: ${justCancelled}`);
-    if (justCancelled) {
-      const cancelledAt  = new Date().toISOString();
-      const periodEndTs  = sub.cancel_at || sub.current_period_end;
-      const periodEnd    = periodEndTs ? new Date(periodEndTs * 1000).toISOString() : null;
-      const patch        = { cancelledAt, ...(periodEnd ? { paidUntil: periodEnd } : {}) };
-      const u = updateUser(sub.customer, null, patch);
-      if (u) {
-        const endStr = periodEnd ? new Date(periodEnd).toLocaleDateString("hu-HU") : (u.paidUntil ? new Date(u.paidUntil).toLocaleDateString("hu-HU") : "–");
-        console.log(`Stripe: lemondva (időszak végéig aktív) – ${u.email}, lejár: ${endStr}`);
-        const adminEmail = process.env.ADMIN_EMAIL;
-        if (adminEmail) mailer.send({
-          to: adminEmail,
-          subject: `❌ Előfizetés lemondva – ${u.email}`,
-          text: `${u.email} lemondta előfizetését. Aktív marad: ${endStr}`,
-          html: `<p>A <b>${u.email}</b> lemondta a 90perc.hu előfizetését.</p><p>Aktív marad: <b>${endStr}</b></p>`,
-        }).catch(e => console.error("Admin email hiba:", e.message));
-        mailer.sendSubscriptionCancelled(u.email, periodEnd || u.paidUntil).catch(e => console.error("Email hiba:", e.message));
-      }
-    }
-  }
-
-  if (event.type === "customer.subscription.deleted") {
-    const sub = event.data.object;
-    const cancelledAt = new Date().toISOString();
-    const u = updateUser(sub.customer, null, { plan: "free", paidUntil: null, subscriptionStatus: "cancelled", currentPeriodEnd: null, cancelledAt });
-    if (u) {
-      console.log(`Stripe: lemondva – ${u.email}`);
-      mailer.sendSubscriptionExpired(u.email).catch(e => console.error("Email hiba:", e.message));
-      // Admin értesítő
-      const adminEmail = process.env.ADMIN_EMAIL;
-      if (adminEmail) mailer.send({
-        to: adminEmail,
-        subject: `❌ Előfizetés lemondva – ${u.email}`,
-        text: `${u.email} lemondta az előfizetését.`,
-        html: `<p>A <b>${u.email}</b> felhasználó lemondta a 90perc.hu előfizetését.</p><p>Lemondás időpontja: ${cancelledAt}</p>`,
-      }).catch(e => console.error("Admin email hiba:", e.message));
-    }
-  }
-
-});
-
+app.set("trust proxy", 1);                   // Render proxy mögött fut → req.ip a valódi kliens IP
 app.use(express.json());
 app.use(cookieParser());
 app.use(auth.attachUser);                    // minden kérésre beteszi a req.user-t
 app.use(express.static(path.join(__dirname, "public")));
 app.use('/api/odds', require('./routes/odds'));
+
+app.use("/api", security.safeJson);        // XSS-védelem minden API válaszra (lásd lib/security.js)
+app.use(require("./routes/auth"));
+app.use(require("./routes/adminUsers"));
+app.use(stripeRoutes.router);
+app.use(require("./routes/analyzer"));
+const telegramBot = require("./routes/telegram")({ getHistory: () => history, isApproved: t => isApproved(t) });
+app.use(telegramBot.router);
 
 const ADMIN_PWD     = process.env.ADMIN_PASSWORD;
 const ODDS_API_KEY  = process.env.ODDS_API_KEY;
@@ -137,13 +41,14 @@ const TG_PRIVATE_CHAT_ID = process.env.TG_PRIVATE_CHAT_ID || "1326707238"; // ad
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const FOOTBALLDATA_TOKEN = process.env.FOOTBALLDATA_TOKEN;   // opcionális: 90 perces eredményhez (football-data.org)
 const API_FOOTBALL_KEY   = process.env.APIFOOTBALL_KEY;       // Poisson value filter (api-football.com)
-const DATA_FILE     = "/data/history.json";
-const SCHEDULE_FILE = "/data/lastRun.json";
+const DATA_DIR      = process.env.DATA_DIR || "/data";   // perzisztens lemez (Renderen /data)
+const DATA_FILE     = path.join(DATA_DIR, "history.json");
+const SCHEDULE_FILE = path.join(DATA_DIR, "lastRun.json");
 
 // ── Perzisztens tárolás ───────────────────────────────────
 function loadHistory() {
   try {
-    if (!fs.existsSync("/data")) fs.mkdirSync("/data", { recursive: true });
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
     if (!fs.existsSync(DATA_FILE)) return [];
     return JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
   } catch (e) { console.error("History betöltési hiba:", e.message); return []; }
@@ -1631,151 +1536,7 @@ setInterval(async () => {
   }
 }, 60000);
 
-// ── Admin hitelesítés ─────────────────────────────────────
-// Jelszó jöhet: x-admin-password header, body.password, vagy ?password= query.
-// Jelszó jöhet: x-admin-password header (ASCII), x-admin-password-b64 header (UTF-8 biztos,
-// base64), body.password, vagy ?password= query.
-function extractPwd(req) {
-  const b64 = req.get("x-admin-password-b64");
-  if (b64) { try { return Buffer.from(b64, "base64").toString("utf8"); } catch {} }
-  return req.get("x-admin-password") || req.body?.password || req.query?.password || "";
-}
-function requireAdmin(req, res) {
-  // 1) Belépett admin fiók (e-mail + jelszó, session cookie) – ez az elsődleges mód
-  if (req.user?.isAdmin) return true;
-  // 2) Régi, jelszavas mód (visszafelé kompatibilitás: ?admin=... / header)
-  if (!ADMIN_PWD) {
-    // Ha nincs jelszó beállítva, nyitva marad – de erről induláskor figyelmeztetünk.
-    return true;
-  }
-  const pwd = extractPwd(req);
-  if (pwd !== ADMIN_PWD) {
-    res.status(403).json({ error: "Hozzáférés megtagadva — hibás vagy hiányzó admin jelszó." });
-    return false;
-  }
-  return true;
-}
-
-// ── Auth végpontok ────────────────────────────────────────
-const baseUrl = req => BASE_URL || `${req.protocol}://${req.get("host")}`;
-
-async function sendVerifyEmail(req, user) {
-  const token = auth.makePurposeToken("verify", user.id, 24 * 3600 * 1000);
-  const url   = `${baseUrl(req)}/api/auth/verify?token=${encodeURIComponent(token)}`;
-  return mailer.sendVerification(user.email, url);
-}
-
-app.post("/api/auth/register", async (req, res) => {
-  const { email, password, acceptTerms, over18 } = req.body || {};
-  if (!acceptTerms || !over18) {
-    return res.status(400).json({ error: "El kell fogadnod az ÁSZF-et és nyilatkoznod kell a 18. életéved betöltéséről." });
-  }
-  const r = await usersDb.create(email, password);
-  if (!r.ok) return res.status(400).json({ error: r.error });
-  usersDb.update(r.user.id, { acceptedTermsAt: new Date().toISOString() });
-  auth.setSession(res, r.user.id);
-  sendVerifyEmail(req, r.user).catch(() => {});     // ne blokkolja a választ
-  console.log(`Új regisztráció: ${r.user.email} (összes: ${usersDb.count()})`);
-  res.json({ ok: true, user: usersDb.publicView(r.user), hasAccess: auth.hasAccess(r.user) });
-});
-
-// E-mail megerősítés (a levélben lévő linkről érkezik – HTML választ adunk)
-app.get("/api/auth/verify", (req, res) => {
-  const uid = auth.readPurposeToken("verify", req.query.token);
-  const page = (icon, title, msg, color) => `<!DOCTYPE html><html lang="hu"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head>
-<body style="margin:0;background:#07111d;color:#cfd8dc;font-family:-apple-system,Segoe UI,Roboto,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px">
-<div style="background:#0d1b2a;border:1px solid #1e3a2f;border-radius:12px;padding:28px;max-width:420px;text-align:center">
-<div style="font-size:40px;margin-bottom:8px">${icon}</div>
-<div style="color:${color};font-weight:700;font-size:18px;margin-bottom:8px">${title}</div>
-<div style="color:#78909c;font-size:14px;line-height:1.6;margin-bottom:18px">${msg}</div>
-<a href="/" style="display:inline-block;background:#00e676;color:#07111d;font-weight:700;padding:11px 22px;border-radius:8px;text-decoration:none">Tovább a tippekhez</a>
-</div></body></html>`;
-  if (!uid) {
-    return res.status(400).send(page("⚠️", "Érvénytelen vagy lejárt link",
-      "A megerősítő link lejárt (24 óráig érvényes) vagy érvénytelen. Lépj be, és kérj új megerősítő e-mailt.", "#ffcc80"));
-  }
-  const u = usersDb.findById(uid);
-  if (!u) return res.status(400).send(page("⚠️", "Nincs ilyen fiók", "A fiók már nem létezik.", "#ffcc80"));
-  usersDb.update(uid, { emailVerified: true });
-  console.log(`E-mail megerősítve: ${u.email}`);
-  res.send(page("✅", "E-mail cím megerősítve", "Köszönjük! A fiókod aktív, jó szórakozást.", "#00e676"));
-});
-
-app.post("/api/auth/resend-verification", auth.requireLogin, async (req, res) => {
-  if (req.user.emailVerified) return res.json({ ok: true, already: true });
-  await sendVerifyEmail(req, req.user);
-  res.json({ ok: true });
-});
-
-// Elfelejtett jelszó – MINDIG ok:true a válasz (nem áruljuk el, létezik-e a fiók)
-app.post("/api/auth/forgot", async (req, res) => {
-  const u = usersDb.findByEmail(req.body?.email);
-  if (u && !u.disabled) {
-    // A hash a tokenben → a link egyszer használatos (jelszóváltáskor érvénytelenné válik)
-    const token = auth.makePurposeToken("reset", u.id, 3600 * 1000, u.passwordHash);
-    const url   = `${baseUrl(req)}/reset.html?token=${encodeURIComponent(token)}`;
-    await mailer.sendPasswordReset(u.email, url);
-    console.log(`Jelszó-visszaállítás kérve: ${u.email}`);
-  }
-  res.json({ ok: true });
-});
-
-app.post("/api/auth/reset", async (req, res) => {
-  const { token, newPassword } = req.body || {};
-  const uid = auth.readPurposeToken("reset", token, id => usersDb.findById(id)?.passwordHash || "");
-  if (!uid || usersDb.findById(uid)?.disabled) return res.status(400).json({ error: "A link érvénytelen vagy lejárt. Kérj újat." });
-  const r = await usersDb.setPassword(uid, newPassword);
-  if (!r.ok) return res.status(400).json({ error: r.error });
-  const u = usersDb.findById(uid);
-  usersDb.update(uid, { emailVerified: true });   // a linket csak az kaphatta meg, akié a postafiók
-  auth.setSession(res, uid);                       // egyből be is léptetjük
-  console.log(`Jelszó visszaállítva: ${u.email}`);
-  res.json({ ok: true });
-});
-
-app.post("/api/auth/login", async (req, res) => {
-  const { email, password } = req.body || {};
-  const u = await usersDb.verify(email, password);
-  if (!u) return res.status(401).json({ error: "Hibás e-mail cím vagy jelszó." });
-  auth.setSession(res, u.id);
-  res.json({ ok: true, user: usersDb.publicView(u), hasAccess: auth.hasAccess(u) });
-});
-
-app.post("/api/auth/logout", (req, res) => {
-  auth.clearSession(res);
-  res.json({ ok: true });
-});
-
-// Ki vagyok? (a frontend ezzel dönti el, mit mutasson)
-app.get("/api/auth/me", (req, res) => {
-  // Friss DB lookup – Stripe webhook utáni plan változás azonnal látszódjon
-  const freshUser = req.user ? (usersDb.findById(req.user.id) || req.user) : req.user;
-  res.json({
-    user:      usersDb.publicView(freshUser),
-    hasAccess: auth.hasAccess(freshUser),
-    paidMode:  auth.PAID_MODE,
-    isAdmin:   !!req.user?.isAdmin || isAdminReq(req),
-  });
-});
-
-app.post("/api/auth/password", auth.requireLogin, async (req, res) => {
-  const { currentPassword, newPassword } = req.body || {};
-  const ok = await usersDb.verify(req.user.email, currentPassword);
-  if (!ok) return res.status(401).json({ error: "A jelenlegi jelszó hibás." });
-  const r = await usersDb.setPassword(req.user.id, newPassword);
-  if (!r.ok) return res.status(400).json({ error: r.error });
-  res.json({ ok: true });
-});
-
 // ── API végpontok ─────────────────────────────────────────
-// Admin (helyes jelszóval VAGY admin fiókkal) MINDEN tippet lát (jóváhagyásra várókat is).
-function isAdminReq(req) {
-  if (req.user?.isAdmin) return true;
-  const pwd = extractPwd(req);
-  return !!ADMIN_PWD && pwd === ADMIN_PWD;
-}
-
 // ÉLŐ TIPPEK – ez a termék: belépés (és fizetős módban aktív előfizetés) kell hozzá.
 app.get("/api/tips", (req, res) => {
   const admin = isAdminReq(req);
@@ -1999,13 +1760,6 @@ app.delete("/api/history/:id", (req, res) => {
   res.json({ ok: true, removed });
 });
 
-// Admin jelszó ellenőrzése (beviteli mezős belépéshez)
-app.post("/api/admin/login", (req, res) => {
-  const pwd = extractPwd(req);
-  if (!ADMIN_PWD) return res.json({ ok: true, note: "Nincs ADMIN_PASSWORD beállítva – nyitott mód." });
-  if (pwd !== ADMIN_PWD) return res.status(403).json({ ok: false, error: "Hibás jelszó." });
-  res.json({ ok: true });
-});
 
 // Tipp jóváhagyása (ettől lesz publikus)
 app.patch("/api/history/:id/approve", (req, res) => {
@@ -2111,49 +1865,11 @@ app.post("/api/stats/send", async (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Analyzer history szinkronizáció ──────────────────────
-function aPath(uid) {
-  const safe = String(uid).replace(/[^a-z0-9]/g, '').slice(0, 32);
-  return '/data/ah_' + safe + '.json';
-}
-
-app.get("/api/analyzer-history", (req, res) => {
-  const uid = req.query.uid;
-  if (!uid) return res.json([]);
-  try {
-    const p = aPath(uid);
-    if (!fs.existsSync(p)) return res.json([]);
-    res.json(JSON.parse(fs.readFileSync(p, 'utf8')));
-  } catch (e) { res.json([]); }
-});
-
-app.post("/api/analyzer-history", (req, res) => {
-  const { uid, entry } = req.body;
-  if (!uid || !entry) return res.status(400).json({ error: 'Hiányzó adat' });
-  try {
-    const p = aPath(uid);
-    const hist = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : [];
-    const newHist = [entry, ...hist].slice(0, 50);
-    fs.writeFileSync(p, JSON.stringify(newHist), 'utf8');
-    res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.delete("/api/analyzer-history", (req, res) => {
-  const uid = req.query.uid;
-  if (!uid) return res.status(400).json({ error: 'Hiányzó uid' });
-  try {
-    const p = aPath(uid);
-    if (fs.existsSync(p)) fs.unlinkSync(p);
-    res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 // ── Indítás ───────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 // ── Admin fiók bootstrap ──────────────────────────────────
 // Ha be van állítva ADMIN_EMAIL + ADMIN_PASSWORD, létrehozzuk/frissítjük az admin fiókot,
-// hogy e-mail+jelszóval is be tudj lépni (nem csak a régi ?admin= módszerrel).
+// hogy e-mail+jelszóval be tudj lépni (ez az egyetlen admin belépési mód).
 (async () => {
   const email = process.env.ADMIN_EMAIL;
   if (!email || !ADMIN_PWD) return;
@@ -2171,299 +1887,13 @@ const PORT = process.env.PORT || 3000;
 console.log(`Regisztrált felhasználók: ${usersDb.count()} · Fizetős mód: ${auth.PAID_MODE ? "BE" : "KI (ingyenes szakasz)"}`);
 
 
-app.get("/api/admin/users", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  const list = usersDb.all().map(u => ({
-    id: u.id,
-    email: u.email,
-    plan: u.plan || "free",
-    emailVerified: u.emailVerified !== false,
-    isAdmin: !!u.isAdmin,
-    createdAt: u.createdAt || null,
-    paidUntil: u.paidUntil || null,
-    cancelledAt: u.cancelledAt || null,
-    subscriptionStatus: u.subscriptionStatus || null,
-    stripeCustomerId: u.stripeCustomerId || null,
-  }));
-  res.json(list);
-});
-
-app.patch("/api/admin/users/:id", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  const { plan, paidUntil } = req.body;
-  const validPlan = ["free","pro"].includes(plan) ? plan : "free";
-  const targetUser = usersDb.findById(req.params.id);
-  const subStatus = validPlan === "pro" ? "active" : "cancelled";
-  const cancelledAt = validPlan === "free" ? new Date().toISOString() : null;
-  usersDb.update(req.params.id, { plan: validPlan, paidUntil, subscriptionStatus: subStatus, currentPeriodEnd: paidUntil || null, ...(cancelledAt ? { cancelledAt } : {}) });
-  console.log(`Felhasználó frissítve: ${req.params.id} → plan:${validPlan}`);
-  if (targetUser) {
-    if (validPlan === "pro") {
-      mailer.sendPlanActivated(targetUser.email, paidUntil).catch(e => console.error("Email hiba:", e.message));
-    } else if (validPlan === "free" && targetUser.plan === "pro") {
-      mailer.sendPlanCancelled(targetUser.email).catch(e => console.error("Email hiba:", e.message));
-    }
-  }
-  res.json({ ok: true });
-});
-
-app.delete("/api/admin/users/:id", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  usersDb.update(req.params.id, { disabled: true, plan: "free" });
-  console.log(`Felhasználó deaktiválva: ${req.params.id}`);
-  res.json({ ok: true });
-});
-
-
-// ── Stripe: Checkout Session létrehozása ─────────────────────
-app.post("/api/stripe/checkout", auth.requireLogin, async (req, res) => {
-  if (!stripe)       return res.status(500).json({ error: "Stripe nincs konfigurálva" });
-  if (!STRIPE_PRICE) return res.status(500).json({ error: "STRIPE_PRICE_ID nincs beállítva" });
-  try {
-    const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      payment_method_types: ["card"],
-      customer_email: req.user.email,
-      line_items: [{ price: STRIPE_PRICE, quantity: 1 }],
-      success_url: `${BASE_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url:  `${BASE_URL}/elofizetes.html`,
-      metadata:    { userId: req.user.id },
-      locale:                   "hu",
-      allow_promotion_codes:    true,
-      billing_address_collection: "required",
-    });
-    res.json({ url: session.url });
-  } catch (err) {
-    console.error("Stripe checkout hiba:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── Stripe: Ügyfélportál (előfizetés kezelése / lemondás) ─────
-app.post("/api/stripe/portal", auth.requireLogin, async (req, res) => {
-  if (!stripe) return res.status(500).json({ error: "Stripe nincs konfigurálva" });
-  const user = usersDb.findById(req.user.id);
-  if (!user?.stripeCustomerId) return res.status(400).json({ error: "Nincs aktív előfizetés" });
-  try {
-    const portal = await stripe.billingPortal.sessions.create({
-      customer:   user.stripeCustomerId,
-      return_url: `${BASE_URL}/tippek.html`,
-    });
-    res.json({ url: portal.url });
-  } catch (err) {
-    console.error("Stripe portal hiba:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── Stripe: Előfizetés státusz ────────────────────────────────
-app.get("/api/stripe/status", auth.requireLogin, (req, res) => {
-  const user = usersDb.findById(req.user.id);
-  res.json({
-    plan:            user?.plan || "free",
-    paidUntil:       user?.paidUntil || null,
-    hasStripe:       !!user?.stripeCustomerId,
-    stripeConfigured: !!stripe && !!STRIPE_PRICE,
-  });
-});
-
-
-// ══════════════════════════════════════════════════════════════
-// ── TELEGRAM BOT (kétirányú) ──────────────────────────────────
-// ══════════════════════════════════════════════════════════════
-
-const TG_BOT_API = `https://api.telegram.org/bot${TG_BOT_TOKEN}`;
-
-async function tgSend(chatId, text, extra = {}) {
-  if (!TG_BOT_TOKEN) return;
-  await fetch(`${TG_BOT_API}/sendMessage`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", ...extra })
-  }).catch(e => console.error("tgSend hiba:", e.message));
-}
-
-async function tgTyping(chatId) {
-  if (!TG_BOT_TOKEN) return;
-  await fetch(`${TG_BOT_API}/sendChatAction`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, action: "typing" })
-  }).catch(() => {});
-}
-
-// ── Meccs elemzés szerver oldalon (bot számára) ───────────────
-async function analyzeForBot(query) {
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "anthropic-beta": "web-search-2025-03-05" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6", max_tokens: 4000,
-      tools: [{ type: "web_search_20250305", name: "web_search" }],
-      messages: [{ role: "user", content:
-        `Te egy profi labdarúgás-fogadási elemző vagy. Kizárólag helyes, igényes magyar nyelven írj. Kerüld a zsargont.
-
-A kérés: "${query}"
-
-Ha nem focimeccs, válaszolj: "NEM ÉRTEM: [magyarázat]"
-
-Készíts rövid, tömör elemzést Telegram-ra optimalizálva (max 800 karakter). Struktúra:
-
-⚽ <b>[Meccs neve]</b>
-
-<b>Forma:</b> [1-2 mondat, számokkal]
-<b>H2H:</b> [1 mondat]
-<b>Sérülések:</b> [1 mondat]
-
-<b>Top tippek:</b>
-1. [Tipp] @ [odds] – [Megbízhatóság: MAGAS/KÖZEPES]
-2. [Tipp] @ [odds] – [Megbízhatóság: MAGAS/KÖZEPES]
-
-Ne használj csillagot (*) vagy hashtaget (#). Csak HTML bold (<b>) formázást.`
-      }]
-    })
-  });
-  const data = await r.json();
-  const text = (data.content?.filter(b => b.type === "text").map(b => b.text) || []).join("\n").trim();
-  return text || "Az elemzés sikertelen. Próbáld újra.";
-}
-
-// ── Bot parancsok kezelése ────────────────────────────────────
-async function handleBotUpdate(update) {
-  const msg    = update.message || update.edited_message;
-  if (!msg?.text) return;
-  if (msg.chat.type !== "private") return;  // csak privát chat, ne csatorna/csoport
-  const chatId = msg.chat.id;
-  const text   = msg.text.trim();
-  const userId = msg.from?.id;
-
-  // /start
-  if (text === "/start" || text.startsWith("/start ")) {
-    await tgSend(chatId,
-      `⚽ <b>Üdv a 90perc.hu botban!</b>\n\n` +
-      `<b>Parancsok:</b>\n` +
-      `/tippek – Mai jóváhagyott tippek\n` +
-      `/elemzes [meccs] – AI meccs elemzés (Pro)\n` +
-      `/help – Súgó\n\n` +
-      `<a href="https://90perc.hu">90perc.hu →</a>`
-    );
-    return;
-  }
-
-  // /help
-  if (text === "/help") {
-    await tgSend(chatId,
-      `<b>90perc.hu Bot – Súgó</b>\n\n` +
-      `/tippek – Megmutatja a mai jóváhagyott tippeket\n` +
-      `/elemzes [meccs] – AI elemzés egy meccsre (Pro előfizetők)\n` +
-      `  Példa: <code>/elemzes Bayern - Dortmund</code>\n\n` +
-      `<a href="https://90perc.hu/elofizetes.html">Pro előfizetés</a>`
-    );
-    return;
-  }
-
-  // /tippek
-  if (text === "/tippek") {
-    const approved = history.filter(t =>
-      isApproved(t) && t.result === "pending" && t.type !== "combo"
-    );
-    if (!approved.length) {
-      await tgSend(chatId, "⚽ Ma még nincsenek jóváhagyott tippek. Nézz vissza később!");
-      return;
-    }
-    const lines = approved.slice(0, 5).map(t =>
-      `• <b>${t.match}</b>\n  ${t.market}: <b>${t.pick}</b> @ ${t.odds}`
-    ).join("\n\n");
-    await tgSend(chatId,
-      `⚽ <b>Mai tippek (${approved.length} db)</b>\n\n${lines}\n\n` +
-      `<a href="https://90perc.hu/tippek.html">Összes tipp →</a>`
-    );
-    return;
-  }
-
-
-  // /elemzes
-  if (text.startsWith("/elemzes")) {
-    const query = text.replace("/elemzes", "").trim();
-    if (!query) {
-      await tgSend(chatId, "❓ Add meg a meccs nevét!\nPélda: <code>/elemzes Bayern - Dortmund</code>");
-      return;
-    }
-    // Admin bypass: ha ADMIN_TELEGRAM_CHAT_ID be van állítva és egyezik, azonnal engedélyezzük
-    const ADMIN_TG_ID = process.env.ADMIN_TELEGRAM_CHAT_ID;
-    if (ADMIN_TG_ID && String(chatId) === String(ADMIN_TG_ID)) {
-      console.log(`Bot /elemzes – admin bypass (ADMIN_TELEGRAM_CHAT_ID), chatId: ${chatId}`);
-      // Rate limit nincs adminra → egyből elemzünk
-    } else {
-      // Pro ellenőrzés normál felhasználóknak
-      const allLinked = usersDb.all().filter(u => u.telegramChatId === String(chatId));
-      console.log(`Bot /elemzes – chatId: ${chatId}, linked fiókok: ${allLinked.map(u => u.email + "/" + u.plan).join(", ") || "nincs"}`);
-      const linked = allLinked.find(u => u.isAdmin || u.plan === "pro") || allLinked[0];
-      const hasProAccess = linked && (linked.isAdmin || linked.plan === "pro" ||
-        (process.env.ADMIN_EMAIL && linked.email === process.env.ADMIN_EMAIL));
-      if (!hasProAccess) {
-        await tgSend(chatId,
-          `🔒 <b>Pro előfizetés szükséges</b>\n\n` +
-          `Az AI meccs elemzés csak Pro előfizetőknek elérhető.\n` +
-          `<a href="https://90perc.hu/elofizetes.html">Előfizetek – 14 990 Ft/hó →</a>`
-        );
-        return;
-      }
-      // Rate limit: max 5 elemzés/nap
-      const isAdminUser = linked.isAdmin || (process.env.ADMIN_EMAIL && linked.email === process.env.ADMIN_EMAIL);
-      if (!isAdminUser) {
-        const today = todayHU();
-        linked._tgDailyCount = linked._tgDailyCount || {};
-        const count = linked._tgDailyCount[today] || 0;
-        if (count >= 5) {
-          await tgSend(chatId, "⏳ Napi elemzési limit elérve (5/nap). Holnap folytathatod.");
-          return;
-        }
-        linked._tgDailyCount[today] = count + 1;
-        usersDb.update(linked.id, { _tgDailyCount: linked._tgDailyCount });
-      }
-    }
-
-
-    await tgSend(chatId, `🔍 Elemzem: <b>${query}</b>...\nEz 30-60 másodpercig tarthat.`);
-    // Folyamatos "typing" jelzés amíg az AI dolgozik
-    const typingInterval = setInterval(() => tgTyping(chatId), 4000);
-    try {
-      const result = await analyzeForBot(query);
-      clearInterval(typingInterval);
-      // Telegram max 4096 karakter
-      const chunks = result.match(/.{1,4000}/gs) || [result];
-      for (const chunk of chunks) await tgSend(chatId, chunk);
-    } catch(e) {
-      clearInterval(typingInterval);
-      console.error("Bot elemzés hiba:", e.message);
-      await tgSend(chatId, "❌ Elemzési hiba. Próbáld újra néhány perc múlva.");
-    }
-    return;
-  }
-
-  // Ismeretlen parancs
-  if (text.startsWith("/")) {
-    await tgSend(chatId, "❓ Ismeretlen parancs. Írd: /help");
-  }
-}
-
-// ── Telegram bot webhook endpoint ─────────────────────────────
-// Telegram GET-tel is ellenőrzi a webhookot
-app.get("/api/telegram/bot", (req, res) => res.sendStatus(200));
-
-app.post("/api/telegram/bot", express.json(), async (req, res) => {
-  res.sendStatus(200); // Telegram-nak azonnal válaszolunk
-  try { await handleBotUpdate(req.body); } catch(e) { console.error("Bot hiba:", e.message); }
-});
-
-// Telegram linking eltávolítva
-
-
-
-// ── Globális hibakezelők – szerver ne omoljon össze ──────────────
+// ── Globális hibakezelők ──────────────
+// Elkapatlan kivétel után a folyamat állapota bizonytalan (félbemaradt írás, memóriában lévő
+// tippek) – ilyenkor naplózunk és kilépünk; a Render automatikusan, tiszta állapotból újraindít.
 process.on("uncaughtException", (err) => {
-  console.error("UNCAUGHT EXCEPTION:", err.message);
+  console.error("UNCAUGHT EXCEPTION – újraindítás:", err.message);
   console.error(err.stack);
-  // NE lépjünk ki – a szerver maradjon fent
+  process.exit(1);
 });
 
 process.on("unhandledRejection", (reason, promise) => {
@@ -2472,59 +1902,13 @@ process.on("unhandledRejection", (reason, promise) => {
 });
 
 
-// ── Admin: paidUntil szinkronizálás Stripe-ból ───────────────
-app.post("/api/admin/sync-stripe", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  if (!stripe) return res.status(500).json({ error: "Stripe nincs konfigurálva" });
-  const proUsers = usersDb.all().filter(u => u.plan === "pro");
-  console.log(`Stripe sync: ${proUsers.length} pro felhasználó keresése...`);
-  let updated = 0;
-  for (const u of proUsers) {
-    try {
-      let sub = null;
-      // 1. Ha van stripeCustomerId, azzal keresünk
-      if (u.stripeCustomerId) {
-        const subs = await stripe.subscriptions.list({ customer: u.stripeCustomerId, status: "active", limit: 1 });
-        if (subs.data.length) sub = subs.data[0];
-      }
-      // 2. Ha nincs vagy nem találtuk, email alapján keresünk
-      if (!sub) {
-        const customers = await stripe.customers.list({ email: u.email, limit: 1 });
-        if (customers.data.length) {
-          const cust = customers.data[0];
-          const subs = await stripe.subscriptions.list({ customer: cust.id, status: "active", limit: 1 });
-          if (subs.data.length) {
-            sub = subs.data[0];
-            usersDb.update(u.id, { stripeCustomerId: cust.id });
-            console.log(`  Stripe customer ID beállítva: ${u.email} → ${cust.id}`);
-          }
-        }
-      }
-      if (sub) {
-        const paidUntil = new Date(sub.current_period_end * 1000).toISOString();
-        usersDb.update(u.id, { paidUntil, subscriptionStatus: "active", currentPeriodEnd: paidUntil });
-        console.log(`  Stripe sync OK: ${u.email} → lejár: ${paidUntil}`);
-        updated++;
-      } else {
-        console.log(`  Nincs aktív Stripe előfizetés: ${u.email}`);
-      }
-    } catch(e) { console.error(`Stripe sync hiba (${u.email}):`, e.message); }
-  }
-  res.json({ ok: true, updated, total: proUsers.length });
-});
-
-
 app.listen(PORT, () => {
   console.log(`90perc.hu fut: http://localhost:${PORT}`);
-  if (TG_BOT_TOKEN) {
-    console.log("✓ Telegram bot aktív – webhook: /api/telegram/bot");
-  } else {
-    console.log("⚠️  TG_BOT_TOKEN nincs beállítva – bot inaktív");
-  }
+  telegramBot.registerWebhook();
 });
 
-if (!ADMIN_PWD) {
-  console.warn("⚠️  FIGYELEM: ADMIN_PASSWORD nincs beállítva – az admin végpontok (törlés, eredményjelölés, stat-küldés, frissítés) VÉDTELENEK! Állítsd be a Render Environment Variables között.");
+if (!usersDb.all().some(u => u.isAdmin) && !(process.env.ADMIN_EMAIL && ADMIN_PWD)) {
+  console.warn("⚠️  Nincs admin fiók, és ADMIN_EMAIL + ADMIN_PASSWORD sincs beállítva – az admin felület így nem érhető el. Állítsd be a Renderen!");
 }
 if (FOOTBALLDATA_TOKEN) {
   (async () => {
@@ -2675,7 +2059,7 @@ app.post("/api/admin/preview-matches", async (req, res) => {
           // Csak a default ablakos lekérés írja felül a cache-t
           lastMatchList = newList;
           lastMatchListTs = Date.now();
-          try { require("fs").writeFileSync((process.env.DATA_DIR || "/data") + "/last_match_list.json", JSON.stringify(newList)); } catch(e) {}
+          try { require("fs").writeFileSync(path.join(DATA_DIR, "last_match_list.json"), JSON.stringify(newList)); } catch(e) {}
         }
         // Egyéni ablak esetén ideiglenesen használjuk, de nem írjuk felül a cache-t
         const fresh = newList;
@@ -2739,7 +2123,7 @@ app.post("/api/refresh-odds-only", async (req, res) => {
     const newList = await fetchMatchListOnly();
     if (newList && newList.length > 0) {
       lastMatchList = newList;
-      try { require("fs").writeFileSync((process.env.DATA_DIR || "/data") + "/last_match_list.json", JSON.stringify(lastMatchList)); } catch(e) {}
+      try { require("fs").writeFileSync(path.join(DATA_DIR, "last_match_list.json"), JSON.stringify(lastMatchList)); } catch(e) {}
       console.log(`Odds frissítve (AI nélkül): ${lastMatchList.length} meccs`);
     }
     res.json({ ok: true, matches: lastMatchList.length });
@@ -2753,7 +2137,7 @@ let lastMatchList = [];
 let lastMatchListTs = 0;
 (() => {
   try {
-    const saved = JSON.parse(require("fs").readFileSync((process.env.DATA_DIR || "/data") + "/last_match_list.json", "utf8"));
+    const saved = JSON.parse(require("fs").readFileSync(path.join(DATA_DIR, "last_match_list.json"), "utf8"));
     if (Array.isArray(saved)) lastMatchList = saved;
     console.log(`Meccs lista betöltve: ${lastMatchList.length} meccs`);
   } catch(e) {}
