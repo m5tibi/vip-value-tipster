@@ -472,15 +472,19 @@ async function _fetchAFStandings(leagueId) {
   if (cached && (now - cached.ts) < 6 * 3600 * 1000) return cached.standings;
 
   try {
-    const season = new Date().getFullYear();
-    const url = `https://v3.football.api-sports.io/standings?league=${leagueId}&season=${season}`;
-    const r = await fetch(url, {
-      headers: { "x-apisports-key": API_FOOTBALL_KEY }
-    });
-    if (!r.ok) { console.warn(`API-Football standings HTTP ${r.status} (liga ${leagueId})`); return null; }
-    const json = await r.json();
-    const groups = json?.response?.[0]?.league?.standings;
-    if (!groups || !groups.length) return null;
+    // Legtöbb liga a korábbi évben indul (2025/26 → season=2025), ezért ha az aktuális
+    // évben nincs adat, automatikusan visszalépünk az előző évre.
+    const currentYear = new Date().getFullYear();
+    let groups = null;
+    for (const season of [currentYear, currentYear - 1]) {
+      const url = `https://v3.football.api-sports.io/standings?league=${leagueId}&season=${season}`;
+      const r = await fetch(url, { headers: { "x-apisports-key": API_FOOTBALL_KEY } });
+      if (!r.ok) { console.warn(`API-Football standings HTTP ${r.status} (liga ${leagueId}, season ${season})`); continue; }
+      const json = await r.json();
+      const g = json?.response?.[0]?.league?.standings;
+      if (g && g.length) { groups = g; console.log(`API-Football: liga ${leagueId} → season ${season}`); break; }
+    }
+    if (!groups) return null;
     // groups.flat(): több csoportos ligáknál (NL, CL group stage) az összes csapat egy listában
     const rows = groups.flat();
     const standings = rows.map(row => ({
