@@ -2631,7 +2631,36 @@ app.post("/api/admin/preview-matches", async (req, res) => {
       }
     } catch(e) { console.warn("Poisson preview hiba:", e.message); }
 
-    res.json({ matches: fresh, edgeMap, cachedAgoMin: Math.round(cacheAge), generatedAt: new Date().toISOString() });
+    // Formázott mezők hozzáadása a visszafelé kompatibilitáshoz
+    const matchesEnriched = fresh.map(m => {
+      // commence_time biztosítása (régi cache-bejegyzéseknél hiányozhat)
+      let ct = m.commence_time;
+      if (!ct && m.commence) {
+        // hu-HU "09. 27. 18:00" → ISO (megközelítő, CET+2)
+        const rxc = String(m.commence).replace(",", " ").match(/(\d{2})\.?\s*(\d{2})\.?\s+(\d{2}):(\d{2})/);
+        if (rxc) {
+          const [,mm,dd,hh,min] = rxc;
+          ct = new Date(`${new Date().getFullYear()}-${mm}-${dd}T${hh}:${min}:00+02:00`).toISOString();
+        }
+      }
+      // 1X2 odds összefoglalója plain stringként
+      const oddsH2H = (m.odds || []).filter(o => o.market === "1X2");
+      const oddsSummary = oddsH2H.length
+        ? oddsH2H.map(o => `${o.name}: ${o.odds}`).join(" | ")
+        : (m.odds || []).slice(0,3).map(o => `${o.name}: ${o.odds}`).join(" | ");
+      // Poisson value badge
+      const pe = edgeMap[m.match];
+      const valueTag = pe ? (pe.hasValue ? "✅ value" : "⚠️ no value") : "";
+      return {
+        ...m,
+        commence_time: ct || m.commence_time || "",
+        time: m.commence || "",          // alias – egyes frontend kódok "time" mezőt várnak
+        start_time: ct || "",            // alias – ISO formátum
+        odds_summary: oddsSummary,       // plain string, biztonságosan megjeleníthető
+        value_tag: valueTag,
+      };
+    });
+    res.json({ matches: matchesEnriched, edgeMap, cachedAgoMin: Math.round(cacheAge), generatedAt: new Date().toISOString() });
   } catch(e) {
     console.error("preview-matches hiba:", e.message);
     res.status(500).json({ error: e.message });
