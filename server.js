@@ -2529,8 +2529,11 @@ const lastRun = loadLastRun();
 if (lastRun) console.log(`Utolsó futás: ${Math.round((Date.now() - new Date(lastRun).getTime()) / 60000)} perce`);
 
 // Csak meccs lista összeállítása AI nélkül
-async function fetchMatchListOnly() {
+async function fetchMatchListOnly(fromTs = null, toTs = null) {
   const now = new Date();
+  // Ha explicit időablakot kap, azt használja; egyébként a default ±24h
+  const windowFrom = fromTs ? new Date(fromTs) : new Date(now.getTime() + 1.5 * 3600000);
+  const windowTo   = toTs   ? new Date(toTs)   : new Date(now.getTime() + WINDOW_HOURS * 3600000);
   const newList = [];
   for (const [sportKey, meta] of Object.entries(SPORT_MAP)) {
     try {
@@ -2538,16 +2541,16 @@ async function fetchMatchListOnly() {
       if (!er.ok) continue;
       const events = await er.json();
       const hasUpcoming = (Array.isArray(events) ? events : []).some(e => {
-        const h = (new Date(e.commence_time) - now) / 3600000;
-        return h >= 1.5 && h <= WINDOW_HOURS;
+        const t = new Date(e.commence_time);
+        return t >= windowFrom && t <= windowTo;
       });
       if (!hasUpcoming) continue;
       const r = await fetch(`https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h,totals,spreads&oddsFormat=decimal&dateFormat=iso`);
       if (!r.ok) continue;
       const games = await r.json();
       for (const g of (Array.isArray(games) ? games : [])) {
-        const h = (new Date(g.commence_time) - now) / 3600000;
-        if (h < 1.5 || h > WINDOW_HOURS) continue;
+        const t = new Date(g.commence_time);
+        if (t < windowFrom || t > windowTo) continue;
         // Normalizált odds (ugyanolyan formátum mint fetchAndProcess-ben)
         const normOdds = [];
         const validBMs = (g.bookmakers || []).filter(bm => !EXCLUDED_BM.includes(bm.key) && bm.markets?.length > 0);
@@ -2607,23 +2610,68 @@ async function fetchMatchListOnly() {
   return newList;
 }
 
+// Helper: meccs lista → frontend-ready formátum (commenceHu string, odds string, Poisson badge)
+function _enrichMatchesForPreview(matchArr, edgeMap) {
+  return matchArr.map(m => {
+    let commenceHu = m.commence || "";
+    if (m.commence_time) {
+      const dt = new Date(m.commence_time);
+      commenceHu = dt.toLocaleString("hu-HU", {
+        timeZone: "Europe/Budapest",
+        month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit"
+      }).replace(",", "").trim();
+    }
+    const oddsArr = Array.isArray(m.odds) ? m.odds : [];
+    const h2h = oddsArr.filter(o => o.market === "1X2");
+    const oddsStr = (h2h.length ? h2h : oddsArr.slice(0, 3))
+      .map(o => `${o.name}: ${o.odds}`).join(" | ") || "–";
+    const pe = edgeMap[m.match];
+    const poiStr = pe
+      ? (pe.hasValue
+          ? ` ✅ ${(pe.valueMarkets||[]).map(v=>`${v.name}+${v.edge}%`).join(", ")}`
+          : ` ⚠️ λH:${pe.lambdaHome} λA:${pe.lambdaAway}`)
+      : "";
+    return { ...m, commenceHu, odds: oddsStr + poiStr, commence_time: m.commence_time || "" };
+  });
+}
+
 // Admin meccs előnézet – tippek.html admin panel hívja (POST /api/admin/preview-matches)
 // Visszaadja az aktuális meccslistát (cache vagy friss lekérés), opcionális Poisson edge-gel.
 app.post("/api/admin/preview-matches", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
-    // Ha a cache üres vagy nagyon régi (>30 perc), frissítjük
+    const { fromTs, toTs } = req.body || {};
+    const isCustomWindow = !!(fromTs || toTs);
+    // Ha egyéni időablak van, mindig friss lekérés (ne a 24h-s cache-t szűrje)
+    // Ha nincs, csak akkor frissít ha a cache régi (>30 perc)
     const cacheAge = lastMatchListTs ? (Date.now() - lastMatchListTs) / 60000 : 999;
-    if (!lastMatchList.length || cacheAge > 30) {
-      const newList = await fetchMatchListOnly();
+    if (isCustomWindow || !lastMatchList.length || cacheAge > 30) {
+      const newList = await fetchMatchListOnly(fromTs || null, toTs || null);
       if (newList && newList.length > 0) {
-        lastMatchList = newList;
-        lastMatchListTs = Date.now();
-        try { require("fs").writeFileSync((process.env.DATA_DIR || "/data") + "/last_match_list.json", JSON.stringify(lastMatchList)); } catch(e) {}
+        if (!isCustomWindow) {
+          // Csak a default ablakos lekérés írja felül a cache-t
+          lastMatchList = newList;
+          lastMatchListTs = Date.now();
+          try { require("fs").writeFileSync((process.env.DATA_DIR || "/data") + "/last_match_list.json", JSON.stringify(newList)); } catch(e) {}
+        }
+        // Egyéni ablak esetén ideiglenesen használjuk, de nem írjuk felül a cache-t
+        const fresh = newList;
+        // Poisson edge
+        const edgeMap = {};
+        try {
+          const pe = await computePoissonEdge(fresh);
+          for (const [matchName, data] of pe.entries()) {
+            edgeMap[matchName] = { hasValue: data.hasValue, valueMarkets: data.valueMarkets, lambdaHome: data.lambdaHome, lambdaAway: data.lambdaAway };
+          }
+        } catch(e) { console.warn("Poisson preview hiba:", e.message); }
+        const matchesForFrontend = _enrichMatchesForPreview(fresh, edgeMap);
+        return res.json({ matches: matchesForFrontend, edgeMap, scanned: Object.keys(edgeMap).length, oddsHits: fresh.length, cachedAgoMin: 0, generatedAt: new Date().toISOString() });
       }
     }
-    // Időszak szűrő: frontend fromTs/toTs paramétereket küldhet
-    const { fromTs, toTs } = req.body || {};
+    // Időszak szűrő a cache-en: frontend fromTs/toTs paramétereket küldhet
+    const fromMs = fromTs ? new Date(fromTs).getTime() : Date.now() - 2 * 3600000;
+    const toMs   = toTs   ? new Date(toTs).getTime()   : Date.now() + 28 * 3600000;
     const fromMs = fromTs ? new Date(fromTs).getTime() : Date.now() - 2 * 3600000;
     const toMs   = toTs   ? new Date(toTs).getTime()   : Date.now() + 28 * 3600000;
     const fresh = lastMatchList.filter(m => {
@@ -2650,44 +2698,12 @@ app.post("/api/admin/preview-matches", async (req, res) => {
       }
     } catch(e) { console.warn("Poisson preview hiba:", e.message); }
 
-    // Formázott mezők: frontend m.commenceHu (string) és m.odds (string) mezőket vár
-    const matchesForFrontend = fresh.map(m => {
-      // commenceHu: hu-HU formátumú idő string (amit a tippek.html táblázata mutat)
-      let commenceHu = m.commence || "";
-      if (m.commence_time) {
-        // ISO → hu-HU "HH:MM" (csak az idő – a dátum már a commence-ben van)
-        const dt = new Date(m.commence_time);
-        commenceHu = dt.toLocaleString("hu-HU", {
-          timeZone: "Europe/Budapest",
-          month: "2-digit", day: "2-digit",
-          hour: "2-digit", minute: "2-digit"
-        }).replace(",", "").trim();
-      }
-      // odds string: 1X2 piac összefoglalója (amit a táblázat „1X2 odds" oszlopba ír)
-      const oddsArr = Array.isArray(m.odds) ? m.odds : [];
-      const h2h = oddsArr.filter(o => o.market === "1X2");
-      const oddsStr = (h2h.length ? h2h : oddsArr.slice(0, 3))
-        .map(o => `${o.name}: ${o.odds}`)
-        .join(" | ") || "–";
-      // Poisson badge hozzáfűzése az odds oszlophoz
-      const pe = edgeMap[m.match];
-      const poiStr = pe
-        ? (pe.hasValue
-            ? ` ✅ ${(pe.valueMarkets||[]).map(v=>`${v.name}+${v.edge}%`).join(", ")}`
-            : ` ⚠️ λH:${pe.lambdaHome} λA:${pe.lambdaAway}`)
-        : "";
-      return {
-        ...m,
-        commenceHu,          // frontend ezt a mezőt rendereli
-        odds: oddsStr + poiStr,  // felülírjuk az array-t string-gel
-        commence_time: m.commence_time || "",
-      };
-    });
+    const matchesForFrontend = _enrichMatchesForPreview(fresh, edgeMap);
     res.json({
       matches: matchesForFrontend,
       edgeMap,
-      scanned: Object.keys(edgeMap).length,   // frontend megjeleníti ("N liga átnézve")
-      oddsHits: fresh.length,                 // frontend megjeleníti ("N odds lekérés")
+      scanned: Object.keys(edgeMap).length,
+      oddsHits: fresh.length,
       cachedAgoMin: Math.round(cacheAge),
       generatedAt: new Date().toISOString()
     });
