@@ -2611,16 +2611,24 @@ app.post("/api/admin/preview-matches", async (req, res) => {
         try { require("fs").writeFileSync((process.env.DATA_DIR || "/data") + "/last_match_list.json", JSON.stringify(lastMatchList)); } catch(e) {}
       }
     }
-    // Lejárt meccsek kiszűrése
-    const now = Date.now();
+    // Időszak szűrő: frontend fromTs/toTs paramétereket küldhet
+    const { fromTs, toTs } = req.body || {};
+    const fromMs = fromTs ? new Date(fromTs).getTime() : Date.now() - 2 * 3600000;
+    const toMs   = toTs   ? new Date(toTs).getTime()   : Date.now() + 28 * 3600000;
     const fresh = lastMatchList.filter(m => {
+      // Elsősorban commence_time (ISO) alapján szűrünk
+      if (m.commence_time) {
+        const t = new Date(m.commence_time).getTime();
+        return t >= fromMs && t <= toMs;
+      }
+      // Fallback: commence string parse
       if (!m.commence) return true;
       const c = String(m.commence).replace(",", " ");
       const match = c.match(/(\d{2})\.(\d{2})\.?\s+(\d{2}):(\d{2})/);
       if (!match) return true;
       const [,mm,dd,hh,min] = match;
       const d = new Date(`${new Date().getFullYear()}-${mm}-${dd}T${hh}:${min}:00+02:00`);
-      return (now - d.getTime()) / 3600000 < 2;
+      return d.getTime() >= fromMs && d.getTime() <= toMs;
     });
     // Poisson edge szinkron (cache-ből – ne lassítsa a lekérést)
     const edgeMap = {};
@@ -2631,36 +2639,47 @@ app.post("/api/admin/preview-matches", async (req, res) => {
       }
     } catch(e) { console.warn("Poisson preview hiba:", e.message); }
 
-    // Formázott mezők hozzáadása a visszafelé kompatibilitáshoz
-    const matchesEnriched = fresh.map(m => {
-      // commence_time biztosítása (régi cache-bejegyzéseknél hiányozhat)
-      let ct = m.commence_time;
-      if (!ct && m.commence) {
-        // hu-HU "09. 27. 18:00" → ISO (megközelítő, CET+2)
-        const rxc = String(m.commence).replace(",", " ").match(/(\d{2})\.?\s*(\d{2})\.?\s+(\d{2}):(\d{2})/);
-        if (rxc) {
-          const [,mm,dd,hh,min] = rxc;
-          ct = new Date(`${new Date().getFullYear()}-${mm}-${dd}T${hh}:${min}:00+02:00`).toISOString();
-        }
+    // Formázott mezők: frontend m.commenceHu (string) és m.odds (string) mezőket vár
+    const matchesForFrontend = fresh.map(m => {
+      // commenceHu: hu-HU formátumú idő string (amit a tippek.html táblázata mutat)
+      let commenceHu = m.commence || "";
+      if (m.commence_time) {
+        // ISO → hu-HU "HH:MM" (csak az idő – a dátum már a commence-ben van)
+        const dt = new Date(m.commence_time);
+        commenceHu = dt.toLocaleString("hu-HU", {
+          timeZone: "Europe/Budapest",
+          month: "2-digit", day: "2-digit",
+          hour: "2-digit", minute: "2-digit"
+        }).replace(",", "").trim();
       }
-      // 1X2 odds összefoglalója plain stringként
-      const oddsH2H = (m.odds || []).filter(o => o.market === "1X2");
-      const oddsSummary = oddsH2H.length
-        ? oddsH2H.map(o => `${o.name}: ${o.odds}`).join(" | ")
-        : (m.odds || []).slice(0,3).map(o => `${o.name}: ${o.odds}`).join(" | ");
-      // Poisson value badge
+      // odds string: 1X2 piac összefoglalója (amit a táblázat „1X2 odds" oszlopba ír)
+      const oddsArr = Array.isArray(m.odds) ? m.odds : [];
+      const h2h = oddsArr.filter(o => o.market === "1X2");
+      const oddsStr = (h2h.length ? h2h : oddsArr.slice(0, 3))
+        .map(o => `${o.name}: ${o.odds}`)
+        .join(" | ") || "–";
+      // Poisson badge hozzáfűzése az odds oszlophoz
       const pe = edgeMap[m.match];
-      const valueTag = pe ? (pe.hasValue ? "✅ value" : "⚠️ no value") : "";
+      const poiStr = pe
+        ? (pe.hasValue
+            ? ` ✅ ${(pe.valueMarkets||[]).map(v=>`${v.name}+${v.edge}%`).join(", ")}`
+            : ` ⚠️ λH:${pe.lambdaHome} λA:${pe.lambdaAway}`)
+        : "";
       return {
         ...m,
-        commence_time: ct || m.commence_time || "",
-        time: m.commence || "",          // alias – egyes frontend kódok "time" mezőt várnak
-        start_time: ct || "",            // alias – ISO formátum
-        odds_summary: oddsSummary,       // plain string, biztonságosan megjeleníthető
-        value_tag: valueTag,
+        commenceHu,          // frontend ezt a mezőt rendereli
+        odds: oddsStr + poiStr,  // felülírjuk az array-t string-gel
+        commence_time: m.commence_time || "",
       };
     });
-    res.json({ matches: matchesEnriched, edgeMap, cachedAgoMin: Math.round(cacheAge), generatedAt: new Date().toISOString() });
+    res.json({
+      matches: matchesForFrontend,
+      edgeMap,
+      scanned: Object.keys(edgeMap).length,   // frontend megjeleníti ("N liga átnézve")
+      oddsHits: fresh.length,                 // frontend megjeleníti ("N odds lekérés")
+      cachedAgoMin: Math.round(cacheAge),
+      generatedAt: new Date().toISOString()
+    });
   } catch(e) {
     console.error("preview-matches hiba:", e.message);
     res.status(500).json({ error: e.message });
