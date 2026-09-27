@@ -548,53 +548,72 @@ function _afTeamMatch(standingsArr, teamName) {
   return found || null;
 }
 
+// Odds-alapú λ becslés: 1X2 implied prob-okból grid search-el találja a Poisson λH, λA értékeket.
+// Előny: nem kell API-Football, minden ligára működik ahol van 1X2 piac.
+// Az 1X2-ből kapott λ-val aztán az Over/Under és BTTS piacokat ellenőrizzük → ott keressük a value-t.
+function _estimateLambdaFromOdds(pHome, pDraw, pAway) {
+  const MAX_GOALS = 8;
+  let bestLH = 1.3, bestLA = 1.1, bestErr = Infinity;
+  for (let lh100 = 30; lh100 <= 420; lh100 += 8) {
+    const lh = lh100 / 100;
+    for (let la100 = 30; la100 <= 420; la100 += 8) {
+      const la = la100 / 100;
+      let ph = 0, pd = 0, pa = 0;
+      for (let h = 0; h <= MAX_GOALS; h++) {
+        const phh = _poissonPmf(lh, h);
+        for (let a = 0; a <= MAX_GOALS; a++) {
+          const p = phh * _poissonPmf(la, a);
+          if (h > a) ph += p;
+          else if (h === a) pd += p;
+          else pa += p;
+        }
+      }
+      const err = (ph - pHome) ** 2 + (pd - pDraw) ** 2 + (pa - pAway) ** 2;
+      if (err < bestErr) { bestErr = err; bestLH = lh; bestLA = la; }
+    }
+  }
+  return { lambdaHome: Math.round(bestLH * 100) / 100, lambdaAway: Math.round(bestLA * 100) / 100 };
+}
+
 // A fő value filter függvény: matchList bemenetre visszaadja a value market-eket meccsenként
 // Visszatér: Map { matchName → { markets: [{market, modelProb, impliedProb, edge}], hasValue: bool } }
 async function computePoissonEdge(matchList) {
-  if (!API_FOOTBALL_KEY) return new Map();
-
-  // Ligánként fetch, 1 request/liga (24h cache)
-  const standingsCache = {}; // leagueId → standings[]
   const result = new Map();
 
   for (const m of matchList) {
-    const sportLabelLower = (m.sport || "").toLowerCase();
-    // Liga azonosítása
-    let leagueEntry = null;
-    for (const le of AF_LEAGUE_MAP) {
-      // Szóhatáros illesztés: "la liga 2" ne matchelje a "la liga" label-t
-      if (le.labels.some(lbl => {
-        const idx = sportLabelLower.indexOf(lbl);
-        if (idx === -1) return false;
-        const after = sportLabelLower[idx + lbl.length];
-        return !after || /[\s\W]/.test(after); // label után szóköz/nem alfanumerikus, vagy a string vége
-      })) { leagueEntry = le; break; }
-    }
-    if (!leagueEntry) { console.log(`[POI-DBG] ismeretlen liga: "${m.sport}" → kihagyva`); continue; }
+    const oddsArr = Array.isArray(m.odds) ? m.odds : [];
+    const h2h = oddsArr.filter(o => o.market === "1X2");
+    if (h2h.length < 3) continue; // 1X2 kell a λ becsléshez
 
-    // Standings lekérés (cache-elve)
-    let standings = null;
-    for (const lid of leagueEntry.ids) {
-      if (!standingsCache[lid]) {
-        standingsCache[lid] = await _fetchAFStandings(lid);
-      }
-      if (standingsCache[lid]) { standings = standingsCache[lid]; break; }
-    }
-    if (!standings) { console.log(`[POI-DBG] standings null: liga ${leagueEntry.ids} (${m.sport})`); continue; }
-
-    // Csapatnév kinyerés
+    // Csapatnév kinyerés (hazai = match első fele)
     const parts = String(m.match || "").split(/\s+vs\.?\s+/i);
     if (parts.length !== 2) continue;
     const [homeName, awayName] = parts;
 
-    const homeStats = _afTeamMatch(standings, homeName);
-    const awayStats = _afTeamMatch(standings, awayName);
-    if (!homeStats || !awayStats) { console.log(`[POI-DBG] csapatnév nem found: "${homeName}" → ${homeStats?homeStats.teamName:"NULL"}, "${awayName}" → ${awayStats?awayStats.teamName:"NULL"} | standings[0]: ${standings[0]?.teamName}`); continue; }
-    if (homeStats.homePlayed < 2 || awayStats.awayPlayed < 2) continue;
+    // Home / draw / away odds azonosítása
+    const drawEntry = h2h.find(o => /draw|döntetlen|^x$/i.test(o.name));
+    if (!drawEntry) continue;
+    const nonDraw = h2h.filter(o => o !== drawEntry);
+    if (nonDraw.length < 2) continue;
+    const norm4 = s => s.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5);
+    const homeEntry = nonDraw.find(o => norm4(o.name) === norm4(homeName)) ||
+                      nonDraw.find(o => norm4(homeName).includes(norm4(o.name)) || norm4(o.name).includes(norm4(homeName))) ||
+                      nonDraw[0];
+    const awayEntry = nonDraw.find(o => o !== homeEntry) || nonDraw[1];
+    if (!homeEntry || !awayEntry) continue;
 
-    // λ számítás (hazai/idegen teljesítmény alapján)
-    const lambdaHome = ((homeStats.homeFor / homeStats.homePlayed) + (awayStats.awayAgainst / awayStats.awayPlayed)) / 2;
-    const lambdaAway = ((awayStats.awayFor / awayStats.awayPlayed) + (homeStats.homeAgainst / homeStats.homePlayed)) / 2;
+    // Implied prob vig-eltávolítással
+    const rawH = 1 / parseFloat(homeEntry.odds);
+    const rawD = 1 / parseFloat(drawEntry.odds);
+    const rawA = 1 / parseFloat(awayEntry.odds);
+    const vigTotal = rawH + rawD + rawA;
+    if (vigTotal <= 0.5) continue;
+    const pHome = rawH / vigTotal;
+    const pDraw = rawD / vigTotal;
+    const pAway = rawA / vigTotal;
+
+    // λ becslés 1X2 odds-ból
+    const { lambdaHome, lambdaAway } = _estimateLambdaFromOdds(pHome, pDraw, pAway);
 
     const probs = _computePoissonProbs(lambdaHome, lambdaAway, 2.5);
     const probs15 = _computePoissonProbs(lambdaHome, lambdaAway, 1.5);
