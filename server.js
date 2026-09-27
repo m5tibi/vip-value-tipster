@@ -457,15 +457,19 @@ const AF_LEAGUE_MAP = [
   { ids: [203], labels: ["török szuperliga", "super lig", "szuperliga"] },
   { ids: [71],  labels: ["brazil serie a", "brazil"] },
   { ids: [106], labels: ["ekstraklasa"] },
+  { ids: [141], labels: ["la liga 2", "segunda division", "segunda división"] },
+  { ids: [253], labels: ["mls", "major league soccer"] },
+  { ids: [262], labels: ["liga mx", "liga mex", "liga mexicana"] },
+  { ids: [5],   labels: ["nemzetek ligája", "nations league", "uefa nations league"] },
 ];
 
-// 24 órás cache: leagueId → { ts, standings: [{teamName, homeFor, homeAgainst, homePlayed, awayFor, awayAgainst, awayPlayed}] }
+// 6 órás cache: leagueId → { ts, standings: [{teamName, homeFor, homeAgainst, homePlayed, awayFor, awayAgainst, awayPlayed}] }
 const _afStandingsCache = {};
 
 async function _fetchAFStandings(leagueId) {
   const now = Date.now();
   const cached = _afStandingsCache[leagueId];
-  if (cached && (now - cached.ts) < 24 * 3600 * 1000) return cached.standings;
+  if (cached && (now - cached.ts) < 6 * 3600 * 1000) return cached.standings;
 
   try {
     const season = new Date().getFullYear();
@@ -477,8 +481,8 @@ async function _fetchAFStandings(leagueId) {
     const json = await r.json();
     const groups = json?.response?.[0]?.league?.standings;
     if (!groups || !groups.length) return null;
-    // standings[0] az első csoport (ligában általában 1 van)
-    const rows = groups[0];
+    // groups.flat(): több csoportos ligáknál (NL, CL group stage) az összes csapat egy listában
+    const rows = groups.flat();
     const standings = rows.map(row => ({
       teamName: row.team?.name || "",
       homePlayed:   row.home?.played   || 0,
