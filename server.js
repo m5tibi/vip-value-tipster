@@ -2672,8 +2672,6 @@ app.post("/api/admin/preview-matches", async (req, res) => {
     // Időszak szűrő a cache-en: frontend fromTs/toTs paramétereket küldhet
     const fromMs = fromTs ? new Date(fromTs).getTime() : Date.now() - 2 * 3600000;
     const toMs   = toTs   ? new Date(toTs).getTime()   : Date.now() + 28 * 3600000;
-    const fromMs = fromTs ? new Date(fromTs).getTime() : Date.now() - 2 * 3600000;
-    const toMs   = toTs   ? new Date(toTs).getTime()   : Date.now() + 28 * 3600000;
     const fresh = lastMatchList.filter(m => {
       // Elsősorban commence_time (ISO) alapján szűrünk
       if (m.commence_time) {
