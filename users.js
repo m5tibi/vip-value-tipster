@@ -53,7 +53,7 @@ function findByStripeCustomer(cid) {
 // A skipPolicy csak a belső admin-bootstraphez való (a meglévő ADMIN_PASSWORD lehet rövidebb).
 async function create(email, password, { isAdmin = false, skipPolicy = false } = {}) {
   const e = normEmail(email);
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return { ok: false, error: "Érvénytelen e-mail cím." };
+  if (!/^[^@\s<>"'`\\()]+@[^@\s<>"'`\\()]+\.[^@\s<>"'`\\()]+$/.test(e)) return { ok: false, error: "Érvénytelen e-mail cím." };
   if (!password)                             return { ok: false, error: "A jelszó kötelező." };
   if (!skipPolicy && password.length < 8)    return { ok: false, error: "A jelszó legalább 8 karakter legyen." };
   if (findByEmail(e))                        return { ok: false, error: "Ezzel az e-mail címmel már van fiók." };

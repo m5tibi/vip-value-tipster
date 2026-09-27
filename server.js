@@ -123,11 +123,66 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
 
 });
 
+app.set("trust proxy", 1);                   // Render proxy mögött fut → req.ip a valódi kliens IP
 app.use(express.json());
 app.use(cookieParser());
 app.use(auth.attachUser);                    // minden kérésre beteszi a req.user-t
 app.use(express.static(path.join(__dirname, "public")));
 app.use('/api/odds', require('./routes/odds'));
+
+// ── XSS-védelem ───────────────────────────────────────────
+// A frontend innerHTML-lel rajzol, a szövegek pedig részben az AI-tól (webes keresésből)
+// és a felhasználóktól (e-mail cím) jönnek. Ezért minden kimenő JSON szöveges mezőjében
+// a < és > jeleket ártalmatlan, hasonló kinézetű jelekre cseréljük – így HTML tag nem kerülhet be.
+// (Adat HTML-attribútumba / onclick-be nem kerül, csak azonosító – ezt a frontenden tartsuk is így.)
+function safeOut(v) {
+  if (typeof v === "string") return v.replace(/</g, "‹").replace(/>/g, "›");
+  if (Array.isArray(v)) return v.map(safeOut);
+  if (v && typeof v === "object") {
+    const o = {};
+    for (const k of Object.keys(v)) o[k] = safeOut(v[k]);
+    return o;
+  }
+  return v;
+}
+app.use("/api", (req, res, next) => {
+  const json = res.json.bind(res);
+  res.json = body => json(safeOut(body));
+  next();
+});
+
+// ── Próbálkozás-korlátozás (brute force / spam ellen) ─────
+// Egyszerű, memóriában tartott csúszóablakos számláló IP-nként – egy példányhoz elég.
+function hitCounter(max, windowMs) {
+  const hits = new Map();
+  const recent = key => (hits.get(key) || []).filter(t => Date.now() - t < windowMs);
+  setInterval(() => {
+    for (const k of hits.keys()) {
+      const fresh = recent(k);
+      if (fresh.length) hits.set(k, fresh); else hits.delete(k);
+    }
+  }, windowMs).unref();
+  return {
+    blocked: key => recent(key).length >= max,
+    hit:     key => hits.set(key, [...recent(key), Date.now()]),
+  };
+}
+function rateLimit(name, max, windowMs) {
+  const c = hitCounter(max, windowMs);
+  return (req, res, next) => {
+    const key = req.ip || "?";
+    if (c.blocked(key)) {
+      console.warn(`Rate limit (${name}): ${key}`);
+      return res.status(429).json({ error: "Túl sok próbálkozás. Próbáld újra később." });
+    }
+    c.hit(key);
+    next();
+  };
+}
+const loginLimiter = rateLimit("login", 10, 15 * 60 * 1000);   // 10 próbálkozás / 15 perc
+const mailLimiter  = rateLimit("mail",   5, 60 * 60 * 1000);   // jelszó-visszaállítás / újraküldés: 5 / óra
+const regLimiter   = rateLimit("register", 20, 60 * 60 * 1000); // regisztráció: 20 / óra (mobilhálózaton sokan osztoznak egy IP-n)
+const adminFails   = hitCounter(10, 15 * 60 * 1000);           // hibás admin jelszó: 10 / 15 perc
 
 const ADMIN_PWD     = process.env.ADMIN_PASSWORD;
 const ODDS_API_KEY  = process.env.ODDS_API_KEY;
@@ -1632,24 +1687,30 @@ setInterval(async () => {
 }, 60000);
 
 // ── Admin hitelesítés ─────────────────────────────────────
-// Jelszó jöhet: x-admin-password header, body.password, vagy ?password= query.
 // Jelszó jöhet: x-admin-password header (ASCII), x-admin-password-b64 header (UTF-8 biztos,
-// base64), body.password, vagy ?password= query.
+// base64) vagy body.password. URL-ben (?password=) szándékosan NEM, mert az bekerül a logokba.
 function extractPwd(req) {
   const b64 = req.get("x-admin-password-b64");
   if (b64) { try { return Buffer.from(b64, "base64").toString("utf8"); } catch {} }
-  return req.get("x-admin-password") || req.body?.password || req.query?.password || "";
+  return req.get("x-admin-password") || req.body?.password || "";
+}
+// Időzítés-biztos összehasonlítás (hash-eken, hogy a hossz se szivárogjon ki)
+// Csak a HIBÁS próbálkozásokat számoljuk, így a jelszavas admin felület normál használata nem akad el.
+function adminPwdOk(req) {
+  const pwd = extractPwd(req);
+  if (!ADMIN_PWD || !pwd) return false;
+  const key = req.ip || "?";
+  if (adminFails.blocked(key)) return false;
+  const h = x => require("crypto").createHash("sha256").update(String(x)).digest();
+  const ok = require("crypto").timingSafeEqual(h(pwd), h(ADMIN_PWD));
+  if (!ok) { adminFails.hit(key); console.warn(`Hibás admin jelszó: ${key}`); }
+  return ok;
 }
 function requireAdmin(req, res) {
   // 1) Belépett admin fiók (e-mail + jelszó, session cookie) – ez az elsődleges mód
   if (req.user?.isAdmin) return true;
-  // 2) Régi, jelszavas mód (visszafelé kompatibilitás: ?admin=... / header)
-  if (!ADMIN_PWD) {
-    // Ha nincs jelszó beállítva, nyitva marad – de erről induláskor figyelmeztetünk.
-    return true;
-  }
-  const pwd = extractPwd(req);
-  if (pwd !== ADMIN_PWD) {
+  // 2) Régi, jelszavas mód (visszafelé kompatibilitás: header). ADMIN_PASSWORD nélkül zárva.
+  if (!adminPwdOk(req)) {
     res.status(403).json({ error: "Hozzáférés megtagadva — hibás vagy hiányzó admin jelszó." });
     return false;
   }
@@ -1665,7 +1726,7 @@ async function sendVerifyEmail(req, user) {
   return mailer.sendVerification(user.email, url);
 }
 
-app.post("/api/auth/register", async (req, res) => {
+app.post("/api/auth/register", regLimiter, async (req, res) => {
   const { email, password, acceptTerms, over18 } = req.body || {};
   if (!acceptTerms || !over18) {
     return res.status(400).json({ error: "El kell fogadnod az ÁSZF-et és nyilatkoznod kell a 18. életéved betöltéséről." });
@@ -1702,14 +1763,14 @@ app.get("/api/auth/verify", (req, res) => {
   res.send(page("✅", "E-mail cím megerősítve", "Köszönjük! A fiókod aktív, jó szórakozást.", "#00e676"));
 });
 
-app.post("/api/auth/resend-verification", auth.requireLogin, async (req, res) => {
+app.post("/api/auth/resend-verification", auth.requireLogin, mailLimiter, async (req, res) => {
   if (req.user.emailVerified) return res.json({ ok: true, already: true });
   await sendVerifyEmail(req, req.user);
   res.json({ ok: true });
 });
 
 // Elfelejtett jelszó – MINDIG ok:true a válasz (nem áruljuk el, létezik-e a fiók)
-app.post("/api/auth/forgot", async (req, res) => {
+app.post("/api/auth/forgot", mailLimiter, async (req, res) => {
   const u = usersDb.findByEmail(req.body?.email);
   if (u && !u.disabled) {
     // A hash a tokenben → a link egyszer használatos (jelszóváltáskor érvénytelenné válik)
@@ -1721,7 +1782,7 @@ app.post("/api/auth/forgot", async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/auth/reset", async (req, res) => {
+app.post("/api/auth/reset", loginLimiter, async (req, res) => {
   const { token, newPassword } = req.body || {};
   const uid = auth.readPurposeToken("reset", token, id => usersDb.findById(id)?.passwordHash || "");
   if (!uid || usersDb.findById(uid)?.disabled) return res.status(400).json({ error: "A link érvénytelen vagy lejárt. Kérj újat." });
@@ -1734,7 +1795,7 @@ app.post("/api/auth/reset", async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/auth/login", async (req, res) => {
+app.post("/api/auth/login", loginLimiter, async (req, res) => {
   const { email, password } = req.body || {};
   const u = await usersDb.verify(email, password);
   if (!u) return res.status(401).json({ error: "Hibás e-mail cím vagy jelszó." });
@@ -1772,8 +1833,7 @@ app.post("/api/auth/password", auth.requireLogin, async (req, res) => {
 // Admin (helyes jelszóval VAGY admin fiókkal) MINDEN tippet lát (jóváhagyásra várókat is).
 function isAdminReq(req) {
   if (req.user?.isAdmin) return true;
-  const pwd = extractPwd(req);
-  return !!ADMIN_PWD && pwd === ADMIN_PWD;
+  return adminPwdOk(req);
 }
 
 // ÉLŐ TIPPEK – ez a termék: belépés (és fizetős módban aktív előfizetés) kell hozzá.
@@ -2001,9 +2061,8 @@ app.delete("/api/history/:id", (req, res) => {
 
 // Admin jelszó ellenőrzése (beviteli mezős belépéshez)
 app.post("/api/admin/login", (req, res) => {
-  const pwd = extractPwd(req);
-  if (!ADMIN_PWD) return res.json({ ok: true, note: "Nincs ADMIN_PASSWORD beállítva – nyitott mód." });
-  if (pwd !== ADMIN_PWD) return res.status(403).json({ ok: false, error: "Hibás jelszó." });
+  if (!ADMIN_PWD) return res.status(403).json({ ok: false, error: "Az admin jelszó nincs beállítva a szerveren." });
+  if (!adminPwdOk(req)) return res.status(403).json({ ok: false, error: "Hibás jelszó." });
   res.json({ ok: true });
 });
 
@@ -2112,9 +2171,11 @@ app.post("/api/stats/send", async (req, res) => {
 });
 
 // ── Analyzer history szinkronizáció ──────────────────────
+// Az uid a felhasználó saját Claude API kulcsának SHA-256 hash-e (64 hex karakter) –
+// kitalálhatatlan, így más előzményét nem lehet olvasni/törölni. Rövidebb (régi) uid-t elutasítunk.
 function aPath(uid) {
-  const safe = String(uid).replace(/[^a-z0-9]/g, '').slice(0, 32);
-  return '/data/ah_' + safe + '.json';
+  if (!/^[a-f0-9]{64}$/.test(String(uid))) return null;
+  return path.join(process.env.DATA_DIR || "/data", "ah_" + uid + ".json");
 }
 
 app.get("/api/analyzer-history", (req, res) => {
@@ -2122,18 +2183,20 @@ app.get("/api/analyzer-history", (req, res) => {
   if (!uid) return res.json([]);
   try {
     const p = aPath(uid);
-    if (!fs.existsSync(p)) return res.json([]);
+    if (!p || !fs.existsSync(p)) return res.json([]);
     res.json(JSON.parse(fs.readFileSync(p, 'utf8')));
   } catch (e) { res.json([]); }
 });
 
-app.post("/api/analyzer-history", (req, res) => {
-  const { uid, entry } = req.body;
-  if (!uid || !entry) return res.status(400).json({ error: 'Hiányzó adat' });
+const analyzerLimiter = rateLimit("analyzer", 60, 60 * 60 * 1000);   // lemez teleírása ellen
+app.post("/api/analyzer-history", analyzerLimiter, (req, res) => {
+  const { uid, entry, entries } = req.body || {};
+  const p = aPath(uid);
+  if (!p || (!entry && !Array.isArray(entries))) return res.status(400).json({ error: 'Hiányzó vagy érvénytelen adat' });
   try {
-    const p = aPath(uid);
     const hist = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : [];
-    const newHist = [entry, ...hist].slice(0, 50);
+    // entries: a böngészőben tárolt teljes előzmény egyszeri feltöltése (átállás az új uid-ra)
+    const newHist = (entry ? [entry, ...hist] : [...entries, ...hist]).slice(0, 50);
     fs.writeFileSync(p, JSON.stringify(newHist), 'utf8');
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -2141,9 +2204,9 @@ app.post("/api/analyzer-history", (req, res) => {
 
 app.delete("/api/analyzer-history", (req, res) => {
   const uid = req.query.uid;
-  if (!uid) return res.status(400).json({ error: 'Hiányzó uid' });
+  const p = aPath(uid);
+  if (!p) return res.status(400).json({ error: 'Hiányzó vagy érvénytelen uid' });
   try {
-    const p = aPath(uid);
     if (fs.existsSync(p)) fs.unlinkSync(p);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -2281,6 +2344,9 @@ async function tgSend(chatId, text, extra = {}) {
     body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", ...extra })
   }).catch(e => console.error("tgSend hiba:", e.message));
 }
+
+// Telegram HTML módhoz: felhasználói szöveg escape-elése
+const tgEsc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 async function tgTyping(chatId) {
   if (!TG_BOT_TOKEN) return;
@@ -2423,7 +2489,7 @@ async function handleBotUpdate(update) {
     }
 
 
-    await tgSend(chatId, `🔍 Elemzem: <b>${query}</b>...\nEz 30-60 másodpercig tarthat.`);
+    await tgSend(chatId, `🔍 Elemzem: <b>${tgEsc(query)}</b>...\nEz 30-60 másodpercig tarthat.`);
     // Folyamatos "typing" jelzés amíg az AI dolgozik
     const typingInterval = setInterval(() => tgTyping(chatId), 4000);
     try {
@@ -2450,7 +2516,13 @@ async function handleBotUpdate(update) {
 // Telegram GET-tel is ellenőrzi a webhookot
 app.get("/api/telegram/bot", (req, res) => res.sendStatus(200));
 
+// TG_WEBHOOK_SECRET: a Telegram minden hívásnál visszaküldi az X-Telegram-Bot-Api-Secret-Token
+// headerben – enélkül bárki hamisíthatna bot-üzenetet (pl. admin chat ID nevében).
+const TG_WEBHOOK_SECRET = process.env.TG_WEBHOOK_SECRET;
 app.post("/api/telegram/bot", express.json(), async (req, res) => {
+  if (!TG_WEBHOOK_SECRET || req.get("x-telegram-bot-api-secret-token") !== TG_WEBHOOK_SECRET) {
+    return res.sendStatus(403);
+  }
   res.sendStatus(200); // Telegram-nak azonnal válaszolunk
   try { await handleBotUpdate(req.body); } catch(e) { console.error("Bot hiba:", e.message); }
 });
@@ -2517,14 +2589,24 @@ app.post("/api/admin/sync-stripe", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`90perc.hu fut: http://localhost:${PORT}`);
   if (TG_BOT_TOKEN) {
-    console.log("✓ Telegram bot aktív – webhook: /api/telegram/bot");
+    if (TG_WEBHOOK_SECRET) {
+      // Webhook (újra)regisztrálása a secret tokennel – így elég a TG_WEBHOOK_SECRET env változót beállítani
+      fetch(`${TG_BOT_API}/setWebhook`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: `${BASE_URL}/api/telegram/bot`, secret_token: TG_WEBHOOK_SECRET }),
+      }).then(r => r.json())
+        .then(d => console.log(d.ok ? "✓ Telegram bot aktív – webhook: /api/telegram/bot" : `⚠️  Telegram setWebhook hiba: ${d.description}`))
+        .catch(e => console.error("Telegram setWebhook hiba:", e.message));
+    } else {
+      console.warn("⚠️  TG_WEBHOOK_SECRET nincs beállítva – a Telegram bot parancsai le vannak tiltva. Állítsd be a Renderen (A-Z, a-z, 0-9, _ és -, max. 256 karakter).");
+    }
   } else {
     console.log("⚠️  TG_BOT_TOKEN nincs beállítva – bot inaktív");
   }
 });
 
 if (!ADMIN_PWD) {
-  console.warn("⚠️  FIGYELEM: ADMIN_PASSWORD nincs beállítva – az admin végpontok (törlés, eredményjelölés, stat-küldés, frissítés) VÉDTELENEK! Állítsd be a Render Environment Variables között.");
+  console.warn("⚠️  ADMIN_PASSWORD nincs beállítva – a jelszavas admin mód ki van kapcsolva, admin műveletek csak belépett admin fiókkal érhetők el.");
 }
 if (FOOTBALLDATA_TOKEN) {
   (async () => {

@@ -95,13 +95,18 @@ function esc(s){
 
 function mk(k){return k.slice(0,14)+'................'+k.slice(-4);}
 
-function simpleHash(s){
-  var h=0;
-  for(var i=0;i<s.length;i++){h=Math.imul(31,h)+s.charCodeAt(i)|0;}
-  return Math.abs(h).toString(36);
+// Szerveroldali előzmény-azonosító: a Claude kulcs SHA-256 hash-e (kitalálhatatlan)
+var uidCache={key:'',uid:''};
+function withUid(cb){
+  var k=S.claudeKey;
+  if(!k||!window.crypto||!crypto.subtle) return;
+  if(uidCache.key===k) return cb(uidCache.uid);
+  crypto.subtle.digest('SHA-256',new TextEncoder().encode(k)).then(function(buf){
+    var hex=Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+    uidCache={key:k,uid:hex};
+    cb(hex);
+  }).catch(function(){});
 }
-
-function getUid(){return S.claudeKey?simpleHash(S.claudeKey):'';}
 
 function tabSt(name){
   var a=S.tab===name;
@@ -201,33 +206,40 @@ if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',b
 else boot();
 
 function syncHistory(){
-  var uid=getUid();
-  if(!uid) return;
-  fetch('/api/analyzer-history?uid='+uid)
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if(Array.isArray(d)&&d.length){
-        S.history=d;
-        lsSet(HS,JSON.stringify(d));
-        R();
-      }
-    }).catch(function(){});
+  withUid(function(uid){
+    fetch('/api/analyzer-history?uid='+uid)
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(Array.isArray(d)&&d.length){
+          S.history=d;
+          lsSet(HS,JSON.stringify(d));
+          R();
+        } else if(S.history.length){
+          // Átállás az új azonosítóra: a böngészőben tárolt előzményt egyszer feltöltjük
+          fetch('/api/analyzer-history',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({uid:uid,entries:S.history})
+          }).catch(function(){});
+        }
+      }).catch(function(){});
+  });
 }
 
 function saveEntry(entry){
-  var uid=getUid();
-  if(!uid) return;
-  fetch('/api/analyzer-history',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({uid:uid,entry:entry})
-  }).catch(function(){});
+  withUid(function(uid){
+    fetch('/api/analyzer-history',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({uid:uid,entry:entry})
+    }).catch(function(){});
+  });
 }
 
 function clearServerHistory(){
-  var uid=getUid();
-  if(!uid) return;
-  fetch('/api/analyzer-history?uid='+uid,{method:'DELETE'}).catch(function(){});
+  withUid(function(uid){
+    fetch('/api/analyzer-history?uid='+uid,{method:'DELETE'}).catch(function(){});
+  });
 }
 
 // ── API kulcs ─────────────────────────────────────────────
