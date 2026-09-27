@@ -59,7 +59,8 @@ function clearSession(res) {
 // Minden kérésre beteszi a req.user-t (ha van érvényes session)
 function attachUser(req, res, next) {
   const uid = readToken(req.cookies?.[COOKIE]);
-  req.user = uid ? users.findById(uid) : null;
+  const u = uid ? users.findById(uid) : null;
+  req.user = u && !u.disabled ? u : null;           // deaktivált fiók session-je érvénytelen
   next();
 }
 

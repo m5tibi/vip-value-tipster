@@ -80,7 +80,7 @@ async function create(email, password, { isAdmin = false, skipPolicy = false } =
 
 async function verify(email, password) {
   const u = findByEmail(email);
-  if (!u) return null;
+  if (!u || u.disabled) return null;          // deaktivált fiók nem léphet be
   const ok = await bcrypt.compare(String(password || ""), u.passwordHash);
   if (!ok) return null;
   u.lastLoginAt = new Date().toISOString();

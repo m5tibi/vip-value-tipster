@@ -1711,7 +1711,7 @@ app.post("/api/auth/resend-verification", auth.requireLogin, async (req, res) =>
 // Elfelejtett jelszó – MINDIG ok:true a válasz (nem áruljuk el, létezik-e a fiók)
 app.post("/api/auth/forgot", async (req, res) => {
   const u = usersDb.findByEmail(req.body?.email);
-  if (u) {
+  if (u && !u.disabled) {
     // A hash a tokenben → a link egyszer használatos (jelszóváltáskor érvénytelenné válik)
     const token = auth.makePurposeToken("reset", u.id, 3600 * 1000, u.passwordHash);
     const url   = `${baseUrl(req)}/reset.html?token=${encodeURIComponent(token)}`;
@@ -1724,7 +1724,7 @@ app.post("/api/auth/forgot", async (req, res) => {
 app.post("/api/auth/reset", async (req, res) => {
   const { token, newPassword } = req.body || {};
   const uid = auth.readPurposeToken("reset", token, id => usersDb.findById(id)?.passwordHash || "");
-  if (!uid) return res.status(400).json({ error: "A link érvénytelen vagy lejárt. Kérj újat." });
+  if (!uid || usersDb.findById(uid)?.disabled) return res.status(400).json({ error: "A link érvénytelen vagy lejárt. Kérj újat." });
   const r = await usersDb.setPassword(uid, newPassword);
   if (!r.ok) return res.status(400).json({ error: r.error });
   const u = usersDb.findById(uid);
@@ -2420,14 +2420,6 @@ async function handleBotUpdate(update) {
         linked._tgDailyCount[today] = count + 1;
         usersDb.update(linked.id, { _tgDailyCount: linked._tgDailyCount });
       }
-    }
-    if (!hasProAccess) {
-      await tgSend(chatId,
-        `🔒 <b>Pro előfizetés szükséges</b>\n\n` +
-        `Az AI meccs elemzés csak Pro előfizetőknek elérhető.\n` +
-        `<a href="https://90perc.hu/elofizetes.html">Előfizetek – 14 990 Ft/hó →</a>`
-      );
-      return;
     }
 
 
