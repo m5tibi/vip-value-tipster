@@ -1,4 +1,4 @@
-// server.js v2.46 | 2026-09-18
+// server.js v2.34 | 2026-09-09
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
@@ -136,9 +136,7 @@ const TG_CHAT_ID         = process.env.TG_CHAT_ID;           // publikus csatorn
 const TG_PRIVATE_CHAT_ID = process.env.TG_PRIVATE_CHAT_ID || "1326707238"; // admin privát
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const FOOTBALLDATA_TOKEN = process.env.FOOTBALLDATA_TOKEN;   // opcionális: 90 perces eredményhez (football-data.org)
-// ── Mondomatutit integráció ───────────────────────────────────
-const MONDOMATUTIT_URL  = (process.env.MONDOMATUTIT_URL  || "https://mondomatutit.hu").replace(/\/$/, "");
-const MONDOMATUTIT_PASS = process.env.MONDOMATUTIT_ADMIN_PASSWORD;
+const API_FOOTBALL_KEY   = process.env.APIFOOTBALL_KEY;       // Poisson value filter (api-football.com)
 const DATA_FILE     = "/data/history.json";
 const SCHEDULE_FILE = "/data/lastRun.json";
 
@@ -197,8 +195,6 @@ const SPORT_MAP = {
   "soccer_france_ligue_two":             { sport: "soccer", label: "⚽ Ligue 2" },
   // Egyéb európai élvonalak
   "soccer_netherlands_eredivisie":       { sport: "soccer", label: "⚽ Eredivisie" },
-  "soccer_scotland_premiership":         { sport: "soccer", label: "⚽ Skót Premiership" },
-  "soccer_romania_liga1":               { sport: "soccer", label: "⚽ Román Liga 1" },
   "soccer_portugal_primeira_liga":       { sport: "soccer", label: "⚽ Primeira Liga" },
   "soccer_belgium_first_div":            { sport: "soccer", label: "⚽ Belga élvonal" },
   "soccer_turkey_super_league":          { sport: "soccer", label: "⚽ Török Szuperliga" },
@@ -442,77 +438,242 @@ function buildStatsMsg(title) {
     `ROI: <b>${roiStr}</b>`;
 }
 
+// ── Poisson value filter ──────────────────────────────────
+// API-Football liga-ID térkép (sport label → league id)
+// A label-ek az Odds API SPORT_MAP label mezőiből jönnek (lowercase match)
+const AF_LEAGUE_MAP = [
+  { ids: [2],   labels: ["bl", "bajnokok ligája", "champions league"] },
+  { ids: [3],   labels: ["el", "europa league"] },
+  { ids: [848], labels: ["konferencia liga", "conference league"] },
+  { ids: [39],  labels: ["premier league"] },
+  { ids: [40],  labels: ["championship"] },
+  { ids: [41],  labels: ["league one"] },
+  { ids: [78],  labels: ["bundesliga"] },
+  { ids: [135], labels: ["serie a"] },
+  { ids: [140], labels: ["la liga"] },
+  { ids: [61],  labels: ["ligue 1"] },
+  { ids: [94],  labels: ["primeira liga"] },
+  { ids: [88],  labels: ["eredivisie"] },
+  { ids: [203], labels: ["török szuperliga", "super lig", "szuperliga"] },
+  { ids: [71],  labels: ["brazil serie a", "brazil"] },
+  { ids: [106], labels: ["ekstraklasa"] },
+];
+
+// 24 órás cache: leagueId → { ts, standings: [{teamName, homeFor, homeAgainst, homePlayed, awayFor, awayAgainst, awayPlayed}] }
+const _afStandingsCache = {};
+
+async function _fetchAFStandings(leagueId) {
+  const now = Date.now();
+  const cached = _afStandingsCache[leagueId];
+  if (cached && (now - cached.ts) < 24 * 3600 * 1000) return cached.standings;
+
+  try {
+    const season = new Date().getFullYear();
+    const url = `https://v3.football.api-sports.io/standings?league=${leagueId}&season=${season}`;
+    const r = await fetch(url, {
+      headers: { "x-apisports-key": API_FOOTBALL_KEY }
+    });
+    if (!r.ok) { console.warn(`API-Football standings HTTP ${r.status} (liga ${leagueId})`); return null; }
+    const json = await r.json();
+    const groups = json?.response?.[0]?.league?.standings;
+    if (!groups || !groups.length) return null;
+    // standings[0] az első csoport (ligában általában 1 van)
+    const rows = groups[0];
+    const standings = rows.map(row => ({
+      teamName: row.team?.name || "",
+      homePlayed:   row.home?.played   || 0,
+      homeFor:      row.home?.goals?.for     || 0,
+      homeAgainst:  row.home?.goals?.against || 0,
+      awayPlayed:   row.away?.played   || 0,
+      awayFor:      row.away?.goals?.for     || 0,
+      awayAgainst:  row.away?.goals?.against || 0,
+    })).filter(s => s.homePlayed + s.awayPlayed >= 2); // legalább 2 lejátszott mérkőzés
+    _afStandingsCache[leagueId] = { ts: now, standings };
+    console.log(`API-Football standings: liga ${leagueId} → ${standings.length} csapat`);
+    return standings;
+  } catch (e) {
+    console.warn(`API-Football standings hiba (liga ${leagueId}):`, e.message);
+    return null;
+  }
+}
+
+// Poisson P(X=k) – λ és k alapján
+function _poissonPmf(lambda, k) {
+  if (lambda <= 0) return k === 0 ? 1 : 0;
+  let logP = -lambda + k * Math.log(lambda);
+  for (let i = 1; i <= k; i++) logP -= Math.log(i);
+  return Math.exp(logP);
+}
+
+// 1X2 + Over N + BTTS valószínűségek Poisson-modellel
+function _computePoissonProbs(lambdaHome, lambdaAway, overLine = 2.5) {
+  const MAX_GOALS = 10;
+  let pH = 0, pD = 0, pA = 0, pBTTS = 0, pOver = 0;
+  for (let i = 0; i <= MAX_GOALS; i++) {
+    for (let j = 0; j <= MAX_GOALS; j++) {
+      const p = _poissonPmf(lambdaHome, i) * _poissonPmf(lambdaAway, j);
+      if (i > j) pH += p;
+      else if (i === j) pD += p;
+      else pA += p;
+      if (i > 0 && j > 0) pBTTS += p;
+      if (i + j > overLine) pOver += p;
+    }
+  }
+  return { home: pH, draw: pD, away: pA, btts: pBTTS, over: pOver };
+}
+
+// Közelítő csapatnév egyezés (Poisson cache-hez)
+function _afTeamMatch(standingsArr, teamName) {
+  const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const t = norm(teamName);
+  // Pontos egyezés
+  let found = standingsArr.find(s => norm(s.teamName) === t);
+  if (found) return found;
+  // Részleges: legalább 4 karakter egyezik
+  found = standingsArr.find(s => {
+    const n = norm(s.teamName);
+    return (n.length >= 4 && t.includes(n)) || (t.length >= 4 && n.includes(t));
+  });
+  return found || null;
+}
+
+// A fő value filter függvény: matchList bemenetre visszaadja a value market-eket meccsenként
+// Visszatér: Map { matchName → { markets: [{market, modelProb, impliedProb, edge}], hasValue: bool } }
+async function computePoissonEdge(matchList) {
+  if (!API_FOOTBALL_KEY) return new Map();
+
+  // Ligánként fetch, 1 request/liga (24h cache)
+  const standingsCache = {}; // leagueId → standings[]
+  const result = new Map();
+
+  for (const m of matchList) {
+    const sportLabelLower = (m.sport || "").toLowerCase();
+    // Liga azonosítása
+    let leagueEntry = null;
+    for (const le of AF_LEAGUE_MAP) {
+      if (le.labels.some(lbl => sportLabelLower.includes(lbl))) { leagueEntry = le; break; }
+    }
+    if (!leagueEntry) continue; // ismeretlen liga → nem szűrjük
+
+    // Standings lekérés (cache-elve)
+    let standings = null;
+    for (const lid of leagueEntry.ids) {
+      if (!standingsCache[lid]) {
+        standingsCache[lid] = await _fetchAFStandings(lid);
+      }
+      if (standingsCache[lid]) { standings = standingsCache[lid]; break; }
+    }
+    if (!standings) continue;
+
+    // Csapatnév kinyerés
+    const parts = String(m.match || "").split(/\s+vs\.?\s+/i);
+    if (parts.length !== 2) continue;
+    const [homeName, awayName] = parts;
+
+    const homeStats = _afTeamMatch(standings, homeName);
+    const awayStats = _afTeamMatch(standings, awayName);
+    if (!homeStats || !awayStats) continue;
+    if (homeStats.homePlayed < 2 || awayStats.awayPlayed < 2) continue;
+
+    // λ számítás (hazai/idegen teljesítmény alapján)
+    const lambdaHome = ((homeStats.homeFor / homeStats.homePlayed) + (awayStats.awayAgainst / awayStats.awayPlayed)) / 2;
+    const lambdaAway = ((awayStats.awayFor / awayStats.awayPlayed) + (homeStats.homeAgainst / homeStats.homePlayed)) / 2;
+
+    const probs = _computePoissonProbs(lambdaHome, lambdaAway, 2.5);
+    const probs15 = _computePoissonProbs(lambdaHome, lambdaAway, 1.5);
+    const probs35 = _computePoissonProbs(lambdaHome, lambdaAway, 3.5);
+
+    // Bookmaker implikált valószínűségek (legjobb odds alapján)
+    const impliedProb = {};
+    for (const o of (m.odds || [])) {
+      const key = `${o.market}|${o.name}`;
+      const imp = 1 / o.odds;
+      if (!impliedProb[key] || imp < impliedProb[key]) impliedProb[key] = imp; // legjobb (legalacsonyabb) imp. val.
+    }
+
+    // Edge számítás piaconként
+    const markets = [];
+    const addEdge = (market, name, modelProb) => {
+      const key = `${market}|${name}`;
+      const imp = impliedProb[key];
+      if (!imp) return;
+      const edge = modelProb - imp;
+      markets.push({ market, name, modelProb: Math.round(modelProb * 1000) / 10, impliedProb: Math.round(imp * 1000) / 10, edge: Math.round(edge * 1000) / 10 });
+    };
+
+    // 1X2
+    const h2hNames = [...new Set((m.odds || []).filter(o => o.market === "1X2").map(o => o.name))];
+    for (const name of h2hNames) {
+      const nameLow = name.toLowerCase();
+      let prob = null;
+      if (nameLow.includes("draw") || nameLow === "döntetlen" || nameLow === "x") prob = probs.draw;
+      else if (name === parts[0] || nameLow.includes(parts[0].toLowerCase().split(" ")[0])) prob = probs.home;
+      else if (name === parts[1] || nameLow.includes(parts[1].toLowerCase().split(" ")[0])) prob = probs.away;
+      if (prob !== null) addEdge("1X2", name, prob);
+    }
+    // Over/Under
+    addEdge("Over 2.5", "Over 2.5", probs.over);
+    addEdge("Over 1.5", "Over 1.5", probs15.over);
+    addEdge("Over 3.5", "Over 3.5", probs35.over);
+    // BTTS
+    addEdge("BTTS", "Igen", probs.btts);
+    addEdge("BTTS", "Nem", 1 - probs.btts);
+
+    const hasValue = markets.some(mk => mk.edge >= 5.0); // +5% küszöb
+    result.set(m.match, {
+      lambdaHome: Math.round(lambdaHome * 100) / 100,
+      lambdaAway: Math.round(lambdaAway * 100) / 100,
+      markets,
+      hasValue,
+      valueMarkets: markets.filter(mk => mk.edge >= 5.0)
+    });
+  }
+
+  const withValue = [...result.values()].filter(v => v.hasValue).length;
+  console.log(`Poisson value filter: ${result.size} meccs elemezve, ${withValue} mérkőzésnél van +5%+ edge`);
+  return result;
+}
+
 // ── AI tippek ─────────────────────────────────────────────
 // Visszatér: { singles: [...], comboLegs: [...] }
-async function fetchAiTips(matchList, alreadyTipped = []) {
+async function fetchAiTips(matchList, alreadyTipped = [], poissonEdge = new Map()) {
   if (!ANTHROPIC_KEY || !matchList.length) return { singles: [], comboLegs: [] };
+  console.log(`AI elemzés: ${matchList.length} meccs`);
 
-  // Maximum 20 meccs küldése Claude-nak – 28+ meccs esetén a JSON levágódik a token limit miatt.
-  // Prioritás: top ligák előre, azon belül legkorábbi kezdés.
-  const LEAGUE_PRIORITY = [
-    "Premier League","La Liga","Bundesliga","Serie A","Ligue 1","Champions League",
-    "Europa League","Conference League","Eredivisie","Primeira Liga","Championship",
-    "Skót Premiership","Román Liga 1","MLS","Brasileirao","Argentin Primera","Liga MX"
-  ];
-  const sorted = [...matchList].sort((a, b) => {
-    const pa = LEAGUE_PRIORITY.findIndex(l => (a.sport||"").includes(l));
-    const pb = LEAGUE_PRIORITY.findIndex(l => (b.sport||"").includes(l));
-    const ra = pa === -1 ? 99 : pa;
-    const rb = pb === -1 ? 99 : pb;
-    return ra !== rb ? ra - rb : 0;
-  });
-  const capped = sorted.slice(0, 20);
-  if (matchList.length > 20) console.log(`AI elemzés: ${matchList.length} meccsből top 20 küldve (liga prioritás szerint)`);
-  console.log(`AI elemzés: ${capped.length} meccs`);
-
-  const matchText = capped.map(m => {
-    const oddsStr = m.odds.map(o => `${o.market} / ${o.name}: ${o.odds} (${o.bookmaker})`).join(", ");
-    let standingsStr = "";
-    if (m.homeStandings || m.awayStandings) {
-      const fmt = (d, name) => d
-        ? `${name}: ${d.position}. hely | ${d.points}p | Forma: ${(d.form||"").replace(/,/g,"")} | Lőtt: ${d.scored} | Kapott: ${d.conceded}`
-        : `${name}: nincs adat`;
-      const [homeName, awayName] = (m.match || "").split(" vs ");
-      standingsStr = `\n  Tabella/Forma: ${fmt(m.homeStandings, homeName)} | ${fmt(m.awayStandings, awayName)}`;
-    }
-    return `- ${m.sport} | ${m.match} | Kezdés: ${m.commence}\n  Valós odds: ${oddsStr}${standingsStr}`;
+  const matchText = matchList.map(m => {
+    const base = `- ${m.sport} | ${m.match} | Kezdés: ${m.commence}\n  Valós odds: ${m.odds.map(o => `${o.market} / ${o.name}: ${o.odds} (${o.bookmaker})`).join(", ")}`;
+    const pe = poissonEdge.get(m.match);
+    if (!pe) return base; // nincs Poisson adat → nem szűrjük, de nem annotáljuk
+    const valueStr = pe.valueMarkets.length
+      ? `\n  ✅ VALUE PIACOK (Poisson +5%+ edge): ${pe.valueMarkets.map(mk => `${mk.name} (modell: ${mk.modelProb}%, implikált: ${mk.impliedProb}%, edge: +${mk.edge}%)`).join(" | ")}`
+      : `\n  ⚠️ NINCS VALUE PIAC (Poisson szerint egyik piac sem kínál +5%+ edge-t – kerüld!)\n  Modell: λH=${pe.lambdaHome} λA=${pe.lambdaAway} | Legjobb edge: ${pe.markets.length ? pe.markets.sort((a,b) => b.edge - a.edge)[0].edge + '%' : 'n/a'}`;
+    return base + valueStr;
   }).join("\n");
 
   const skipNote = alreadyTipped.length
     ? `\nEZEKRE A MECCSEKRE MÁR VAN TIPP – NE szerepeljen sem SINGLE tippként, sem KOMBI LÁBKÉNT: ${alreadyTipped.join("; ")}\n`
     : "";
 
-  const prompt = `Te egy profi labdarúgás-fogadási elemző vagy. Használj web keresést az aktuális formához, sérülésekhez és keretinformációkhoz az alábbi közelgő foci meccsekre (a következő ~36 óra).
+  const hasAnyPoisson = poissonEdge.size > 0;
+  const poissonInstruction = hasAnyPoisson
+    ? `\n⚡ POISSON VALUE FILTER AKTÍV: A meccsek mellett jelöltük, melyik piacokon van matematikailag igazolt +5%+ edge (✅ VALUE PIACOK). CSAK ilyen piacokra adj tippet! Ha egy meccsnél ⚠️ NINCS VALUE PIAC felirat szerepel, azt a meccset NE tippeld (sem single, sem kombi láb)! Ez a szűrő védi a bankrollt a negatív várható értékű tippektől.\n`
+    : "";
 
+  const prompt = `Te egy profi labdarúgás-fogadási elemző vagy. Használj web keresést az aktuális formához, sérülésekhez és keretinformációkhoz az alábbi közelgő foci meccsekre (a következő ~36 óra).
+${poissonInstruction}
 Mai meccsek (valós bookmaker oddsokkal):
 ${matchText}
 ${skipNote}
-NYELV – MINDEN MEZŐT MAGYARUL ADJ MEG:
-- Nemzeti csapatneveknél használd a magyar nevet: pl. Norway → Norvégia, Denmark → Dánia, Austria → Ausztria, Germany → Németország, France → Franciaország, Portugal → Portugália, Spain → Spanyolország, England → Anglia, Scotland → Skócia, Netherlands → Hollandia stb.
-- Klubcsapatneveknél maradj az eredeti névnél (pl. "Bayer Leverkusen", "Manchester City") – ezeknek nincs magyar nevük.
-- A "market" és "pick" mezőket MINDIG magyarul add meg:
-  * "Over 2.5" → "Több mint 2,5 gól" | "Under 2.5" → "Kevesebb mint 2,5 gól"
-  * "Over 1.5" → "Több mint 1,5 gól" | "Under 1.5" → "Kevesebb mint 1,5 gól"
-  * "Over 3.5" → "Több mint 3,5 gól" | "Under 3.5" → "Kevesebb mint 3,5 gól"
-  * "BTTS Yes" / "BTTS Igen" → "Mindkét csapat betalál"
-  * "BTTS No" / "BTTS Nem" → "Nem talál be mindkét csapat"
-  * "1X2" marad "1X2"
-  * "Asian Handicap" → "Ázsiai hendikep"
-  * "Handicap" → "Hendikep"
-  * "Draw No Bet" → "Döntetlen esetén visszajár"
-  * "Home Win" → "Hazai győzelem" | "Away Win" → "Vendég győzelem" | "Draw" → "Döntetlen"
-- A "note" indoklást természetesen magyarul írd.
+HÁROM dolgot adj – MINDHÁROM KÖTELEZŐ:
 
-KÉT dolgot adj – MINDKETTŐ KÖTELEZŐ:
-
-1) "tippek": 6-8 ERŐS single tipp (két platform számára – minimum 6, ha van elég meccs!).
-   - MECCSENKÉNT LEGFELJEBB 1 single tipp – a legerősebb piacot válaszd az adott meccsre.
+1) "tippek": 2-3 ERŐS single tipp (csak a legjobbak, ne erőltesd a számot).
+   - MECCSENKÉNT LEGFELJEBB 1 single tipp – a legerősebb piacot válaszd az adott meccsre. Ne adj több tippet ugyanarra a meccsre!
    - CSAK legalább ${MIN_SINGLE_ODDS} oddsú single tippet adj – az ennél alacsonyabb oddsú kimenetet NE tedd single tippnek (a nagyon alacsony oddsúak a kombi lábak közé valók).
-   - Lehetőleg KÜLÖNBÖZŐ meccsekről legyenek – minél több meccs, annál jobb.
+   - Lehetőleg KÜLÖNBÖZŐ meccsekről legyenek. Ha csak 1 meccs van elérhető, akkor csak 1 tippet adj.
    - PIACVÁLTOZATOSSÁG: ne csak győzelmet adj! Választhatsz: Over 2.5 / Under 2.5, BTTS (mindkét csapat szerez gólt), ázsiai hendikep (-0.5, -1), 1X2. A legértékesebb piacot válaszd az adott meccsre.
 
-2) "kombi_labak": 4-8 BIZTONSÁGOS, alacsony kockázatú láb kombi szelvényekhez.
-   - MINDEGYIK láb MÁS meccsről legyen – használj annyi különböző meccset, amennyi elérhető (legalább 2, hogy összeálljon egy kötés; ha van elég meccs, adj 6-8 lábat, hogy több, NEM átfedő kötés is kijöjjön).
+2) "kombi_labak": 4-6 BIZTONSÁGOS, alacsony kockázatú láb kombi szelvényekhez.
+   - MINDEGYIK láb MÁS meccsről legyen – használj annyi különböző meccset, amennyi elérhető (legalább 2, hogy összeálljon egy kötés; ha van elég meccs, adj 4-6 lábat, hogy több, NEM átfedő kötés is kijöjjön).
    - Ezek külön-külön NEM elég értékesek single tippnek, de kombinálva értékes össz oddsot adnak.
    - Magas valószínűségű kimenetelek: erős favorit győzelme, Over 1.5, Under 4.5, hendikep -1 / -1.5 nagy favoritnál stb.
    - PIACVÁLTOZATOSSÁG: kombi lábak lehetnek Over 1.5, BTTS, hendikep – ne csak győzelmek!
@@ -523,20 +684,26 @@ KÉT dolgot adj – MINDKETTŐ KÖTELEZŐ:
      * 4+ lábas kombi össz odds: MINIMUM 3.50
    - Ha egy kombi nem érné el a minimumot, válassz magasabb oddsú lábakat vagy ne generáld!
 
+3) "ingyenes_tipp": ⚠️ KÖTELEZŐ – NE hagyd ki, NE add null-ként! Mindig töltsd ki!
+   - Ha nincs külön kiemelkedő meccs, add meg a legjobb single tippedet ide is (lehet ugyanaz a meccs).
+   - Minimum 1.50 odds. Lehet single VAGY kombi (2-3 láb, 1.20-1.55 lábankénti odds).
+   - Single esetén: "type":"single", add meg a "match","market","pick","odds","note","commence" mezőket.
+   - Kombi esetén: "type":"kombi", add meg a "legs" tömböt (minden lábban: match, pick, odds, commence).
+
 KÖZÖS szabályok:
 - Az "odds" mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd (a megfelelő piac/kimenet oddsát).
 - A "market" és "pick" pontosan egyezzen egy valós piaccal/kimenettel; a csapatnév a fent megadott formában szerepeljen.
-- Rövid (1-2 mondat) magyar indoklás valós adatok alapján (csak a "tippek"-hez kell note).
+- Rövid (1-2 mondat) magyar indoklás valós adatok alapján (csak a "tippek"-hez és "ingyenes_tipp"-hez kell note).
 
 Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
-{"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ Premier League","commence":"07.05 20:00","market":"Over 2.5","pick":"Over 2.5","odds":1.85,"note":"..."},{"match":"...","sport":"soccer","sportLabel":"⚽ La Liga","commence":"07.05 21:00","market":"BTTS","pick":"Igen","odds":1.78,"note":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ Bundesliga","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28},{"match":"...","sportLabel":"⚽ Serie A","commence":"07.05 20:00","market":"1X2","pick":"Csapat A","odds":1.35}]}`;
+{"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ Premier League","commence":"07.05 20:00","market":"Over 2.5","pick":"Over 2.5","odds":1.85,"note":"..."},{"match":"...","sport":"soccer","sportLabel":"⚽ La Liga","commence":"07.05 21:00","market":"BTTS","pick":"Igen","odds":1.78,"note":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ Bundesliga","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28},{"match":"...","sportLabel":"⚽ Serie A","commence":"07.05 20:00","market":"1X2","pick":"Csapat A","odds":1.35}],"ingyenes_tipp":{"type":"single","match":"...","market":"BTTS","pick":"Igen","odds":1.72,"note":"...","commence":"07.05 20:00"}}`;
 
   try {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6", max_tokens: 16000,
+        model: "claude-sonnet-4-6", max_tokens: 8000,
         tools: [{ type: "web_search_20250305", name: "web_search" }],
         messages: [{ role: "user", content: prompt }]
       })
@@ -629,9 +796,42 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       if (l.odds < 1.20) { console.log(`Kombi láb kiszűrve (odds < 1.20): "${l.match}" @ ${l.odds}`); return false; }
       return true;
     });
-    // Ingyenes tipp nincs – az admin manuálisan tesz free-vé bármely single tippet
-    return { singles, comboLegs };
-  } catch (e) { console.error("AI tipp hiba:", e.message); return { singles: [], comboLegs: [] }; }
+    // Ingyenes tipp feldolgozása
+    const ft = obj.ingyenes_tipp;
+    let freeTip = null;
+    if (ft && ft.match && ft.pick && ft.odds && parseFloat(ft.odds) >= 1.40) {
+      const ftMarket = inferMarket(ft.pick, ft.market);
+      const ftPick   = fixPick(ft.pick, ftMarket);
+      freeTip = {
+        id: `free-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: "free", match: ft.match,
+        commence: realCommence(ft.match) || ft.commence || null,
+        market: ftMarket, pick: ftPick,
+        odds: parseFloat(ft.odds), note: ft.note || "",
+        approved: false, sent: false,
+        addedAt: nowHu(), result: "pending"
+      };
+      console.log(`Ingyenes tipp (AI): ${freeTip.match} | ${freeTip.pick} @${freeTip.odds}`);
+    } else {
+      // Debug: mi jött vissza az AI-tól
+      console.log(`Ingyenes tipp AI válasz: ${JSON.stringify(ft)}`);
+      // Fallback: a legjobb single tippet adjuk free-ként (ha van)
+      if (singles.length > 0) {
+        const best = singles.reduce((a, b) => parseFloat(b.odds) > parseFloat(a.odds) ? b : a);
+        freeTip = {
+          ...best,
+          id: `free-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          type: "free",
+          approved: false, sent: false,
+          addedAt: nowHu(), result: "pending"
+        };
+        console.log(`Ingyenes tipp (fallback, legjobb single): ${freeTip.match} | ${freeTip.pick} @${freeTip.odds}`);
+      } else {
+        console.log(`Ingyenes tipp: nincs érvényes tipp (AI: ${ft ? `odds=${ft.odds}` : "null"})`);
+      }
+    }
+    return { singles, comboLegs, freeTip };
+  } catch (e) { console.error("AI tipp hiba:", e.message); return { singles: [], comboLegs: [], freeTip: null }; }
 }
 
 function comboHash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0; return h.toString(36); }
@@ -696,12 +896,9 @@ function buildCombos(legs, matchList = []) {
 const isApproved = t => t.approved !== false;
 
 // ── Fő frissítő ───────────────────────────────────────────
-async function fetchAndProcess(fromTs = null, toTs = null) {
+async function fetchAndProcess() {
   const now   = new Date();
-  // Időablak: ha nincs megadva, a következő WINDOW_HOURS óra (alapértelmezés)
-  const fromDate = fromTs ? new Date(fromTs) : now;
-  const toDate   = toTs   ? new Date(toTs)   : new Date(now.getTime() + WINDOW_HOURS * 3600000);
-  console.log(`Elemzés indul: ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })} | Ablak: ${fromDate.toLocaleString("hu-HU", {timeZone:"Europe/Budapest"})} – ${toDate.toLocaleString("hu-HU", {timeZone:"Europe/Budapest"})}`);
+  console.log(`Elemzés indul: ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}`);
 
   // Minden MÉG LE NEM ZÁRT (pending) single tipp meccse – dátumtól függetlenül.
   // Így egy előre (pl. tegnap) felvett, még el nem kezdődött meccsre nem ad újabb tippet.
@@ -713,16 +910,16 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
   let scannedLeagues = 0, oddsCalls = 0;
   for (const [sportKey, meta] of Object.entries(SPORT_MAP)) {
     try {
-      // 1) INGYENES esemény-lekérdezés (/events = 0 kredit): van-e meccs az időablakban?
+      // 1) INGYENES esemény-lekérdezés (/events = 0 kredit): van-e meccs a köv. 24 órában?
       const er = await fetch(`https://api.the-odds-api.com/v4/sports/${sportKey}/events?apiKey=${ODDS_API_KEY}&dateFormat=iso`);
       scannedLeagues++;
       if (!er.ok) continue;
       const events = await er.json();
       const hasUpcoming = (Array.isArray(events) ? events : []).some(e => {
-        const ct = new Date(e.commence_time);
-        return ct >= fromDate && ct <= toDate;
+        const h = (new Date(e.commence_time) - now) / 3600000;
+        return h >= 0 && h <= WINDOW_HOURS;
       });
-      if (!hasUpcoming) continue;   // nincs meccs az időablakban → NEM kérünk (drága) oddsot
+      if (!hasUpcoming) continue;   // nincs közelgő meccs → NEM kérünk (drága) oddsot
 
       // 2) Csak most kérünk oddsot (3 kredit/liga), mert van közelgő meccs
       const url   = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h,totals,spreads&oddsFormat=decimal&dateFormat=iso`;
@@ -731,8 +928,8 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
       if (!r.ok) continue;
       const games = await r.json();
       for (const game of games) {
-        const ct = new Date(game.commence_time);
-        if (ct < fromDate || ct > toDate) continue;
+        const hoursUntil = (new Date(game.commence_time) - now) / 3600000;
+        if (hoursUntil < 0 || hoursUntil > WINDOW_HOURS) continue;
         // (Nincs meccs-kihagyás: a teljes lista kell a kombi lábakhoz is; a single
         //  duplikátumot a prompt + a válasz utólagos szűrése kezeli.)
 
@@ -788,9 +985,10 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
   }
   console.log(`Ligák átnézve (ingyenes): ${scannedLeagues} · odds-hívás (fizetős, ~3 kredit/liga): ${oddsCalls} · feldolgozható meccs: ${matchList.length}`);
 
-  // Standings gazdagítás (football-data.org, ha elérhető)
-  const enrichedList = await Promise.all(matchList.map(m => enrichMatchWithStandings(m)));
-  const { singles, comboLegs } = await fetchAiTips(enrichedList, [...tippedMatches]);
+  // Poisson value filter: API-Football gólstatisztikák → edge számítás
+  const poissonEdge = await computePoissonEdge(matchList);
+
+  const { singles, comboLegs, freeTip } = await fetchAiTips(matchList, [...tippedMatches], poissonEdge);
 
   // Backstop: a már ma tippelt meccsekre ne kerüljön újabb SINGLE (a prompt mellett is szűrünk)
   const newAiTips = singles.filter(t => !tippedMatches.has(t.match));
@@ -864,6 +1062,19 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
   if (freshCombos.length) { history = [...freshCombos, ...history]; saveHistory(); }
   comboTips = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
 
+  // Ingyenes tipp mentése
+  let newFreeTip = null;
+  if (freeTip) {
+    const hasFreeTodayAlready = history.some(t => t.type === "free" && t.addedAt && t.addedAt.startsWith(new Date().toLocaleDateString("hu-HU").replaceAll(". ", ".").replace(".", "")));
+    if (!hasFreeTodayAlready && !existingIds.has(freeTip.id)) {
+      history = [freeTip, ...history];
+      newFreeTip = freeTip;
+      saveHistory();
+      console.log(`Ingyenes tipp hozzáadva: ${freeTip.match} | ${freeTip.pick} @${freeTip.odds}`);
+    }
+  } else {
+    console.log("Ingyenes tipp: az AI nem javasolt (null visszatérés vagy odds < 1.50)");
+  }
   freeTips = history.filter(t => t.type === "free" && (!t.result || t.result === "pending"));
 
   // Státusz-értesítés Telegramra (a tippek TARTALMA NEM megy ki – az csak jóváhagyás után,
@@ -985,8 +1196,6 @@ async function regulationScore(game, cache) {
 // won / lost / push / half_won / half_lost, vagy null ha nem értelmezhető.
 function settleMarket(market, pick, homeTeam, awayTeam, homeScore, awayScore) {
   const mk = (market || "").toLowerCase();
-  // Fogadáskészítő (bet builder): manuális kiértékelés szükséges
-  if (mk.includes("fogadáskészítő") || mk.includes("fogadaskeszito") || mk.includes("bet builder")) return null;
   // A pick csapatneve az AI-tól jön ("Molde"), a valós név az odds API-tól ("Molde FK") –
   // ezért laza (normalizált) névegyezést használunk, nem szigorú ===-t.
   const pickIsHome = () => nameSim(normTeam(pick), normTeam(homeTeam));
@@ -1536,8 +1745,6 @@ app.get("/api/tips", (req, res) => {
       error: req.user ? "Aktív előfizetés szükséges." : "Belépés szükséges a tippek megtekintéséhez.",
       needLogin: !req.user, needSubscription: !!req.user,
       aiTips: [], comboTips: [],
-      // A free tippek minden látogató számára láthatók.
-      freeTips: freeTips.filter(isApproved),
     });
   }
   res.json({
@@ -1555,10 +1762,7 @@ app.get("/api/history", (req, res) => {
   const approved = history.filter(isApproved);
   const freshUserHist = req.user ? (usersDb.findById(req.user.id) || req.user) : req.user;
   if (auth.hasAccess(freshUserHist)) return res.json(approved);
-  // Track record: minden lezárt tipp látható, bejelentkezés nélkül is
-  const settledOnly = history.filter(t =>
-    t.result && t.result !== "pending"
-  );
+  const settledOnly = approved.filter(t => t.result && t.result !== "pending");
   res.json(settledOnly);
 });
 
@@ -1676,14 +1880,8 @@ app.get("/api/public-stats", (req, res) => {
 
 app.post("/api/refresh", async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const { fromTs, toTs } = req.body || {};
-  try {
-    await fetchAndProcess(fromTs || null, toTs || null);
-    res.json({ ok: true, aiTips: aiTips.length });
-  } catch(e) {
-    console.error("[refresh] Hiba:", e.message);
-    res.status(500).json({ error: e.message });
-  }
+  await fetchAndProcess();
+  res.json({ ok: true, aiTips: aiTips.length });
 });
 
 app.patch("/api/history/:id", (req, res) => {
@@ -1698,8 +1896,7 @@ app.patch("/api/history/:id", (req, res) => {
     if (pick   !== undefined) patch.pick   = pick;
     if (market !== undefined) patch.market = market;
     if (legs !== undefined) {
-      patch.legs  = legs;
-      patch.legN  = legs.length;
+      patch.legs = legs;
       const totalOdds = legs.reduce((p, l) => p * parseFloat(l.odds || 1), 1);
       patch.totalOdds = parseFloat(totalOdds.toFixed(2));
     }
@@ -1770,27 +1967,9 @@ app.post("/api/admin/login", (req, res) => {
 });
 
 // Tipp jóváhagyása (ettől lesz publikus)
-// VIP tipp → Free tipp konverzió
-app.post("/api/history/:id/make-free", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  const id = req.params.id;
-  const tip = history.find(t => t.id === id);
-  if (!tip) return res.status(404).json({ ok: false, error: "Tipp nem található" });
-  if (tip.type === "free") return res.status(400).json({ ok: false, error: "Már free tipp" });
-
-  // Típus váltás: ai → free
-  history  = history.map(t => t.id === id ? { ...t, type: "free", approved: true } : t);
-  aiTips   = aiTips.filter(t => t.id !== id);
-  freeTips = [...history.filter(t => t.id === id), ...freeTips];
-  saveHistory();
-  console.log(`[make-free] ${tip.match} átalakítva free tippé`);
-  res.json({ ok: true });
-});
-
-
 app.patch("/api/history/:id/approve", (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const id  = req.params.id;
+  const id = req.params.id;
   const set = t => t.id === id ? { ...t, approved: true } : t;
   history   = history.map(set);
   aiTips    = aiTips.map(set);
@@ -1800,21 +1979,7 @@ app.patch("/api/history/:id/approve", (req, res) => {
   res.json({ ok: true });
 });
 
-// Free tipp kézi eredmény beállítás
-app.patch("/api/free-tips/:id/result", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  const id = req.params.id;
-  const { result } = req.body;
-  const VALID = ["won","lost","push","half_won","half_lost","pending"];
-  if (!VALID.includes(result)) return res.status(400).json({ ok: false, error: "Érvénytelen eredmény" });
-  const patch = { result, approved: true, settledAt: result !== "pending" ? nowHu() : undefined };
-  history   = history.map(t => t.id === id ? { ...t, ...patch } : t);
-  freeTips  = history.filter(t => t.type === "free" && (!t.result || t.result === "pending"));
-  saveHistory();
-  res.json({ ok: true });
-});
-
-// Free tipp jóváhagyás
+// Jóváhagyott, még el nem küldött tippek kézi kiküldése Telegramra + e-mailben
 app.post("/api/tips/send", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const singlesToSend = history.filter(t => t.type === "ai"    && isApproved(t) && !t.sent && (!t.result || t.result === "pending"));
@@ -1903,108 +2068,6 @@ app.post("/api/stats/send", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   await sendTelegram(buildStatsMsg("90perc.hu – Statisztika"));
   res.json({ ok: true });
-});
-
-// ── Mondomatutit push ─────────────────────────────────────────────────────────
-// Egy tippet (single / kombi / free) átküld a mondomatutit.hu /api/receive-tip
-// endpointjára. A tipp a mondomatutit admin panelén "Jóváhagyásra vár" státuszban
-// jelenik meg – Tibi ott dönt, hogy publikálja-e és mikor küldi ki.
-async function pushTipToMondomatutit(tip) {
-  if (!MONDOMATUTIT_PASS) throw new Error("MONDOMATUTIT_ADMIN_PASSWORD nincs beállítva");
-
-  // tip_type meghatározása a 90perc.hu belső type mezőből
-  const tipType = tip.type === "combo" ? "kombi"
-                : tip.type === "free"  ? "free"
-                : "single";
-
-  const commence    = tip.commence || "";
-  const commenceStr = commence ? ` 🕐 ${commence}` : "";
-  const mktPrefix   = (tip.market && tip.market.toLowerCase() !== "1x2")
-                      ? `${tip.market}: ` : "";
-
-  // Kombi lábak JSON-ba csomagolva
-  let aiLegs = null;
-  if (tip.type === "combo" && Array.isArray(tip.legs)) {
-    aiLegs = JSON.stringify(tip.legs.map(l => ({
-      match:    l.match    || "",
-      pick:     l.pick     || "",
-      odds:     l.odds     || 0,
-      market:   l.market   || "1X2",
-      commence: l.commence || ""
-    })));
-  }
-
-  // target_date kinyerése commence stringből ("09.20 20:00" → "2026-09-20")
-  let targetDate = null;
-  if (commence) {
-    const m = commence.match(/(\d{2})\.(\d{2})/);
-    if (m) targetDate = `${new Date().getFullYear()}-${m[1]}-${m[2]}`;
-  }
-  if (!targetDate) targetDate = new Date().toISOString().slice(0, 10);
-
-  // tipp_neve formázása (mondomatutit konvenció szerint)
-  const tippNeve = tip.type === "combo"
-    ? `[AI] Kombi – össz odds ${tip.odds}`
-    : `[AI${tip.type === "free" ? " FREE" : ""}] ${tip.match} – ${mktPrefix}${tip.pick} @ ${tip.odds}${commenceStr}`;
-
-  // ai_note összeállítása – kombikhoz a lábakat is beleírjuk,
-  // mert a mondomatutit ai_tips_review.html '\nLábak:\n' szeparátorral jeleníti meg őket.
-  let aiNote = tip.note || "";
-  if (tip.type === "combo" && Array.isArray(tip.legs) && tip.legs.length) {
-    const legsStr = tip.legs.map(l =>
-      `  • ${l.match}: ${l.pick} @ ${l.odds}` + (l.commence ? ` 🕐 ${l.commence}` : "")
-    ).join("\n");
-    aiNote = (aiNote ? aiNote + "\n\n" : "") + `Lábak:\n${legsStr}`;
-  }
-
-  const body = {
-    tipp_neve:   tippNeve,
-    eredo_odds:  tip.odds,
-    tip_type:    tipType,
-    ai_match:    tip.match   || "",
-    ai_pick:     tip.pick    || "",
-    ai_market:   tip.market  || "1X2",
-    ai_commence: commence,
-    ai_note:     aiNote,
-    ai_legs:     aiLegs,
-    target_date: targetDate
-  };
-
-  const r = await fetch(`${MONDOMATUTIT_URL}/api/receive-tip`, {
-    method:  "POST",
-    headers: {
-      "Content-Type":     "application/json",
-      "X-Admin-Password": MONDOMATUTIT_PASS
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout ? AbortSignal.timeout(20000) : undefined
-  });
-
-  let data;
-  try { data = await r.json(); } catch(e) { throw new Error(`HTTP ${r.status} – nem JSON válasz`); }
-  if (!r.ok || !data.ok) throw new Error(data.error || `HTTP ${r.status}`);
-  return data;  // { ok: true, id: <supabase_id> }
-}
-
-// Admin endpoint: "→ Mondomatutit" gomb hívja
-app.post("/api/admin/push-to-mondomatutit", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-
-  const { tipId } = req.body;
-  if (!tipId) return res.status(400).json({ error: "tipId kötelező" });
-
-  // Megkeresés az összes in-memory tömbben
-  const tip = [...history, ...freeTips, ...comboTips].find(t => t.id === tipId);
-  if (!tip) return res.status(404).json({ error: "Tipp nem található (id: " + tipId + ")" });
-
-  try {
-    const result = await pushTipToMondomatutit(tip);
-    console.log(`[mondomatutit ✓] ${tip.match || "kombi"} @ ${tip.odds} → id: ${result.id}`);
-    res.json({ ok: true, mondomatutit_id: result.id });
-  } catch (e) {
-    console.error(`[mondomatutit ✗] ${e.message}`);
-    res.status(500).json({ error: e.message });
-  }
 });
 
 // ── Analyzer history szinkronizáció ──────────────────────
@@ -2430,90 +2493,7 @@ app.listen(PORT, () => {
 if (!ADMIN_PWD) {
   console.warn("⚠️  FIGYELEM: ADMIN_PASSWORD nincs beállítva – az admin végpontok (törlés, eredményjelölés, stat-küldés, frissítés) VÉDTELENEK! Állítsd be a Render Environment Variables között.");
 }
-// ── football-data.org: standings cache ──────────────────────────────────────
-// Liga kódok: football-data.org competition code → Odds API sport key pattern
-const FD_COMP_MAP = {
-  "PL":  ["premier league"],
-  "PD":  ["la liga"],
-  "BL1": ["bundesliga"],
-  "SA":  ["serie a"],
-  "FL1": ["ligue 1"],
-  "PPL": ["primeira liga"],
-  "TL":  ["török szuperliga", "super lig"],
-  "ELC": ["championship"],
-  "EL1": ["league one"],
-  "DED": ["eredivisie"],
-  "BSA": ["brazil"],
-  "PL1": ["ekstraklasa"],
-};
-
-let _standingsCache = {};
-const STANDINGS_TTL = 3600000;
-
-async function fetchStandings(compCode) {
-  const now = Date.now();
-  if (_standingsCache[compCode] && now - _standingsCache[compCode].updatedAt < STANDINGS_TTL) {
-    return _standingsCache[compCode].teams;
-  }
-  if (!FOOTBALLDATA_TOKEN) return null;
-  try {
-    const r = await fetch(`https://api.football-data.org/v4/competitions/${compCode}/standings`, {
-      headers: { "X-Auth-Token": FOOTBALLDATA_TOKEN }
-    });
-    if (!r.ok) return null;
-    const j = await r.json();
-    const table = (j.standings || []).find(s => s.type === "TOTAL")?.table || [];
-    const teams = {};
-    for (const row of table) {
-      const name = row.team?.name || "";
-      teams[name] = {
-        position: row.position,
-        points:   row.points,
-        played:   row.playedGames,
-        form:     row.form || "",
-        scored:   row.goalsFor,
-        conceded: row.goalsAgainst,
-      };
-    }
-    _standingsCache[compCode] = { updatedAt: now, teams };
-    console.log(`[standings] ${compCode}: ${table.length} csapat betöltve`);
-    return teams;
-  } catch (e) {
-    console.warn(`[standings] ${compCode} hiba:`, e.message);
-    return null;
-  }
-}
-
-function _teamNameMatch(fdName, oddsName) {
-  if (!fdName || !oddsName) return false;
-  const n = s => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const a = n(fdName), b = n(oddsName);
-  return a === b || (a.length >= 4 && a.includes(b)) || (b.length >= 4 && b.includes(a));
-}
-
-async function enrichMatchWithStandings(match) {
-  const sport = (match.sport || "").toLowerCase();
-  let compCode = null;
-  for (const [code, labels] of Object.entries(FD_COMP_MAP)) {
-    if (labels.some(label => sport.includes(label))) {
-      compCode = code; break;
-    }
-  }
-  if (!compCode) return match;
-
-  const teams = await fetchStandings(compCode);
-  if (!teams) return match;
-
-  const [homeName, awayName] = (match.match || "").split(" vs ");
-  const homeData = Object.entries(teams).find(([n]) => _teamNameMatch(n, homeName))?.[1];
-  const awayData = Object.entries(teams).find(([n]) => _teamNameMatch(n, awayName))?.[1];
-
-  if (!homeData && !awayData) return match;
-  return { ...match, homeStandings: homeData || null, awayStandings: awayData || null };
-}
-
 if (FOOTBALLDATA_TOKEN) {
-
   (async () => {
     try {
       const r = await fetch("https://api.football-data.org/v4/competitions", { headers: { "X-Auth-Token": FOOTBALLDATA_TOKEN } });
@@ -2576,71 +2556,6 @@ async function fetchMatchListOnly() {
   return newList;
 }
 
-// ── Meccsek előnézete (tippgenerálás nélkül) ─────────────────────────────────
-// Admin megnézheti milyen meccsek vannak az Odds API-ban egy adott időablakban,
-// mielőtt dönt, hogy érdemes-e generálni.
-app.post("/api/admin/preview-matches", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  const { fromTs, toTs } = req.body || {};
-  const now      = new Date();
-  const fromDate = fromTs ? new Date(fromTs) : now;
-  const toDate   = toTs   ? new Date(toTs)   : new Date(now.getTime() + WINDOW_HOURS * 3600000);
-
-  const matches = [];
-  let scanned = 0, oddsHits = 0;
-  try {
-    for (const [sportKey, meta] of Object.entries(SPORT_MAP)) {
-      try {
-        // 1) Ingyenes events check (0 kredit)
-        const er = await fetch(
-          `https://api.the-odds-api.com/v4/sports/${sportKey}/events?apiKey=${ODDS_API_KEY}&dateFormat=iso`
-        );
-        scanned++;
-        if (!er.ok) continue;
-        const events = await er.json();
-        const hasInWindow = (Array.isArray(events) ? events : []).some(e => {
-          const ct = new Date(e.commence_time);
-          return ct >= fromDate && ct <= toDate;
-        });
-        if (!hasInWindow) continue;
-
-        // 2) Odds lekérés (3 kredit/liga) – csak ha van meccs az ablakban
-        const r = await fetch(
-          `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h&oddsFormat=decimal&dateFormat=iso`
-        );
-        oddsHits++;
-        if (!r.ok) continue;
-        const games = await r.json();
-        for (const g of (Array.isArray(games) ? games : [])) {
-          const ct = new Date(g.commence_time);
-          if (ct < fromDate || ct > toDate) continue;
-          const h2h = (g.bookmakers || [])
-            .flatMap(bk => (bk.markets || [])
-              .filter(m => m.key === "h2h")
-              .flatMap(m => (m.outcomes || []).map(o => ({ name: o.name, odds: o.price, bk: bk.title })))
-            );
-          const best = {};
-          for (const o of h2h) {
-            if (!best[o.name] || o.odds > best[o.name].odds) best[o.name] = o;
-          }
-          const oddsStr = Object.values(best).map(o => `${o.name} ${o.odds.toFixed(2)}`).join(" · ");
-          matches.push({
-            sport:   meta.label,
-            match:   `${g.home_team} vs ${g.away_team}`,
-            commence: g.commence_time,
-            commenceHu: huTime(g.commence_time),
-            odds:    oddsStr
-          });
-        }
-      } catch(e) {}
-    }
-    matches.sort((a, b) => new Date(a.commence) - new Date(b.commence));
-    res.json({ ok: true, matches, scanned, oddsHits });
-  } catch(e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
 app.post("/api/refresh-odds-only", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
@@ -2666,7 +2581,7 @@ let lastMatchList = [];
   } catch(e) {}
 })();
 
-app.get("/api/match-list", async (req, res) => {
+app.get("/api/match-list", (req, res) => {
   if (!requireAdmin(req, res)) return;
   const tippedMatches = [...new Set(history
     .filter(t => t.result === "pending" && (t.type === "ai" || t.type === "combo" || t.type === "free"))
@@ -2687,13 +2602,10 @@ app.get("/api/match-list", async (req, res) => {
     if (!match) return true;
     const [,mm,dd,hh,min] = match;
     // Budapest (UTC+2) → UTC korrekció
-    const year = new Date().getFullYear();
-    const d = new Date(`${year}-${mm}-${dd}T${hh}:${min}:00+02:00`);
+    const d = new Date(`2026-${mm}-${dd}T${hh}:${min}:00+02:00`);
     const hoursAgo = (now - d.getTime()) / 3600000;
     return hoursAgo < 2;  // max 2 óra múltban tartunk meg
   });
-  console.log(`[match-list] ${freshMatches.length} friss meccs visszaadva (${lastMatchList.length - freshMatches.length} kiszűrve)`);
-  // Standings gazdagítás a mondomatutit AI generátor számára
-  const enrichedMatches = await Promise.all(freshMatches.map(m => enrichMatchWithStandings(m)));
-  res.json({ matches: enrichedMatches, tippedMatches, tippedPicks, generatedAt: new Date().toISOString() });
+  console.log(`[match-list] ${freshMatches.length} friss meccs visszaadva (${lastMatchList.length - freshMatches.length} kiszűrve)`);  
+  res.json({ matches: freshMatches, tippedMatches, tippedPicks, generatedAt: new Date().toISOString() });
 });
