@@ -64,8 +64,7 @@ könyvtárban (Renderen a `/data` perzisztens lemez).
 
 | Változó | Leírás |
 |---|---|
-| `FOOTBALLDATA_TOKEN` | football-data.org – 90 perces eredményekhez |
-| `APIFOOTBALL_KEY` | api-football.com – Poisson value szűrő |
+| `FOOTBALLDATA_TOKEN` | football-data.org – 90 perces eredményekhez, a tabellaadatokhoz és a Poisson value szűrőhöz |
 | `ODDS_PROXY_TOKEN` | Az odds proxy külső (nem belépett) hívásaihoz |
 | `MONDOMATUTIT_ADMIN_PASSWORD` | A „→ Mondomatutit” gombhoz: ezzel küldi át a tippet a mondomatutit.hu-ra |
 | `MONDOMATUTIT_URL` | A mondomatutit címe (alapértelmezés: `https://mondomatutit.hu`) |

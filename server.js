@@ -40,7 +40,6 @@ const TG_CHAT_ID         = process.env.TG_CHAT_ID;           // publikus csatorn
 const TG_PRIVATE_CHAT_ID = process.env.TG_PRIVATE_CHAT_ID || "1326707238"; // admin privát
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const FOOTBALLDATA_TOKEN = process.env.FOOTBALLDATA_TOKEN;   // opcionális: 90 perces eredményhez (football-data.org)
-const API_FOOTBALL_KEY   = process.env.APIFOOTBALL_KEY;       // Poisson value filter (api-football.com)
 // ── Mondomatutit integráció ───────────────────────────────────
 const MONDOMATUTIT_URL  = (process.env.MONDOMATUTIT_URL  || "https://mondomatutit.hu").replace(/\/$/, "");
 const MONDOMATUTIT_PASS = process.env.MONDOMATUTIT_ADMIN_PASSWORD;
@@ -349,74 +348,9 @@ function buildStatsMsg(title) {
 }
 
 // ── Poisson value filter ──────────────────────────────────
-// API-Football liga-ID térkép (sport label → league id)
-// A label-ek az Odds API SPORT_MAP label mezőiből jönnek (lowercase match)
-const AF_LEAGUE_MAP = [
-  { ids: [2],   labels: ["bl", "bajnokok ligája", "champions league"] },
-  { ids: [3],   labels: ["el", "europa league"] },
-  { ids: [848], labels: ["konferencia liga", "conference league"] },
-  { ids: [39],  labels: ["premier league"] },
-  { ids: [40],  labels: ["championship"] },
-  { ids: [41],  labels: ["league one"] },
-  { ids: [78],  labels: ["bundesliga"] },
-  { ids: [135], labels: ["serie a"] },
-  { ids: [141], labels: ["la liga 2", "segunda division", "segunda división"] },
-  { ids: [140], labels: ["la liga"] },
-  { ids: [61],  labels: ["ligue 1"] },
-  { ids: [94],  labels: ["primeira liga"] },
-  { ids: [88],  labels: ["eredivisie"] },
-  { ids: [203], labels: ["török szuperliga", "super lig", "szuperliga"] },
-  { ids: [71],  labels: ["brazil serie a", "brazil"] },
-  { ids: [106], labels: ["ekstraklasa"] },
-  { ids: [253], labels: ["mls", "major league soccer"] },
-  { ids: [262], labels: ["liga mx", "liga mex", "liga mexicana"] },
-  { ids: [5],   labels: ["nemzetek ligája", "nations league", "uefa nations league"] },
-];
-
-// 6 órás cache: leagueId → { ts, standings: [{teamName, homeFor, homeAgainst, homePlayed, awayFor, awayAgainst, awayPlayed}] }
-const _afStandingsCache = {};
-
-async function _fetchAFStandings(leagueId) {
-  const now = Date.now();
-  const cached = _afStandingsCache[leagueId];
-  if (cached && (now - cached.ts) < 6 * 3600 * 1000) return cached.standings;
-
-  try {
-    // Legtöbb liga a korábbi évben indul (2025/26 → season=2025), ezért ha az aktuális
-    // évben nincs adat, automatikusan visszalépünk az előző évre.
-    const currentYear = new Date().getFullYear();
-    let groups = null;
-    for (const season of [currentYear, currentYear - 1, currentYear - 2]) {
-      const url = `https://v3.football.api-sports.io/standings?league=${leagueId}&season=${season}`;
-      const r = await fetch(url, { headers: { "x-apisports-key": API_FOOTBALL_KEY } });
-      if (!r.ok) { console.warn(`[AF] HTTP ${r.status} liga=${leagueId} season=${season}`); continue; }
-      const json = await r.json();
-      const errors = json?.errors;
-      if (errors && Object.keys(errors).length) { console.warn(`[AF] API hiba liga=${leagueId} season=${season}:`, JSON.stringify(errors)); continue; }
-      const g = json?.response?.[0]?.league?.standings;
-      console.log(`[AF] liga=${leagueId} season=${season} → response.length=${json?.response?.length ?? "N/A"} standings groups=${g?.length ?? 0}`);
-      if (g && g.length) { groups = g; break; }
-    }
-    if (!groups) { console.warn(`[AF] standings nem elérhető: liga ${leagueId}`); return null; }
-    // groups.flat(): több csoportos ligáknál (NL, CL group stage) az összes csapat egy listában
-    const rows = groups.flat();
-    const standings = rows.map(row => ({
-      teamName: row.team?.name || "",
-      homePlayed:   row.home?.played   || 0,
-      homeFor:      row.home?.goals?.for     || 0,
-      homeAgainst:  row.home?.goals?.against || 0,
-      awayPlayed:   row.away?.played   || 0,
-      awayFor:      row.away?.goals?.for     || 0,
-      awayAgainst:  row.away?.goals?.against || 0,
-    })).filter(s => s.homePlayed + s.awayPlayed >= 2); // legalább 2 lejátszott mérkőzés
-    _afStandingsCache[leagueId] = { ts: now, standings };
-    console.log(`API-Football standings: liga ${leagueId} → ${standings.length} csapat`);
-    return standings;
-  } catch (e) {
-    console.warn(`API-Football standings hiba (liga ${leagueId}):`, e.message);
-    return null;
-  }
-}
+// Valódi gólstatisztikákból (football-data.org tabella) becsüljük a várható gólszámot (λ),
+// és ezt vetjük össze a fogadóirodák oddsaival. Csak azokra a ligákra működik, amelyekhez
+// van football-data tabella (lásd FD_LABEL_MAP); a többi meccs Poisson-jelölés nélkül megy.
 
 // Poisson P(X=k) – λ és k alapján
 function _poissonPmf(lambda, k) {
@@ -443,141 +377,111 @@ function _computePoissonProbs(lambdaHome, lambdaAway, overLine = 2.5) {
   return { home: pH, draw: pD, away: pA, btts: pBTTS, over: pOver };
 }
 
-// Közelítő csapatnév egyezés (Poisson cache-hez)
-function _afTeamMatch(standingsArr, teamName) {
-  const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const t = norm(teamName);
-  // Pontos egyezés
-  let found = standingsArr.find(s => norm(s.teamName) === t);
-  if (found) return found;
-  // Részleges: legalább 4 karakter egyezik
-  found = standingsArr.find(s => {
-    const n = norm(s.teamName);
-    return (n.length >= 4 && t.includes(n)) || (t.length >= 4 && n.includes(t));
-  });
-  return found || null;
-}
+const POISSON_EDGE_MIN   = 5.0;  // +5% edge felett "value" a piac
+const POISSON_PRIOR_GAMES = 4;   // ennyi "átlagos" meccsel húzzuk a ligaátlag felé a csapatokat (kis minta ellen)
+const POISSON_MIN_LEAGUE_GAMES = 10;  // ennél kevesebb lejátszott ligameccsnél nem modellezünk
 
-// Odds-alapú λ becslés: 1X2 implied prob-okból grid search-el találja a Poisson λH, λA értékeket.
-// Előny: nem kell API-Football, minden ligára működik ahol van 1X2 piac.
-// Az 1X2-ből kapott λ-val aztán az Over/Under és BTTS piacokat ellenőrizzük → ott keressük a value-t.
-function _estimateLambdaFromOdds(pHome, pDraw, pAway) {
-  const MAX_GOALS = 8;
-  let bestLH = 1.3, bestLA = 1.1, bestErr = Infinity;
-  for (let lh100 = 30; lh100 <= 420; lh100 += 8) {
-    const lh = lh100 / 100;
-    for (let la100 = 30; la100 <= 420; la100 += 8) {
-      const la = la100 / 100;
-      let ph = 0, pd = 0, pa = 0;
-      for (let h = 0; h <= MAX_GOALS; h++) {
-        const phh = _poissonPmf(lh, h);
-        for (let a = 0; a <= MAX_GOALS; a++) {
-          const p = phh * _poissonPmf(la, a);
-          if (h > a) ph += p;
-          else if (h === a) pd += p;
-          else pa += p;
-        }
-      }
-      const err = (ph - pHome) ** 2 + (pd - pDraw) ** 2 + (pa - pAway) ** 2;
-      if (err < bestErr) { bestErr = err; bestLH = lh; bestLA = la; }
-    }
-  }
-  return { lambdaHome: Math.round(bestLH * 100) / 100, lambdaAway: Math.round(bestLA * 100) / 100 };
+// λ becslés a tabellából: támadó-/védekezőerő a lőtt/kapott gólokból, a ligaátlag felé húzva,
+// a hazai pálya előnye a liga hazai/idegenbeli gólátlagából.
+function _lambdaFromStandings(league, home, away) {
+  const k = POISSON_PRIOR_GAMES;
+  const avg = (league.homeAvg + league.awayAvg) / 2;           // gól / csapat / meccs
+  const rate = (goals, played) => (goals + k * avg) / (played + k) / avg;
+  const attH = rate(home.scored,   home.played), defH = rate(home.conceded, home.played);
+  const attA = rate(away.scored,   away.played), defA = rate(away.conceded, away.played);
+  return {
+    lambdaHome: league.homeAvg * attH * defA,
+    lambdaAway: league.awayAvg * attA * defH,
+  };
 }
 
 // A fő value filter függvény: matchList bemenetre visszaadja a value market-eket meccsenként
-// Visszatér: Map { matchName → { markets: [{market, modelProb, impliedProb, edge}], hasValue: bool } }
+// Visszatér: Map { matchName → { lambdaHome, lambdaAway, markets: [{market, name, modelProb, impliedProb, edge}], hasValue, valueMarkets } }
 async function computePoissonEdge(matchList) {
   const result = new Map();
+  let noLeague = 0, noTeam = 0;
 
   for (const m of matchList) {
-    const oddsArr = Array.isArray(m.odds) ? m.odds : [];
-    const h2h = oddsArr.filter(o => o.market === "1X2");
-    if (h2h.length < 3) continue; // 1X2 kell a λ becsléshez
+    const code = FD_LABEL_MAP[m.sport];
+    if (!code) { noLeague++; continue; }
+    const stats = await getLeagueStats(code);
+    if (!stats || stats.league.games < POISSON_MIN_LEAGUE_GAMES) { noLeague++; continue; }
 
-    // Csapatnév kinyerés (hazai = match első fele)
     const parts = String(m.match || "").split(/\s+vs\.?\s+/i);
     if (parts.length !== 2) continue;
     const [homeName, awayName] = parts;
+    const home = findTeam(stats.teams, homeName), away = findTeam(stats.teams, awayName);
+    if (!home || !away || home === away) { noTeam++; continue; }
 
-    // Home / draw / away odds azonosítása
-    const drawEntry = h2h.find(o => /draw|döntetlen|^x$/i.test(o.name));
-    if (!drawEntry) continue;
-    const nonDraw = h2h.filter(o => o !== drawEntry);
-    if (nonDraw.length < 2) continue;
-    const norm4 = s => s.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5);
-    const homeEntry = nonDraw.find(o => norm4(o.name) === norm4(homeName)) ||
-                      nonDraw.find(o => norm4(homeName).includes(norm4(o.name)) || norm4(o.name).includes(norm4(homeName))) ||
-                      nonDraw[0];
-    const awayEntry = nonDraw.find(o => o !== homeEntry) || nonDraw[1];
-    if (!homeEntry || !awayEntry) continue;
+    const { lambdaHome, lambdaAway } = _lambdaFromStandings(stats.league, home, away);
+    const base = _computePoissonProbs(lambdaHome, lambdaAway, 2.5);
 
-    // Implied prob vig-eltávolítással
-    const rawH = 1 / parseFloat(homeEntry.odds);
-    const rawD = 1 / parseFloat(drawEntry.odds);
-    const rawA = 1 / parseFloat(awayEntry.odds);
-    const vigTotal = rawH + rawD + rawA;
-    if (vigTotal <= 0.5) continue;
-    const pHome = rawH / vigTotal;
-    const pDraw = rawD / vigTotal;
-    const pAway = rawA / vigTotal;
-
-    // λ becslés 1X2 odds-ból
-    const { lambdaHome, lambdaAway } = _estimateLambdaFromOdds(pHome, pDraw, pAway);
-
-    const probs = _computePoissonProbs(lambdaHome, lambdaAway, 2.5);
-    const probs15 = _computePoissonProbs(lambdaHome, lambdaAway, 1.5);
-    const probs35 = _computePoissonProbs(lambdaHome, lambdaAway, 3.5);
-
-    // Bookmaker implikált valószínűségek (legjobb odds alapján)
+    // Bookmaker implikált valószínűség a legjobb odds alapján
     const impliedProb = {};
     for (const o of (m.odds || [])) {
       const key = `${o.market}|${o.name}`;
       const imp = 1 / o.odds;
-      if (!impliedProb[key] || imp < impliedProb[key]) impliedProb[key] = imp; // legjobb (legalacsonyabb) imp. val.
+      if (!impliedProb[key] || imp < impliedProb[key]) impliedProb[key] = imp;
     }
 
-    // Edge számítás piaconként
     const markets = [];
     const addEdge = (market, name, modelProb) => {
-      const key = `${market}|${name}`;
-      const imp = impliedProb[key];
+      const imp = impliedProb[`${market}|${name}`];
       if (!imp) return;
-      const edge = modelProb - imp;
-      markets.push({ market, name, modelProb: Math.round(modelProb * 1000) / 10, impliedProb: Math.round(imp * 1000) / 10, edge: Math.round(edge * 1000) / 10 });
+      markets.push({ market, name,
+        modelProb:   Math.round(modelProb * 1000) / 10,
+        impliedProb: Math.round(imp * 1000) / 10,
+        edge:        Math.round((modelProb - imp) * 1000) / 10 });
     };
 
     // 1X2
-    const h2hNames = [...new Set((m.odds || []).filter(o => o.market === "1X2").map(o => o.name))];
-    for (const name of h2hNames) {
-      const nameLow = name.toLowerCase();
-      let prob = null;
-      if (nameLow.includes("draw") || nameLow === "döntetlen" || nameLow === "x") prob = probs.draw;
-      else if (name === parts[0] || nameLow.includes(parts[0].toLowerCase().split(" ")[0])) prob = probs.home;
-      else if (name === parts[1] || nameLow.includes(parts[1].toLowerCase().split(" ")[0])) prob = probs.away;
-      if (prob !== null) addEdge("1X2", name, prob);
+    for (const o of (m.odds || []).filter(o => o.market === "1X2")) {
+      if (/^(draw|döntetlen|x)$/i.test(o.name)) addEdge("1X2", o.name, base.draw);
+      else if (o.name === homeName) addEdge("1X2", o.name, base.home);
+      else if (o.name === awayName) addEdge("1X2", o.name, base.away);
     }
-    // Over/Under
-    addEdge("Over 2.5", "Over 2.5", probs.over);
-    addEdge("Over 1.5", "Over 1.5", probs15.over);
-    addEdge("Over 3.5", "Over 3.5", probs35.over);
-    // BTTS
-    addEdge("BTTS", "Igen", probs.btts);
-    addEdge("BTTS", "Nem", 1 - probs.btts);
+    // Over / Under – csak .5-ös vonalak (a negyedes ázsiai vonalakat a modell nem kezeli)
+    for (const o of (m.odds || []).filter(o => /^(Over|Under) \d+\.5$/.test(o.market))) {
+      const line = parseFloat(o.market.split(" ")[1]);
+      const pOver = _computePoissonProbs(lambdaHome, lambdaAway, line).over;
+      addEdge(o.market, o.name, o.market.startsWith("Over") ? pOver : 1 - pOver);
+    }
 
-    const hasValue = markets.some(mk => mk.edge >= 5.0); // +5% küszöb
+    const valueMarkets = markets.filter(mk => mk.edge >= POISSON_EDGE_MIN);
     result.set(m.match, {
       lambdaHome: Math.round(lambdaHome * 100) / 100,
       lambdaAway: Math.round(lambdaAway * 100) / 100,
-      markets,
-      hasValue,
-      valueMarkets: markets.filter(mk => mk.edge >= 5.0)
+      markets, hasValue: valueMarkets.length > 0, valueMarkets,
     });
   }
 
   const withValue = [...result.values()].filter(v => v.hasValue).length;
-  console.log(`Poisson value filter: ${result.size} meccs elemezve, ${withValue} mérkőzésnél van +5%+ edge`);
+  console.log(`Poisson value filter (tabella alapú): ${result.size}/${matchList.length} meccs modellezve, ${withValue} meccsnél +${POISSON_EDGE_MIN}%+ edge` +
+    (noLeague || noTeam ? ` · kihagyva: ${noLeague} (nincs tabella a ligához), ${noTeam} (csapat nem azonosítható)` : ""));
   return result;
+}
+
+// Egy generált tipphez tartozó Poisson-adat (a tippel együtt eltároljuk, hogy később
+// kiértékelhető legyen: a value-s tippek tényleg jobban teljesítenek-e).
+function poissonForTip(pe, market, pick, match) {
+  if (!pe) return null;
+  const txt = x => String(x || "").toLowerCase().replace(/,/g, ".");
+  const mk = txt(market), pk = txt(pick);
+  const lineM = (mk.match(/\d+\.5/) || pk.match(/\d+\.5/));
+  let found = null;
+  if (lineM && /under|kevesebb/.test(pk + " " + mk)) found = pe.markets.find(x => x.market === `Under ${lineM[0]}`);
+  else if (lineM && /over|több/.test(pk + " " + mk))  found = pe.markets.find(x => x.market === `Over ${lineM[0]}`);
+  else if (mk === "1x2" || /győzelem|döntetlen|draw/.test(pk)) {
+    const [home, away] = String(match || "").split(/\s+vs\.?\s+/i);
+    const oneX2 = pe.markets.filter(x => x.market === "1X2");
+    if (/^(x|döntetlen|draw)$/.test(pk.trim())) found = oneX2.find(x => /^(draw|döntetlen|x)$/i.test(x.name));
+    else if (/hazai|^1$/.test(pk.trim())) found = oneX2.find(x => x.name === home);
+    else if (/vendég|^2$/.test(pk.trim())) found = oneX2.find(x => x.name === away);
+    else found = oneX2.find(x => !/^(draw|döntetlen|x)$/i.test(x.name) && findTeam({ [x.name]: { name: x.name } }, pick));
+  }
+  return found
+    ? { edge: found.edge, modelProb: found.modelProb, impliedProb: found.impliedProb, value: found.edge >= POISSON_EDGE_MIN }
+    : null;
 }
 
 // ── AI tippek ─────────────────────────────────────────────
@@ -755,6 +659,7 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
         match: t.match, commence: realCommence(t.match) || t.commence || null,
         market, pick, odds: t.odds,
         live: false, note: t.note,
+        poisson: poissonForTip(poissonEdge.get(t.match), market, pick, t.match),
         approved: false, sent: false,
         addedAt: nowHu(), result: "pending"
       };
@@ -909,9 +814,10 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
           const best = {};
           for (const bm of totalsBMs) {
             for (const o of bm.markets.find(m => m.key === "totals")?.outcomes || []) {
-              if (o.name !== "Over") continue;
-              if (!best[o.point] || o.price > best[o.point].odds)
-                best[o.point] = { market: `Over ${o.point}`, name: `Over ${o.point}`, odds: parseFloat(o.price.toFixed(2)), bookmaker: bm.title };
+              if (o.name !== "Over" && o.name !== "Under") continue;
+              const key = `${o.name} ${o.point}`;
+              if (!best[key] || o.price > best[key].odds)
+                best[key] = { market: key, name: key, odds: parseFloat(o.price.toFixed(2)), bookmaker: bm.title };
             }
           }
           totalsOdds.push(...Object.values(best));
@@ -2061,24 +1967,55 @@ if (!usersDb.all().some(u => u.isAdmin) && !(process.env.ADMIN_EMAIL && ADMIN_PW
   console.warn("⚠️  Nincs admin fiók, és ADMIN_EMAIL + ADMIN_PASSWORD sincs beállítva – az admin felület így nem érhető el. Állítsd be a Renderen!");
 }
 // ── football-data.org: standings cache ──────────────────────────────────────
-// Liga kódok: football-data.org competition code → Odds API sport key pattern
-const FD_COMP_MAP = {
-  "PL":  ["premier league"],
-  "PD":  ["la liga"],
-  "BL1": ["bundesliga"],
-  "SA":  ["serie a"],
-  "FL1": ["ligue 1"],
-  "PPL": ["primeira liga"],
-  "TL":  ["török szuperliga", "super lig"],
-  "ELC": ["championship"],
-  "EL1": ["league one"],
-  "DED": ["eredivisie"],
-  "BSA": ["brazil"],
-  "PL1": ["ekstraklasa"],
+// Odds API liga-címke (SPORT_MAP label) → football-data.org competition code.
+// Pontos egyezés kell: részszöveggel pl. a "2. Bundesliga" is a Bundesligát kapná.
+const FD_LABEL_MAP = {
+  "⚽ Premier League":        "PL",
+  "⚽ Championship":          "ELC",
+  "⚽ League One":           "EL1",
+  "⚽ La Liga":              "PD",
+  "⚽ Bundesliga":           "BL1",
+  "⚽ Serie A":              "SA",
+  "⚽ Ligue 1":              "FL1",
+  "⚽ Eredivisie":           "DED",
+  "⚽ Primeira Liga":        "PPL",
+  "⚽ Török Szuperliga":     "TL",
+  "⚽ Lengyel Ekstraklasa":  "PL1",
+  "⚽ Brazil Serie A":       "BSA",
 };
 
 let _standingsCache = {};
 const STANDINGS_TTL = 3600000;
+
+// Csapatnév → szavak (ékezet nélkül, a "FC", "Club" stb. elhagyásával)
+const TEAM_STOPWORDS = new Set(["fc","cf","afc","ac","sc","cd","ss","ssc","as","rc","fk","sk","club","de","del","the","and","1"]);
+function teamTokens(s) {
+  return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(t => t && !TEAM_STOPWORDS.has(t));
+}
+// Az Odds API csapatnevét ("Inter Milan") megkeresi a tabellában ("FC Internazionale Milano" / "Inter").
+// A keresett név szavainak lefedettsége dönt (előtag-egyezés is jó: inter ~ internazionale,
+// milan ~ milano); holtversenyben az nyer, akinek a nevéből több szó egyezik
+// ("AC Milan" → Milan, nem "Internazionale Milano"). Csak egyértelmű legjobb találatot fogad el.
+function findTeam(teams, oddsName) {
+  const q = teamTokens(oddsName);
+  if (!q.length) return null;
+  const tokMatch = (a, b) => a === b || (Math.min(a.length, b.length) >= 4 && (a.startsWith(b) || b.startsWith(a)));
+  const score = cand => {
+    const c = teamTokens(cand);
+    if (!c.length) return 0;
+    const recall    = q.filter(t => c.some(x => tokMatch(t, x))).length / q.length;
+    const precision = c.filter(x => q.some(t => tokMatch(t, x))).length / c.length;
+    return recall ? recall + 0.1 * precision : 0;
+  };
+  let best = null, bestScore = 0, second = 0;
+  for (const t of Object.values(teams)) {
+    const sc = Math.max(score(t.name), score(t.shortName));
+    if (sc > bestScore) { second = bestScore; bestScore = sc; best = t; }
+    else if (sc > second) second = sc;
+  }
+  return bestScore >= 0.5 && bestScore > second ? best : null;
+}
 
 async function fetchStandings(compCode) {
   const now = Date.now();
@@ -2092,11 +2029,14 @@ async function fetchStandings(compCode) {
     });
     if (!r.ok) return null;
     const j = await r.json();
-    const table = (j.standings || []).find(s => s.type === "TOTAL")?.table || [];
+    const tableOf = type => (j.standings || []).find(s => s.type === type)?.table || [];
+    const table = tableOf("TOTAL");
     const teams = {};
     for (const row of table) {
       const name = row.team?.name || "";
       teams[name] = {
+        name,
+        shortName: row.team?.shortName || "",
         position: row.position,
         points:   row.points,
         played:   row.playedGames,
@@ -2105,8 +2045,22 @@ async function fetchStandings(compCode) {
         conceded: row.goalsAgainst,
       };
     }
-    _standingsCache[compCode] = { updatedAt: now, teams };
-    console.log(`[standings] ${compCode}: ${table.length} csapat betöltve`);
+    // Liga hazai/idegenbeli gólátlaga (a hazai pálya előnyéhez a Poisson-modellben)
+    const sum = (rows, f) => rows.reduce((a, x) => a + (x[f] || 0), 0);
+    const homeRows = tableOf("HOME"), awayRows = tableOf("AWAY");
+    let league;
+    if (homeRows.length && awayRows.length && sum(homeRows, "playedGames")) {
+      const games = sum(homeRows, "playedGames");
+      league = { games, homeAvg: sum(homeRows, "goalsFor") / games, awayAvg: sum(awayRows, "goalsFor") / games };
+    } else {
+      // Nincs külön hazai/vendég tabella: az összesítettből, szokásos ~10%-os hazai előnnyel
+      const games = sum(table, "playedGames") / 2;
+      const perTeam = games ? sum(table, "goalsFor") / (2 * games) : 0;
+      league = { games, homeAvg: perTeam * 1.1, awayAvg: perTeam * 0.9 };
+    }
+    const games = league.games;
+    _standingsCache[compCode] = { updatedAt: now, teams, league };
+    console.log(`[standings] ${compCode}: ${table.length} csapat betöltve (${games} meccs, hazai átlag ${league.homeAvg.toFixed(2)}, vendég ${league.awayAvg.toFixed(2)})`);
     return teams;
   } catch (e) {
     console.warn(`[standings] ${compCode} hiba:`, e.message);
@@ -2114,29 +2068,22 @@ async function fetchStandings(compCode) {
   }
 }
 
-function _teamNameMatch(fdName, oddsName) {
-  if (!fdName || !oddsName) return false;
-  const n = s => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const a = n(fdName), b = n(oddsName);
-  return a === b || (a.length >= 4 && a.includes(b)) || (b.length >= 4 && b.includes(a));
+// Tabella + ligaátlagok (Poisson-modellhez)
+async function getLeagueStats(compCode) {
+  const teams = await fetchStandings(compCode);
+  return teams ? _standingsCache[compCode] : null;
 }
 
 async function enrichMatchWithStandings(match) {
-  const sport = (match.sport || "").toLowerCase();
-  let compCode = null;
-  for (const [code, labels] of Object.entries(FD_COMP_MAP)) {
-    if (labels.some(label => sport.includes(label))) {
-      compCode = code; break;
-    }
-  }
+  const compCode = FD_LABEL_MAP[match.sport];
   if (!compCode) return match;
 
   const teams = await fetchStandings(compCode);
   if (!teams) return match;
 
   const [homeName, awayName] = (match.match || "").split(" vs ");
-  const homeData = Object.entries(teams).find(([n]) => _teamNameMatch(n, homeName))?.[1];
-  const awayData = Object.entries(teams).find(([n]) => _teamNameMatch(n, awayName))?.[1];
+  const homeData = findTeam(teams, homeName);
+  const awayData = findTeam(teams, awayName);
 
   if (!homeData && !awayData) return match;
   return { ...match, homeStandings: homeData || null, awayStandings: awayData || null };
@@ -2211,9 +2158,10 @@ async function fetchMatchListOnly(fromTs = null, toTs = null) {
           const best = {};
           for (const bm of totalsBMs) {
             for (const o of bm.markets.find(m => m.key === "totals")?.outcomes || []) {
-              if (o.name !== "Over") continue;
-              if (!best[o.point] || o.price > best[o.point].odds)
-                best[o.point] = { market: `Over ${o.point}`, name: `Over ${o.point}`, odds: parseFloat(o.price.toFixed(2)), bookmaker: bm.title };
+              if (o.name !== "Over" && o.name !== "Under") continue;
+              const key = `${o.name} ${o.point}`;
+              if (!best[key] || o.price > best[key].odds)
+                best[key] = { market: key, name: key, odds: parseFloat(o.price.toFixed(2)), bookmaker: bm.title };
             }
           }
           normOdds.push(...Object.values(best));
