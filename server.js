@@ -450,6 +450,7 @@ const AF_LEAGUE_MAP = [
   { ids: [41],  labels: ["league one"] },
   { ids: [78],  labels: ["bundesliga"] },
   { ids: [135], labels: ["serie a"] },
+  { ids: [141], labels: ["la liga 2", "segunda division", "segunda división"] },
   { ids: [140], labels: ["la liga"] },
   { ids: [61],  labels: ["ligue 1"] },
   { ids: [94],  labels: ["primeira liga"] },
@@ -457,7 +458,6 @@ const AF_LEAGUE_MAP = [
   { ids: [203], labels: ["török szuperliga", "super lig", "szuperliga"] },
   { ids: [71],  labels: ["brazil serie a", "brazil"] },
   { ids: [106], labels: ["ekstraklasa"] },
-  { ids: [141], labels: ["la liga 2", "segunda division", "segunda división"] },
   { ids: [253], labels: ["mls", "major league soccer"] },
   { ids: [262], labels: ["liga mx", "liga mex", "liga mexicana"] },
   { ids: [5],   labels: ["nemzetek ligája", "nations league", "uefa nations league"] },
@@ -476,15 +476,18 @@ async function _fetchAFStandings(leagueId) {
     // évben nincs adat, automatikusan visszalépünk az előző évre.
     const currentYear = new Date().getFullYear();
     let groups = null;
-    for (const season of [currentYear, currentYear - 1]) {
+    for (const season of [currentYear, currentYear - 1, currentYear - 2]) {
       const url = `https://v3.football.api-sports.io/standings?league=${leagueId}&season=${season}`;
       const r = await fetch(url, { headers: { "x-apisports-key": API_FOOTBALL_KEY } });
-      if (!r.ok) { console.warn(`API-Football standings HTTP ${r.status} (liga ${leagueId}, season ${season})`); continue; }
+      if (!r.ok) { console.warn(`[AF] HTTP ${r.status} liga=${leagueId} season=${season}`); continue; }
       const json = await r.json();
+      const errors = json?.errors;
+      if (errors && Object.keys(errors).length) { console.warn(`[AF] API hiba liga=${leagueId} season=${season}:`, JSON.stringify(errors)); continue; }
       const g = json?.response?.[0]?.league?.standings;
-      if (g && g.length) { groups = g; console.log(`API-Football: liga ${leagueId} → season ${season}`); break; }
+      console.log(`[AF] liga=${leagueId} season=${season} → response.length=${json?.response?.length ?? "N/A"} standings groups=${g?.length ?? 0}`);
+      if (g && g.length) { groups = g; break; }
     }
-    if (!groups) return null;
+    if (!groups) { console.warn(`[AF] standings nem elérhető: liga ${leagueId}`); return null; }
     // groups.flat(): több csoportos ligáknál (NL, CL group stage) az összes csapat egy listában
     const rows = groups.flat();
     const standings = rows.map(row => ({
