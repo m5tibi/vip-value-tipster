@@ -586,9 +586,7 @@ async function computePoissonEdge(matchList) {
 
     const homeStats = _afTeamMatch(standings, homeName);
     const awayStats = _afTeamMatch(standings, awayName);
-    if (!homeStats || !awayStats) { console.log(`[POI-DBG] csapatnév nem found: "${homeName}" → ${homeStats?homeStats.teamName:"NULL"}, "${awayName}" → ${awayStats?awayStats.teamName:"NULL"} | standings[0]: ${standings[0]?.teamName}`); }
-    const awayStats = _afTeamMatch(standings, awayName);
-    if (!homeStats || !awayStats) continue;
+    if (!homeStats || !awayStats) { console.log(`[POI-DBG] csapatnév nem found: "${homeName}" → ${homeStats?homeStats.teamName:"NULL"}, "${awayName}" → ${awayStats?awayStats.teamName:"NULL"} | standings[0]: ${standings[0]?.teamName}`); continue; }
     if (homeStats.homePlayed < 2 || awayStats.awayPlayed < 2) continue;
 
     // λ számítás (hazai/idegen teljesítmény alapján)
