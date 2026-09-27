@@ -620,20 +620,7 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       return { singles: [], comboLegs: [] };
     }
     // A valós kezdési idő a meccslistából (odds API), nem az AI adatából
-    const realCommence = name => {
-      const exact = matchList.find(m => m.match === name);
-      if (exact) return exact.commence;
-      const parts = String(name || "").split(/\s+vs\.?\s+/i);
-      if (parts.length !== 2) return null;
-      const nh = normTeam(parts[0]), na = normTeam(parts[1]);
-      const m = matchList.find(x => {
-        const p = String(x.match).split(/\s+vs\.?\s+/i);
-        if (p.length !== 2) return false;
-        const h = normTeam(p[0]), a = normTeam(p[1]);
-        return (nameSim(nh, h) && nameSim(na, a)) || (nameSim(nh, a) && nameSim(na, h));
-      });
-      return m ? m.commence : null;
-    };
+    const realCommence = name => findMatchEntry(matchList, name)?.commence || null;
     // Market mező automatikus kitöltése ha az AI kihagyta
     function inferMarket(pick, market) {
       if (market) return market;
@@ -659,7 +646,8 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
         match: t.match, commence: realCommence(t.match) || t.commence || null,
         market, pick, odds: t.odds,
         live: false, note: t.note,
-        poisson: poissonForTip(poissonEdge.get(t.match), market, pick, t.match),
+        poisson: (() => { const e = findMatchEntry(matchList, t.match);
+                          return e ? poissonForTip(poissonEdge.get(e.match), market, pick, e.match) : null; })(),
         approved: false, sent: false,
         addedAt: nowHu(), result: "pending"
       };
@@ -697,20 +685,7 @@ function comboKey(c) { return (c.legs || []).map(l => `${l.match}|${l.market}|${
 // a másik sem nyerhetne). Minden láb önállóan, a meccs eredménye alapján dől el.
 function buildCombos(legs, matchList = []) {
   // A valós kezdési idő a meccslistából (odds API), nem az AI adatából – laza névpárosítással.
-  const realCommence = name => {
-    const exact = matchList.find(m => m.match === name);
-    if (exact) return exact.commence;
-    const parts = String(name || "").split(/\s+vs\.?\s+/i);
-    if (parts.length !== 2) return null;
-    const nh = normTeam(parts[0]), na = normTeam(parts[1]);
-    const m = matchList.find(x => {
-      const p = String(x.match).split(/\s+vs\.?\s+/i);
-      if (p.length !== 2) return false;
-      const h = normTeam(p[0]), a = normTeam(p[1]);
-      return (nameSim(nh, h) && nameSim(na, a)) || (nameSim(nh, a) && nameSim(na, h));
-    });
-    return m ? m.commence : null;
-  };
+  const realCommence = name => findMatchEntry(matchList, name)?.commence || null;
   const byMatch = {};
   for (const l of legs) {
     if (!l.match || !l.odds) continue;
@@ -872,23 +847,22 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
   // Kombi tippek validálása: AI oddsok vs valódi Odds API oddsok
   // Ha az AI odds > 10%-kal alacsonyabb a valódinál → kizárjuk (AI kitalált oddsot adott)
   function getRealOdds(legMatch, legMarket, legPick, matchList) {
-    const entry = matchList.find(m => {
-      const n1 = (m.match || "").toLowerCase().replace(/[^a-z0-9]/g,"");
-      const n2 = (legMatch || "").toLowerCase().replace(/[^a-z0-9]/g,"");
-      return n1 === n2 || n1.includes(n2) || n2.includes(n1);
-    });
+    const entry = findMatchEntry(matchList, legMatch);
     if (!entry) return null;
     const lm = (legMarket || "").toLowerCase();
     const lp = (legPick  || "").toLowerCase();
+    // A pick csapatneve (hendikepnél a szám nélkül) – magyar országnevet is kezel
+    const pickTeam = normTeam(String(legPick || "").replace(/[-+]?[\d.]+$/, "").trim());
+    const sameTeam = name => nameSim(pickTeam, normTeam(String(name || "").replace(/[-+]?[\d.]+$/, "").trim()));
     for (const o of (entry.odds || [])) {
       const om = (o.market || "").toLowerCase();
-      const on = (o.name   || "").toLowerCase();
       // 1X2 egyezés: market "1x2" és a csapatnév egyezik
-      if (lm.includes("1x2") && om.includes("1x2") && on.includes(lp.split(" ")[0])) return o.odds;
+      if (lm.includes("1x2") && om.includes("1x2") && sameTeam(o.name)) return o.odds;
       // Over/Under egyezés
       if ((lm.includes("over") || lm.includes("under")) && om === lm) return o.odds;
-      // Hendikep egyezés
-      if (lm.includes("hendikep") && om.includes("hendikep") && on.includes(lp.split(" ")[0])) return o.odds;
+      // Hendikep egyezés (a vonalnak is egyeznie kell)
+      if (lm.includes("hendikep") && om.includes("hendikep") && sameTeam(o.name) &&
+          (String(o.name).match(/[-+]?[\d.]+$/) || [""])[0].replace("+", "") === (lp.match(/[-+]?[\d.]+$/) || [""])[0].replace("+", "")) return o.odds;
       // BTTS
       if (lm.includes("btts") && om.includes("btts")) return o.odds;
     }
@@ -939,11 +913,52 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
 // hosszabbítás/tizenegyes nélkül). Az odds API a hosszabbítással együtti végeredményt
 // adja, ami kieséses meccseknél hibás. A football-data.org score.regularTime a 90 perces
 // eredmény – ha be van állítva a FOOTBALLDATA_TOKEN, ezt használjuk a kiértékeléshez.
+// Válogatottak: az AI magyarul írja a nevüket ("Franciaország"), az odds/eredmény API angolul
+// ("France"). A párosításhoz mindkét oldalt ugyanarra az angol névre hozzuk (egész névre illesztve,
+// ékezet és írásjel nélkül). Az angol változatokat is egységesítjük (Türkiye/Turkey, Czechia…).
+const COUNTRY_ALIASES = {
+  "magyarorszag": "hungary", "franciaorszag": "france", "nemetorszag": "germany", "olaszorszag": "italy",
+  "spanyolorszag": "spain", "portugalia": "portugal", "anglia": "england", "skocia": "scotland",
+  "eszak irorszag": "northern ireland", "irorszag": "ireland", "republic of ireland": "ireland",
+  "hollandia": "netherlands", "svajc": "switzerland", "ausztria": "austria",
+  "csehorszag": "czechia", "czech republic": "czechia", "szlovakia": "slovakia", "lengyelorszag": "poland",
+  "horvatorszag": "croatia", "szerbia": "serbia", "szlovenia": "slovenia",
+  "bosznia hercegovina": "bosnia and herzegovina", "bosnia herzegovina": "bosnia and herzegovina",
+  "eszak macedonia": "north macedonia", "macedonia": "north macedonia", "albania": "albania", "koszovo": "kosovo",
+  "gorogorszag": "greece", "torokorszag": "turkey", "turkiye": "turkey", "romania": "romania",
+  "bulgaria": "bulgaria", "ukrajna": "ukraine", "feheroroszorszag": "belarus", "oroszorszag": "russia",
+  "gruzia": "georgia", "ormenyorszag": "armenia", "azerbajdzsan": "azerbaijan",
+  "kazahsztan": "kazakhstan", "izland": "iceland", "norvegia": "norway", "svedorszag": "sweden",
+  "dania": "denmark", "finnorszag": "finland", "esztorszag": "estonia", "lettorszag": "latvia",
+  "litvania": "lithuania", "ciprus": "cyprus", "luxemburg": "luxembourg", "izrael": "israel",
+  "feroer szigetek": "faroe islands", "brazilia": "brazil", "kolumbia": "colombia", "mexiko": "mexico",
+  "egyesult allamok": "usa", "united states": "usa", "kanada": "canada", "japan": "japan",
+  "del korea": "south korea", "korea republic": "south korea", "marokko": "morocco", "szenegal": "senegal",
+  "egyiptom": "egypt", "ausztralia": "australia", "tunezia": "tunisia", "algeria": "algeria",
+  "elefantcsontpart": "ivory coast", "cote d ivoire": "ivory coast", "kamerun": "cameroon",
+};
 function normTeam(s) {
-  return (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
+  let t = (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const key = t.replace(/[^a-z0-9]+/g, " ").trim();
+  if (COUNTRY_ALIASES[key]) t = COUNTRY_ALIASES[key];
+  return t
     .replace(/\b(fc|cf|sc|afc|cd|ac|ss|ssc|as|rc|fk|sk|club|deportivo|united|city)\b/g, "")
     .replace(/[^a-z0-9]/g, "");
+}
+// A meccslistából megkeresi az AI által írt meccsnévhez tartozó bejegyzést (pontos vagy laza
+// névpárosítással – fordított sorrendet és magyar országneveket is kezel).
+function findMatchEntry(matchList, name) {
+  const exact = matchList.find(m => m.match === name);
+  if (exact) return exact;
+  const parts = String(name || "").split(/\s+vs\.?\s+/i);
+  if (parts.length !== 2) return null;
+  const nh = normTeam(parts[0]), na = normTeam(parts[1]);
+  return matchList.find(x => {
+    const p = String(x.match).split(/\s+vs\.?\s+/i);
+    if (p.length !== 2) return false;
+    const h = normTeam(p[0]), a = normTeam(p[1]);
+    return (nameSim(nh, h) && nameSim(na, a)) || (nameSim(nh, a) && nameSim(na, h));
+  }) || null;
 }
 function levDist(a, b) {
   const m = a.length, n = b.length, d = [];
@@ -1080,7 +1095,7 @@ function settleMarket(market, pick, homeTeam, awayTeam, homeScore, awayScore) {
     const lineMatch = (pick || "").match(/-?\+?[\d.]+$/);
     if (!lineMatch) return null;
     const h      = parseFloat(lineMatch[0].replace("+", ""));      // pl. +0.75 / -1.5
-    const team   = (pick || "").replace(/[-+][\d.]+$/, "").trim();  // a csapatnév a hendikep előtt
+    const team   = (pick || "").replace(/\s*[-+]?[\d.]+$/, "").trim();  // a csapatnév a hendikep előtt (0-s vonalnál előjel nélkül)
     const isHome = nameSim(normTeam(team), normTeam(homeTeam));
     const d      = isHome ? homeScore - awayScore : awayScore - homeScore;
     return settleQuarter(d, -h);
