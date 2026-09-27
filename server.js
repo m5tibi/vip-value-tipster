@@ -618,7 +618,7 @@ async function fetchAiTips(matchList, alreadyTipped = [], poissonEdge = new Map(
     if (!pe) return base; // nincs Poisson adat → nem szűrjük, de nem annotáljuk
     const valueStr = pe.valueMarkets.length
       ? `\n  ✅ VALUE PIACOK (Poisson +5%+ edge): ${pe.valueMarkets.map(mk => `${mk.name} (modell: ${mk.modelProb}%, implikált: ${mk.impliedProb}%, edge: +${mk.edge}%)`).join(" | ")}`
-      : `\n  ⚠️ NINCS VALUE PIAC (Poisson szerint egyik piac sem kínál +5%+ edge-t – kerüld!)\n  Modell: λH=${pe.lambdaHome} λA=${pe.lambdaAway} | Legjobb edge: ${pe.markets.length ? pe.markets.sort((a,b) => b.edge - a.edge)[0].edge + '%' : 'n/a'}`;
+      : `\n  ℹ️ Poisson: nincs +5%+ edge-ű piac (λH=${pe.lambdaHome} λA=${pe.lambdaAway} | legjobb edge: ${pe.markets.length ? Math.max(...pe.markets.map(mk => mk.edge)) + '%' : 'n/a'}) – tippelhető, ha a web keresés alapján megalapozott`;
     return base + valueStr;
   }).join("\n");
 
@@ -628,7 +628,7 @@ async function fetchAiTips(matchList, alreadyTipped = [], poissonEdge = new Map(
 
   const hasAnyPoisson = poissonEdge.size > 0;
   const poissonInstruction = hasAnyPoisson
-    ? `\n⚡ POISSON VALUE FILTER AKTÍV: A meccsek mellett jelöltük, melyik piacokon van matematikailag igazolt +5%+ edge (✅ VALUE PIACOK). CSAK ilyen piacokra adj tippet! Ha egy meccsnél ⚠️ NINCS VALUE PIAC felirat szerepel, azt a meccset NE tippeld (sem single, sem kombi láb)! Ez a szűrő védi a bankrollt a negatív várható értékű tippektől.\n`
+    ? `\n⚡ POISSON VALUE JELZÉS (ajánlás, nem tiltás): A meccsek mellett jelöltük, melyik piacokon mutat a Poisson-modell +5%+ edge-et (✅ VALUE PIACOK). Ezeket részesítsd előnyben. A ℹ️ jelölésű meccseken a modell nem talált value-t, de ezek is tippelhetők, ha a web keresés alapján megalapozottak. A kért tippszámot ettől függetlenül teljesítsd.\n`
     : "";
 
   const prompt = `Te egy profi labdarúgás-fogadási elemző vagy. Használj web keresést az aktuális formához, sérülésekhez és keretinformációkhoz az alábbi közelgő foci meccsekre (a következő ~36 óra).
