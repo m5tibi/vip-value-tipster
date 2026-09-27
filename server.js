@@ -567,7 +567,7 @@ async function computePoissonEdge(matchList) {
         return !after || /[\s\W]/.test(after); // label után szóköz/nem alfanumerikus, vagy a string vége
       })) { leagueEntry = le; break; }
     }
-    if (!leagueEntry) continue; // ismeretlen liga → nem szűrjük
+    if (!leagueEntry) { console.log(`[POI-DBG] ismeretlen liga: "${m.sport}" → kihagyva`); continue; }
 
     // Standings lekérés (cache-elve)
     let standings = null;
@@ -577,7 +577,7 @@ async function computePoissonEdge(matchList) {
       }
       if (standingsCache[lid]) { standings = standingsCache[lid]; break; }
     }
-    if (!standings) continue;
+    if (!standings) { console.log(`[POI-DBG] standings null: liga ${leagueEntry.ids} (${m.sport})`); continue; }
 
     // Csapatnév kinyerés
     const parts = String(m.match || "").split(/\s+vs\.?\s+/i);
@@ -585,6 +585,8 @@ async function computePoissonEdge(matchList) {
     const [homeName, awayName] = parts;
 
     const homeStats = _afTeamMatch(standings, homeName);
+    const awayStats = _afTeamMatch(standings, awayName);
+    if (!homeStats || !awayStats) { console.log(`[POI-DBG] csapatnév nem found: "${homeName}" → ${homeStats?homeStats.teamName:"NULL"}, "${awayName}" → ${awayStats?awayStats.teamName:"NULL"} | standings[0]: ${standings[0]?.teamName}`); }
     const awayStats = _afTeamMatch(standings, awayName);
     if (!homeStats || !awayStats) continue;
     if (homeStats.homePlayed < 2 || awayStats.awayPlayed < 2) continue;
