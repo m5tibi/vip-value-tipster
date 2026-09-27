@@ -36,7 +36,7 @@ könyvtárban (Renderen a `/data` perzisztens lemez).
 | Változó | Leírás |
 |---|---|
 | `SESSION_SECRET` | Session cookie aláíró kulcs (nélküle minden újraindítás kiléptet mindenkit) |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Az admin fiók induláskor ezekből jön létre – ez az egyetlen admin belépési mód |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Az admin fiók induláskor ezekből jön létre – ez az egyetlen admin belépési mód a felületen. Az `ADMIN_PASSWORD` X-Admin-Password headerben a `/api/match-list` külső (mondomatutit) hívásához is jó |
 | `BASE_URL` | Az oldal címe (alapértelmezés: `https://90perc.hu`) |
 | `ANTHROPIC_API_KEY` | AI tippgenerálás |
 | `ODDS_API_KEY` | The Odds API kulcs |
@@ -67,4 +67,6 @@ könyvtárban (Renderen a `/data` perzisztens lemez).
 | `FOOTBALLDATA_TOKEN` | football-data.org – 90 perces eredményekhez |
 | `APIFOOTBALL_KEY` | api-football.com – Poisson value szűrő |
 | `ODDS_PROXY_TOKEN` | Az odds proxy külső (nem belépett) hívásaihoz |
+| `MONDOMATUTIT_ADMIN_PASSWORD` | A „→ Mondomatutit” gombhoz: ezzel küldi át a tippet a mondomatutit.hu-ra |
+| `MONDOMATUTIT_URL` | A mondomatutit címe (alapértelmezés: `https://mondomatutit.hu`) |
 | `DATA_DIR` | Adatkönyvtár (alapértelmezés: `/data`) |
