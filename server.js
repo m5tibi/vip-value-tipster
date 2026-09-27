@@ -41,13 +41,14 @@ const TG_PRIVATE_CHAT_ID = process.env.TG_PRIVATE_CHAT_ID || "1326707238"; // ad
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const FOOTBALLDATA_TOKEN = process.env.FOOTBALLDATA_TOKEN;   // opcionális: 90 perces eredményhez (football-data.org)
 const API_FOOTBALL_KEY   = process.env.APIFOOTBALL_KEY;       // Poisson value filter (api-football.com)
-const DATA_FILE     = "/data/history.json";
-const SCHEDULE_FILE = "/data/lastRun.json";
+const DATA_DIR      = process.env.DATA_DIR || "/data";   // perzisztens lemez (Renderen /data)
+const DATA_FILE     = path.join(DATA_DIR, "history.json");
+const SCHEDULE_FILE = path.join(DATA_DIR, "lastRun.json");
 
 // ── Perzisztens tárolás ───────────────────────────────────
 function loadHistory() {
   try {
-    if (!fs.existsSync("/data")) fs.mkdirSync("/data", { recursive: true });
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
     if (!fs.existsSync(DATA_FILE)) return [];
     return JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
   } catch (e) { console.error("History betöltési hiba:", e.message); return []; }
@@ -2058,7 +2059,7 @@ app.post("/api/admin/preview-matches", async (req, res) => {
           // Csak a default ablakos lekérés írja felül a cache-t
           lastMatchList = newList;
           lastMatchListTs = Date.now();
-          try { require("fs").writeFileSync((process.env.DATA_DIR || "/data") + "/last_match_list.json", JSON.stringify(newList)); } catch(e) {}
+          try { require("fs").writeFileSync(path.join(DATA_DIR, "last_match_list.json"), JSON.stringify(newList)); } catch(e) {}
         }
         // Egyéni ablak esetén ideiglenesen használjuk, de nem írjuk felül a cache-t
         const fresh = newList;
@@ -2122,7 +2123,7 @@ app.post("/api/refresh-odds-only", async (req, res) => {
     const newList = await fetchMatchListOnly();
     if (newList && newList.length > 0) {
       lastMatchList = newList;
-      try { require("fs").writeFileSync((process.env.DATA_DIR || "/data") + "/last_match_list.json", JSON.stringify(lastMatchList)); } catch(e) {}
+      try { require("fs").writeFileSync(path.join(DATA_DIR, "last_match_list.json"), JSON.stringify(lastMatchList)); } catch(e) {}
       console.log(`Odds frissítve (AI nélkül): ${lastMatchList.length} meccs`);
     }
     res.json({ ok: true, matches: lastMatchList.length });
@@ -2136,7 +2137,7 @@ let lastMatchList = [];
 let lastMatchListTs = 0;
 (() => {
   try {
-    const saved = JSON.parse(require("fs").readFileSync((process.env.DATA_DIR || "/data") + "/last_match_list.json", "utf8"));
+    const saved = JSON.parse(require("fs").readFileSync(path.join(DATA_DIR, "last_match_list.json"), "utf8"));
     if (Array.isArray(saved)) lastMatchList = saved;
     console.log(`Meccs lista betöltve: ${lastMatchList.length} meccs`);
   } catch(e) {}
