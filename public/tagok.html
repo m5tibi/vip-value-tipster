@@ -161,10 +161,9 @@ let allMembers = [];
 let currentFilter = 'all';
 let pendingUserId = null;
 
+// Az admin jogosultságot a session cookie hordozza, itt csak a Content-Type-ot állítjuk
 function adminHeaders(json) {
-  const h = { 'X-Admin-Password': localStorage.getItem('vbt_admin') || '' };
-  if (json) h['Content-Type'] = 'application/json';
-  return h;
+  return json ? { 'Content-Type': 'application/json' } : {};
 }
 
 function showStatus(msg, isErr) {

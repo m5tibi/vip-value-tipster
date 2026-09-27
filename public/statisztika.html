@@ -234,13 +234,6 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
 </footer>
 
 <script>
-// Régi, jelszavas admin mód: a tippek oldalon eltárolt jelszót küldjük (ha van)
-function adminPwdHeader() {
-  let p = '';
-  try { p = localStorage.getItem('vbt_admin_pwd') || ''; } catch (e) {}
-  if (!p) return {};
-  try { return { 'x-admin-password-b64': btoa(String.fromCharCode(...new TextEncoder().encode(p))) }; } catch (e) { return {}; }
-}
 let allTips = [];
 let currentFilter = 'all';
 let currentPeriod = 'all'; // 'all' | 'YYYY-MM'
@@ -556,7 +549,7 @@ async function loadData() {
   await loadAdminIdentity();
   try {
     const [histRes, pubRes] = await Promise.all([
-      fetch('/api/history', { headers: adminPwdHeader() }),
+      fetch('/api/history'),
       fetch('/api/public-stats')
     ]);
     const hist    = await histRes.json();

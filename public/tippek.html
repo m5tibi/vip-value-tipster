@@ -309,15 +309,8 @@ let dayCounter = 0;
 let ME = { user: null, hasAccess: false, paidMode: false, isAdmin: false };
 let authMode = 'login';   // 'login' | 'register'
 
-// Visszafelé kompatibilis admin-jelszó (régi ?admin=... mód; a session mellett megmarad)
-(function(){
-  var p = new URLSearchParams(window.location.search).get('admin');
-  if (p) {
-    localStorage.setItem('vbt_admin', '1');
-    localStorage.setItem('vbt_admin_pwd', p);
-    window.history.replaceState({}, '', '/');
-  }
-})();
+// A régi, jelszavas admin mód megszűnt – a böngészőben esetleg eltárolt jelszót töröljük
+try { localStorage.removeItem('vbt_admin'); localStorage.removeItem('vbt_admin_pwd'); } catch(e) {}
 function showAdminStats() {
   if (!isAdmin()) return;
   const el = document.getElementById("admin-stats-cards");
@@ -326,14 +319,9 @@ function showAdminStats() {
 }
 
 function isAdmin() { return !!ME.isAdmin || !!(ME.user && ME.user.isAdmin); }
-function getAdminPwd() { return localStorage.getItem('vbt_admin_pwd') || ''; }
-function b64pwd(p) {
-  try { return btoa(String.fromCharCode(...new TextEncoder().encode(p||''))); } catch(e) { return ''; }
-}
+// Az admin jogosultságot a session cookie hordozza, itt csak a Content-Type-ot állítjuk
 function adminHeaders(json) {
-  const h = { "x-admin-password-b64": b64pwd(getAdminPwd()) };
-  if (json) h["Content-Type"] = "application/json";
-  return h;
+  return json ? { "Content-Type": "application/json" } : {};
 }
 
 // ── Belépés / regisztráció ──
@@ -427,8 +415,6 @@ async function resendVerification() {
 
 async function userLogout() {
   try { await fetch('/api/auth/logout', { method: 'POST' }); } catch(e) {}
-  localStorage.removeItem('vbt_admin');
-  localStorage.removeItem('vbt_admin_pwd');
   await refreshMe();
   await loadTips();
   await loadHistory();
@@ -472,8 +458,6 @@ function applyAdminUI() {
 async function handleAdminResp(r, okMsg) {
   if (r.status === 403) {
     showStatus("⛔ Nincs admin jogosultság – lépj be újra.", "#ef9a9a");
-    localStorage.removeItem('vbt_admin');
-    localStorage.removeItem('vbt_admin_pwd');
     applyAdminUI();
     openAuthModal('login');
     return false;
@@ -1069,7 +1053,7 @@ async function refresh(fromTs = null, toTs = null) {
   const btn = document.getElementById("btn-refresh");
   btn.disabled=true; btn.textContent="Elemzés folyamatban...";
   try {
-    const body = {password: getAdminPwd()};
+    const body = {};
     if (fromTs) body.fromTs = fromTs;
     if (toTs)   body.toTs   = toTs;
     const r = await fetch("/api/refresh", {
