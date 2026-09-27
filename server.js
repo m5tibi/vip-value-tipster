@@ -1761,6 +1761,38 @@ app.delete("/api/history/:id", (req, res) => {
 });
 
 
+// VIP tipp → Free tipp konverzió. A tipp NEM lesz automatikusan publikus:
+// jóváhagyásra vár, amíg az admin külön jóvá nem hagyja.
+app.post("/api/history/:id/make-free", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const id = req.params.id;
+  const tip = history.find(t => t.id === id);
+  if (!tip) return res.status(404).json({ ok: false, error: "Tipp nem található" });
+  if (tip.type === "free")  return res.status(400).json({ ok: false, error: "Már free tipp" });
+  if (tip.type === "combo") return res.status(400).json({ ok: false, error: "Kombiból nem lehet free tipp" });
+
+  history  = history.map(t => t.id === id ? { ...t, type: "free", approved: false } : t);
+  aiTips   = aiTips.filter(t => t.id !== id);
+  freeTips = history.filter(t => t.type === "free" && (!t.result || t.result === "pending"));
+  saveHistory();
+  console.log(`[make-free] ${tip.match} átalakítva free tippé (jóváhagyásra vár)`);
+  res.json({ ok: true });
+});
+
+// Free tipp kézi eredmény beállítás
+app.patch("/api/free-tips/:id/result", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const id = req.params.id;
+  const { result } = req.body || {};
+  const VALID = ["won","lost","push","half_won","half_lost","pending"];
+  if (!VALID.includes(result)) return res.status(400).json({ ok: false, error: "Érvénytelen eredmény" });
+  const patch = { result, manual: true, settledAt: result !== "pending" ? nowHu() : undefined };
+  history  = history.map(t => t.id === id ? { ...t, ...patch } : t);
+  freeTips = history.filter(t => t.type === "free" && (!t.result || t.result === "pending"));
+  saveHistory();
+  res.json({ ok: true });
+});
+
 // Tipp jóváhagyása (ettől lesz publikus)
 app.patch("/api/history/:id/approve", (req, res) => {
   if (!requireAdmin(req, res)) return;

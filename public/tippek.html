@@ -563,7 +563,7 @@ function adminTipControls(t) {
     ? `<span style="color:#69f0ae;font-size:11px;font-weight:700">✅ Jóváhagyva (publikus)</span>`
     : `<span style="color:#ffb74d;font-size:11px;font-weight:700">${"⏳ Jóváhagyásra vár (rejtett)"}</span>`;
   const approveBtn = approved ? "" : `<button class="btn-won" style="font-size:11px;padding:4px 10px" onclick="approveTip('${t.id}')">✅ Jóváhagyás</button>`;
-  const makeFreeBtn = t.type !== "free" ? `<button style="background:#00c853;color:#000;border:none;font-size:11px;padding:4px 10px;border-radius:6px;font-weight:700;cursor:pointer" onclick="makeFree('${t.id}')">🆓 Free-nek</button>` : "";
+  const makeFreeBtn = (t.type !== "free" && t.type !== "combo") ? `<button style="background:#00c853;color:#000;border:none;font-size:11px;padding:4px 10px;border-radius:6px;font-weight:700;cursor:pointer" onclick="makeFree('${t.id}')">🆓 Free-nek</button>` : "";
   const mondomatutitBtn = `<button id="mm-btn-${t.id}" style="background:#6B46C1;color:#fff;border:none;font-size:11px;padding:4px 10px;border-radius:6px;font-weight:700;cursor:pointer" onclick="pushToMondomatutit('${t.id}')">→ Mondomatutit</button>`;
   return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #2a3550">
     ${badge}${approveBtn}${makeFreeBtn}${mondomatutitBtn}
@@ -1353,12 +1353,13 @@ async function deleteTip(id) {
 }
 
 async function makeFree(id) {
-  if (!confirm("Free tippként publikálod ezt a tippet?")) return;
+  if (!confirm("Free tippé alakítod ezt a tippet? Jóváhagyásig nem lesz publikus.")) return;
   const r = await fetch(`/api/history/${encodeURIComponent(id)}/make-free`, {
     method: "POST", headers: adminHeaders()
   });
-  if (r.ok) { showStatus("🆓 Free tippként publikálva!"); await loadHistory(); await loadTips(); }
-  else showStatus("❌ Hiba: " + await r.text(), true);
+  if (!(await handleAdminResp(r))) return;
+  if (r.ok) { showStatus("🆓 Free tippé alakítva – jóváhagyásra vár"); await loadHistory(); await loadTips(); }
+  else { const d = await r.json().catch(() => ({})); showStatus("❌ Hiba: " + (d.error || r.status), true); }
 }
 
 async function approveTip(id) {
