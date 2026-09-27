@@ -551,7 +551,13 @@ async function computePoissonEdge(matchList) {
     // Liga azonosítása
     let leagueEntry = null;
     for (const le of AF_LEAGUE_MAP) {
-      if (le.labels.some(lbl => sportLabelLower.includes(lbl))) { leagueEntry = le; break; }
+      // Szóhatáros illesztés: "la liga 2" ne matchelje a "la liga" label-t
+      if (le.labels.some(lbl => {
+        const idx = sportLabelLower.indexOf(lbl);
+        if (idx === -1) return false;
+        const after = sportLabelLower[idx + lbl.length];
+        return !after || /[\s\W]/.test(after); // label után szóköz/nem alfanumerikus, vagy a string vége
+      })) { leagueEntry = le; break; }
     }
     if (!leagueEntry) continue; // ismeretlen liga → nem szűrjük
 
@@ -896,9 +902,13 @@ function buildCombos(legs, matchList = []) {
 const isApproved = t => t.approved !== false;
 
 // ── Fő frissítő ───────────────────────────────────────────
-async function fetchAndProcess() {
+async function fetchAndProcess(fromTs = null, toTs = null) {
   const now   = new Date();
-  console.log(`Elemzés indul: ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}`);
+  // Időablak: ha a frontend küldött fromTs/toTs-t, azt használjuk; egyébként a default ±24h
+  const windowFrom = fromTs ? new Date(fromTs) : now;
+  const windowTo   = toTs   ? new Date(toTs)   : new Date(now.getTime() + WINDOW_HOURS * 3600000);
+  const isCustomWindow = !!(fromTs || toTs);
+  console.log(`Elemzés indul: ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}${isCustomWindow ? ` | Ablak: ${windowFrom.toISOString()} – ${windowTo.toISOString()}` : ""}`);
 
   // Minden MÉG LE NEM ZÁRT (pending) single tipp meccse – dátumtól függetlenül.
   // Így egy előre (pl. tegnap) felvett, még el nem kezdődött meccsre nem ad újabb tippet.
@@ -910,14 +920,14 @@ async function fetchAndProcess() {
   let scannedLeagues = 0, oddsCalls = 0;
   for (const [sportKey, meta] of Object.entries(SPORT_MAP)) {
     try {
-      // 1) INGYENES esemény-lekérdezés (/events = 0 kredit): van-e meccs a köv. 24 órában?
+      // 1) INGYENES esemény-lekérdezés (/events = 0 kredit): van-e meccs az ablakban?
       const er = await fetch(`https://api.the-odds-api.com/v4/sports/${sportKey}/events?apiKey=${ODDS_API_KEY}&dateFormat=iso`);
       scannedLeagues++;
       if (!er.ok) continue;
       const events = await er.json();
       const hasUpcoming = (Array.isArray(events) ? events : []).some(e => {
-        const h = (new Date(e.commence_time) - now) / 3600000;
-        return h >= 0 && h <= WINDOW_HOURS;
+        const t = new Date(e.commence_time);
+        return t >= windowFrom && t <= windowTo;
       });
       if (!hasUpcoming) continue;   // nincs közelgő meccs → NEM kérünk (drága) oddsot
 
@@ -928,8 +938,8 @@ async function fetchAndProcess() {
       if (!r.ok) continue;
       const games = await r.json();
       for (const game of games) {
-        const hoursUntil = (new Date(game.commence_time) - now) / 3600000;
-        if (hoursUntil < 0 || hoursUntil > WINDOW_HOURS) continue;
+        const t = new Date(game.commence_time);
+        if (t < windowFrom || t > windowTo) continue;
         // (Nincs meccs-kihagyás: a teljes lista kell a kombi lábakhoz is; a single
         //  duplikátumot a prompt + a válasz utólagos szűrése kezeli.)
 
@@ -1880,7 +1890,8 @@ app.get("/api/public-stats", (req, res) => {
 
 app.post("/api/refresh", async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  await fetchAndProcess();
+  const { fromTs, toTs } = req.body || {};
+  await fetchAndProcess(fromTs || null, toTs || null);
   res.json({ ok: true, aiTips: aiTips.length });
 });
 
