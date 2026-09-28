@@ -6,6 +6,7 @@ const path    = require("path");
 const cookieParser = require("cookie-parser");
 
 const usersDb = require("./users");
+const { callClaudeWithSearch } = require("./lib/claude");
 const auth    = require("./auth");
 const mailer  = require("./mailer");
 
@@ -536,6 +537,7 @@ async function fetchAiTips(matchList, alreadyTipped = [], poissonEdge = new Map(
     : "";
 
   const prompt = `Te egy profi labdarúgás-fogadási elemző vagy. Használj web keresést az aktuális formához, sérülésekhez és keretinformációkhoz az alábbi közelgő foci meccsekre (a következő ~36 óra).
+Legfeljebb 12 webes keresésed van: a tabella- és oddsadatok alapján először válaszd ki a legígéretesebb meccseket, és azokra keress rá (egy keresésben több témát is összevonhatsz: forma, hiányzók, egymás elleni eredmények). Ne keress rá minden meccsre, és ne ismételj keresést.
 ${poissonInstruction}
 Mai meccsek (valós bookmaker oddsokkal):
 ${matchText}
@@ -585,19 +587,14 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
 {"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ Premier League","commence":"07.05 20:00","market":"Over 2.5","pick":"Over 2.5","odds":1.85,"note":"..."},{"match":"...","sport":"soccer","sportLabel":"⚽ La Liga","commence":"07.05 21:00","market":"BTTS","pick":"Igen","odds":1.78,"note":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ Bundesliga","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28},{"match":"...","sportLabel":"⚽ Serie A","commence":"07.05 20:00","market":"1X2","pick":"Csapat A","odds":1.35}]}`;
 
   try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6", max_tokens: 16000,
-        tools: [{ type: "web_search_20250305", name: "web_search" }],
-        messages: [{ role: "user", content: prompt }]
-      })
+    // Legfeljebb 12 keresés: a meccsek jó részét a tabella- és oddsadatokból is meg tudja
+    // ítélni, keresni főleg a kiválasztott tippekhez kell (a keresési találatok a fő költség).
+    const data = await callClaudeWithSearch({
+      apiKey: ANTHROPIC_KEY, prompt, maxTokens: 16000, maxSearches: 12, label: "tippgenerálás",
     });
-    const data = await r.json();
     if (data.error) { console.error("AI API hiba:", JSON.stringify(data.error)); return { singles: [], comboLegs: [] }; }
-    const text = (data.content?.filter(b => b.type === "text").map(b => b.text) || []).join("\n");
-    if (!text.trim()) { console.log("AI: üres szöveges válasz. stop_reason:", data.stop_reason); return { singles: [], comboLegs: [] }; }
+    const text = data.text;
+    if (!text.trim()) { console.log("AI: üres szöveges válasz. stop_reason:", data.stopReason); return { singles: [], comboLegs: [] }; }
 
     // JSON kinyerés: 1) ```json...``` blokk, 2) nyers {} blokk
     let jsonStr = null;

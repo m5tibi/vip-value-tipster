@@ -3,6 +3,7 @@
 const express = require("express");
 const fetch   = require("node-fetch");
 const { BASE_URL } = require("../lib/config");
+const { callClaudeWithSearch } = require("../lib/claude");
 
 const TG_BOT_TOKEN  = process.env.TG_BOT_TOKEN;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
@@ -32,14 +33,11 @@ module.exports = function createTelegramBot({ getHistory, isApproved }) {
 
   // ── Meccs elemzés szerver oldalon (bot számára) ───────────────
   async function analyzeForBot(query) {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "anthropic-beta": "web-search-2025-03-05" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6", max_tokens: 4000,
-        tools: [{ type: "web_search_20250305", name: "web_search" }],
-        messages: [{ role: "user", content:
+    const data = await callClaudeWithSearch({
+      apiKey: ANTHROPIC_KEY, maxTokens: 4000, maxSearches: 5, label: "Telegram /elemzes",
+      prompt:
           `Te egy profi labdarúgás-fogadási elemző vagy. Kizárólag helyes, igényes magyar nyelven írj. Kerüld a zsargont.
+Legfeljebb 5 webes keresésed van: tervezd meg őket (forma, egymás elleni eredmények, hiányzók, oddsok), és ne ismételj keresést. Csak a kész elemzést írd ki, bevezető nélkül.
 
 A kérés: "${query}"
 
@@ -57,13 +55,10 @@ Készíts rövid, tömör elemzést Telegram-ra optimalizálva (max 800 karakter
 1. [Tipp] @ [odds] – [Megbízhatóság: MAGAS/KÖZEPES]
 2. [Tipp] @ [odds] – [Megbízhatóság: MAGAS/KÖZEPES]
 
-Ne használj csillagot (*) vagy hashtaget (#). Csak HTML bold (<b>) formázást.`
-        }]
-      })
+Ne használj csillagot (*) vagy hashtaget (#). Csak HTML bold (<b>) formázást.`,
     });
-    const data = await r.json();
-    const text = (data.content?.filter(b => b.type === "text").map(b => b.text) || []).join("\n").trim();
-    return text || "Az elemzés sikertelen. Próbáld újra.";
+    if (data.error) console.error("Bot elemzés API hiba:", JSON.stringify(data.error));
+    return data.text || "Az elemzés sikertelen. Próbáld újra.";
   }
 
   // ── Bot parancsok kezelése ────────────────────────────────────
