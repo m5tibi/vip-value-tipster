@@ -1,7 +1,8 @@
 const express = require("express");
 const fs      = require("fs");
 const path    = require("path");
-const { rateLimit } = require("../lib/security");
+const { rateLimit }    = require("../lib/security");
+const { requireAdmin } = require("../lib/admin");
 
 const router = express.Router();
 
@@ -45,6 +46,37 @@ router.delete("/api/analyzer-history", (req, res) => {
     if (fs.existsSync(p)) fs.unlinkSync(p);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Admin: ki használta az elemzőt? Minden ah_*.json fájl egy felhasználó (egy API-kulcs) mentett
+// előzménye. Az elemzések a böngészőből közvetlenül a Claude-hoz mennek, így csak azok
+// látszanak, akiknél legalább egy elemzés mentésre került.
+router.get("/api/admin/analyzer-usage", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const dir = process.env.DATA_DIR || "/data";
+  let files = [];
+  try { files = fs.readdirSync(dir).filter(f => /^ah_[a-z0-9]+\.json$/.test(f)); } catch (e) {}
+  const users = files.map(f => {
+    const full = path.join(dir, f);
+    let entries = [];
+    try { entries = JSON.parse(fs.readFileSync(full, "utf8")); } catch (e) {}
+    if (!Array.isArray(entries)) entries = [];
+    const uid = f.slice(3, -5);
+    return {
+      uid,
+      legacy:    !/^[a-f0-9]{64}$/.test(uid),        // régi (javítás előtti) azonosító
+      count:     entries.length,                      // max. 50-et tárolunk felhasználónként
+      lastUsed:  entries[0]?.ts || null,
+      firstSeen: entries[entries.length - 1]?.ts || null,
+      updatedAt: fs.statSync(full).mtime.toISOString(),
+      recentQueries: entries.slice(0, 5).map(e => String(e.query || "").slice(0, 120)),
+    };
+  }).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  res.json({
+    users,
+    totalUsers:    users.length,
+    totalAnalyses: users.reduce((a, u) => a + u.count, 0),
+  });
 });
 
 module.exports = router;
