@@ -313,6 +313,14 @@ function getPeriodTips() {
   return allTips.filter(t => getYearMonth(t.addedAt || t.commence) === currentPeriod);
 }
 
+// A statisztikába számító tippek – ugyanaz a szabály, mint a szerveren (/api/public-stats):
+// publikált (jóváhagyott), lezárt single foci, free és kombi tippek.
+function statTip(t) {
+  if (t.type === 'value' || t.approved === false) return false;
+  if (!['won','lost','push','half_won','half_lost'].includes(t.result)) return false;
+  return t.type === 'combo' || t.type === 'free' || /soccer|foci|⚽/i.test((t.sport || '') + ' ' + (t.sportLabel || ''));
+}
+
 function calcStats(tips) {
   const settled = tips.filter(t => ['won','lost','push','half_won','half_lost'].includes(t.result));
   const won      = settled.filter(t => t.result === 'won').length;
@@ -423,10 +431,8 @@ function setPeriod(period, btn) {
   const titleNode = chartTitleEl.childNodes[0];
   if (period === 'all') {
     titleNode.textContent = window.t?.('stat.chart_title');
-    // All-time: szerver oldali stats (single forrás)
-    fetch('/api/public-stats').then(r=>r.json()).then(d => {
-      updateScoreboard({ settled: d.settled, winRate: d.winRate, profit: d.profit, roi: d.roi });
-    }).catch(() => updateScoreboard(calcStats(getPeriodTips())));
+    // All time: ugyanabból a listából és ugyanúgy számolva, mint a havi nézet
+    updateScoreboard(calcStats(getPeriodTips()));
   } else {
     const [year, month] = period.split('-');
     titleNode.textContent = `${year} ${monthName(parseInt(month, 10) - 1)} – ${window.t?.('stat.chart_title')}`;
@@ -548,12 +554,8 @@ async function loadAdminIdentity() {
 async function loadData() {
   await loadAdminIdentity();
   try {
-    const [histRes, pubRes] = await Promise.all([
-      fetch('/api/history'),
-      fetch('/api/public-stats')
-    ]);
+    const histRes = await fetch('/api/history');
     const hist    = await histRes.json();
-    const pubStats = await pubRes.json().catch(() => null);
 
     // Dátum parse segédfüggvény (HU locale + ISO + MM.DD HH:MM formátumok)
     function parseAnyDate(s) {
@@ -568,7 +570,7 @@ async function loadData() {
     }
 
     allTips = (Array.isArray(hist) ? hist : [])
-      .filter(t => t.type !== 'value' && t.result && t.result !== 'pending')
+      .filter(statTip)
       .sort((a,b) => {
         // Meccs dátuma: singleknél commence, kombinál az utolsó láb commence-e
         function tipDate(t) {
@@ -583,17 +585,8 @@ async function loadData() {
 
     buildPeriodPicker(allTips);
 
-    // All-time scoreboard: szerver oldali számítás (single forrás)
-    if (pubStats) {
-      updateScoreboard({
-        settled:  pubStats.settled,
-        winRate:  pubStats.winRate,
-        profit:   pubStats.profit,
-        roi:      pubStats.roi
-      });
-    } else {
-      updateScoreboard(calcStats(allTips));
-    }
+    // All time: ugyanabból a listából és ugyanúgy számolva, mint a havi nézet
+    updateScoreboard(calcStats(allTips));
     drawChart(allTips.slice().reverse());
     renderTable(allTips);
   } catch(e) {

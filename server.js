@@ -1512,10 +1512,8 @@ app.get("/api/history", (req, res) => {
   const approved = history.filter(isApproved);
   const freshUserHist = req.user ? (usersDb.findById(req.user.id) || req.user) : req.user;
   if (auth.hasAccess(freshUserHist)) return res.json(approved);
-  // Track record: minden lezárt tipp látható, bejelentkezés nélkül is
-  const settledOnly = history.filter(t =>
-    t.result && t.result !== "pending"
-  );
+  // Track record: minden publikált (jóváhagyott) lezárt tipp látható, bejelentkezés nélkül is
+  const settledOnly = approved.filter(t => t.result && t.result !== "pending");
   res.json(settledOnly);
 });
 
@@ -1604,13 +1602,32 @@ app.get("/api/admin/stats", (req, res) => {
              winRate, profit: parseFloat(profit.toFixed(2)), roi, monthly });
 });
 
+// A statisztikába számító tippek – UGYANEZ a szabály fut a statisztika oldalon is (statTip),
+// így a havi számok összege mindig kiadja az all time számot:
+// publikált (jóváhagyott), lezárt single foci, free és kombi tippek.
+const isStatTip = t =>
+  t.type !== "value" && isApproved(t) && SETTLED.includes(t.result) &&
+  (t.type === "combo" || t.type === "free" || /soccer|foci|⚽/i.test((t.sport || "") + " " + (t.sportLabel || "")));
+// Tippenkénti profit – pontosan úgy, mint a statisztika oldalon (tipProfit a statisztika.html-ben),
+// tippenként 2 tizedesre kerekítve, hogy a két kijelzés fillérre egyezzen.
+function statProfit(t) {
+  if (t.type === "combo") {
+    if (!["won", "lost", "push"].includes(t.result)) return 0;
+    const payout = (typeof t.comboPayout === "number" && t.comboPayout > 0)
+      ? t.comboPayout
+      : (t.result === "won" ? (parseFloat(t.odds) || 0) : t.result === "push" ? 1 : 0);
+    return +(payout - 1).toFixed(2);
+  }
+  const o = parseFloat(t.odds) || 1;
+  if (t.result === "won")       return +(o - 1).toFixed(2);
+  if (t.result === "lost")      return -1;
+  if (t.result === "half_won")  return +((o - 1) / 2).toFixed(2);
+  if (t.result === "half_lost") return -0.5;
+  return 0;
+}
+
 app.get("/api/public-stats", (req, res) => {
-  const isFociSrv = t => /soccer|foci|⚽/i.test((t.sport || "") + " " + (t.sportLabel || ""));
-  const H = history.filter(t =>
-    t.type !== "combo" && t.type !== "value" &&
-    isApproved(t) && isFociSrv(t) &&
-    ["won","lost","push","half_won","half_lost"].includes(t.result)
-  );
+  const H = history.filter(isStatTip);
   const won      = H.filter(t => t.result === "won").length;
   const lost     = H.filter(t => t.result === "lost").length;
   const halfWon  = H.filter(t => t.result === "half_won").length;
@@ -1619,14 +1636,7 @@ app.get("/api/public-stats", (req, res) => {
   const settled  = H.length;
   const decN     = won + lost + halfWon + halfLost;
   const winRate  = decN ? (((won + halfWon * 0.5) / decN) * 100).toFixed(1) : null;
-  const profit   = H.reduce((sum, t) => {
-    const o = parseFloat(t.odds) || 1;
-    if (t.result === "won")       return sum + (o - 1);
-    if (t.result === "lost")      return sum - 1;
-    if (t.result === "half_won")  return sum + (o - 1) / 2;
-    if (t.result === "half_lost") return sum - 0.5;
-    return sum;  // push
-  }, 0);
+  const profit   = H.reduce((sum, t) => sum + statProfit(t), 0);
   const roi = settled ? ((profit / settled) * 100).toFixed(1) : null;
   res.json({ settled, won, lost, push, halfWon, halfLost, winRate, profit: parseFloat(profit.toFixed(2)), roi });
 });
