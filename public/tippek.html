@@ -311,6 +311,10 @@ let authMode = 'login';   // 'login' | 'register'
 
 // A régi, jelszavas admin mód megszűnt – a böngészőben esetleg eltárolt jelszót töröljük
 try { localStorage.removeItem('vbt_admin'); localStorage.removeItem('vbt_admin_pwd'); } catch(e) {}
+// ?login=1 (pl. az elemző zárolt képernyőjéről): rögtön a belépési ablakkal nyitunk
+window.addEventListener('load', () => {
+  if (new URLSearchParams(location.search).get('login') === '1') openAuthModal('login');
+});
 function showAdminStats() {
   if (!isAdmin()) return;
   const el = document.getElementById("admin-stats-cards");
@@ -382,6 +386,10 @@ async function authSubmit() {
       } catch(e) { /* nem támogatott böngészőben csendben tér vissza */ }
     }
     closeAuthModal();
+    // Ha másik oldalról érkezett belépni (pl. az elemzőből: ?next=/analyzer.html), oda visszük vissza.
+    // Csak saját, egyszerű oldalra irányítunk (open redirect ellen).
+    const next = new URLSearchParams(location.search).get('next');
+    if (next && /^\/[a-z0-9_-]+\.html$/i.test(next)) { location.href = next; return; }
     await refreshMe();
     await loadTips();
     await loadHistory();
