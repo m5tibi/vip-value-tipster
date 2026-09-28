@@ -142,6 +142,13 @@ nav{background:var(--surf);border-bottom:1px solid var(--border);padding:12px 16
 <div id="status-msg"></div>
 <div id="members-list" class="members-list"><div class="loading">Betöltés...</div></div>
 
+<!-- Elemző használata -->
+<div style="padding:24px 16px 0">
+  <div style="font-size:15px;font-weight:700;margin-bottom:4px">⚡ Elemző használata</div>
+  <div class="page-sub" style="margin-bottom:10px">Felhasználónként (API-kulcsonként) a szerverre mentett elemzések. Aki elemzés nélkül csak kipróbálta, itt nem látszik.</div>
+  <div id="analyzer-usage" class="page-sub">Betöltés...</div>
+</div>
+
 <!-- Plan modal -->
 <div class="modal-overlay" id="plan-modal" onclick="closeModal(event)">
   <div class="modal">
@@ -164,6 +171,54 @@ let pendingUserId = null;
 // Az admin jogosultságot a session cookie hordozza, itt csak a Content-Type-ot állítjuk
 function adminHeaders(json) {
   return json ? { 'Content-Type': 'application/json' } : {};
+}
+
+const escHtml = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+
+// A saját (ezen a gépen az elemzőben megadott) kulcshoz tartozó azonosítók – hogy a listában
+// jelölni tudjuk, melyik bejegyzés a tiéd. Új: SHA-256 hex; régi: az akkori rövid hash.
+async function ownAnalyzerUids() {
+  let key = '';
+  try { key = localStorage.getItem('vbt_ck') || ''; } catch (e) {}
+  if (!key) return [];
+  const ids = [];
+  try {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key));
+    ids.push(Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join(''));
+  } catch (e) {}
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = Math.imul(31, h) + key.charCodeAt(i) | 0;
+  ids.push(Math.abs(h).toString(36));
+  return ids;
+}
+
+async function loadAnalyzerUsage() {
+  const el = document.getElementById('analyzer-usage');
+  try {
+    const r = await fetch('/api/admin/analyzer-usage', { headers: adminHeaders() });
+    if (!r.ok) { el.textContent = r.status === 403 ? '' : 'Nem sikerült betölteni.'; return; }
+    const d = await r.json();
+    const own = await ownAnalyzerUids();
+    if (!d.users.length) { el.textContent = 'Még senki nem mentett elemzést.'; return; }
+    const others = d.users.filter(u => !own.includes(u.uid)).length;
+    el.innerHTML =
+      `<div style="margin-bottom:10px;color:var(--text)">${d.totalUsers} felhasználó · ${d.totalAnalyses} mentett elemzés` +
+      ` · <b style="color:${others ? 'var(--gold)' : 'var(--green)'}">${others} rajtad kívül</b></div>` +
+      d.users.map(u => `
+        <div class="member-card" style="margin-bottom:8px">
+          <div class="member-top">
+            <div class="member-email" style="font-family:monospace">${escHtml(u.uid.slice(0, 10))}…${own.includes(u.uid) ? ' <span style="color:var(--green)">(te)</span>' : ''}${u.legacy ? ' <span style="color:var(--muted)">(régi azonosító)</span>' : ''}</div>
+            <span class="member-badge badge-free">${u.count} elemzés</span>
+          </div>
+          <div class="member-meta">
+            <span class="meta-item">Első: ${escHtml(u.firstSeen || '–')}</span>
+            <span class="meta-item highlight">Utolsó: ${escHtml(u.lastUsed || new Date(u.updatedAt).toLocaleString('hu-HU'))}</span>
+          </div>
+          ${u.recentQueries.length ? `<div class="page-sub" style="margin-top:6px">Legutóbbi: ${u.recentQueries.map(escHtml).join(' · ')}</div>` : ''}
+        </div>`).join('');
+  } catch (e) {
+    el.textContent = 'Nem sikerült betölteni: ' + e.message;
+  }
 }
 
 function showStatus(msg, isErr) {
@@ -310,6 +365,7 @@ async function syncStripe() {
 }
 
 loadMembers();
+loadAnalyzerUsage();
 </script>
 </body>
 </html>
