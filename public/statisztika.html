@@ -79,6 +79,11 @@
   .period-btn.active{border-color:#f59e0b;color:#f59e0b;background:rgba(245,158,11,.08)}
   .period-btn:hover{border-color:#f59e0b;color:#f59e0b}
   .period-btn.all-time{border-color:rgba(245,158,11,.3)}
+  .range-filter{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border)}
+  .range-label{font-size:12px;font-weight:700;color:var(--muted)}
+  .range-filter input[type=date]{background:var(--surf);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px;font-size:13px;color-scheme:dark}
+  .range-sep{color:var(--muted)}
+  .range-msg{font-size:12px;color:#ef9a9a}
 
   /* FILTER + TABLE */
   .table-wrap{max-width:860px;margin:24px auto 0;padding:0 20px 60px}
@@ -181,6 +186,17 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
   <div class="period-bar" id="period-bar">
     <button class="period-btn all-time active" onclick="setPeriod('all',this)" data-i18n="stat.all_time">📊 Összes (all-time)</button>
   </div>
+  <!-- Egyéni időszak – csak adminnak (loadData után jelenik meg) -->
+  <div id="range-filter" class="range-filter" style="display:none">
+    <span class="range-label">🗓️ Egyéni időszak</span>
+    <input type="date" id="range-from" aria-label="Ettől">
+    <span class="range-sep">–</span>
+    <input type="date" id="range-to" aria-label="Eddig">
+    <button class="period-btn" id="range-apply" onclick="applyRange()">Szűrés</button>
+    <button class="period-btn" onclick="presetRange(7)">Utolsó 7 nap</button>
+    <button class="period-btn" onclick="presetRange(30)">Utolsó 30 nap</button>
+    <span id="range-msg" class="range-msg"></span>
+  </div>
 </div>
 
 <div class="scoreboard" id="scoreboard" style="display:none">
@@ -239,7 +255,7 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
 const tipProfit = statProfit, calcStats = statCalc, getYearMonth = statYearMonth;
 let allTips = [];
 let currentFilter = 'all';
-let currentPeriod = 'all'; // 'all' | 'YYYY-MM'
+let currentPeriod = 'all'; // 'all' | 'YYYY-MM' | { from, to } (admin egyéni időszak)
 
 function RESULT_LABELS() {
   return {
@@ -279,6 +295,13 @@ function formatDate(d) {
 
 function getPeriodTips() {
   if (currentPeriod === 'all') return allTips;
+  // Egyéni időszak (admin): { from: 'YYYY-MM-DD' | '', to: 'YYYY-MM-DD' | '' }, mindkét vég beleértve
+  if (typeof currentPeriod === 'object') {
+    return allTips.filter(t => {
+      const d = statTipDay(t);
+      return d && (!currentPeriod.from || d >= currentPeriod.from) && (!currentPeriod.to || d <= currentPeriod.to);
+    });
+  }
   return allTips.filter(t => getYearMonth(t.addedAt || t.commence) === currentPeriod);
 }
 
@@ -379,7 +402,11 @@ function setPeriod(period, btn) {
 
   const chartTitleEl = document.querySelector('.chart-title');
   const titleNode = chartTitleEl.childNodes[0];
-  if (period === 'all') {
+  if (typeof period === 'object') {
+    const fmt = d => d ? d.replace(/-/g, '. ') + '.' : '…';
+    titleNode.textContent = `${fmt(period.from)} – ${fmt(period.to)} – ${window.t?.('stat.chart_title')}`;
+    updateScoreboard(calcStats(getPeriodTips()));
+  } else if (period === 'all') {
     titleNode.textContent = window.t?.('stat.chart_title');
     // All time: ugyanabból a listából és ugyanúgy számolva, mint a havi nézet
     updateScoreboard(calcStats(getPeriodTips()));
@@ -392,6 +419,25 @@ function setPeriod(period, btn) {
   const periodTips = getPeriodTips();
   drawChart(periodTips.slice().reverse());
   renderTable(periodTips);
+}
+
+// ── Egyéni időszak (admin) ─────────────────────────────────
+function applyRange() {
+  const from = document.getElementById('range-from').value;
+  const to   = document.getElementById('range-to').value;
+  const msg  = document.getElementById('range-msg');
+  msg.textContent = '';
+  if (!from && !to) { msg.textContent = 'Adj meg legalább egy dátumot.'; return; }
+  if (from && to && from > to) { msg.textContent = 'A kezdő dátum későbbi a végsőnél.'; return; }
+  setPeriod({ from, to }, document.getElementById('range-apply'));
+}
+function presetRange(days) {
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const to = new Date(), from = new Date();
+  from.setDate(from.getDate() - (days - 1));        // a mai nappal együtt pontosan `days` nap
+  document.getElementById('range-from').value = iso(from);
+  document.getElementById('range-to').value   = iso(to);
+  applyRange();
 }
 
 function buildPeriodPicker(tips) {
@@ -534,6 +580,8 @@ async function loadData() {
       });
 
     buildPeriodPicker(allTips);
+    const rf = document.getElementById('range-filter');
+    if (rf) rf.style.display = isAdminUser() ? 'flex' : 'none';
 
     // All time: ugyanabból a listából és ugyanúgy számolva, mint a havi nézet
     updateScoreboard(calcStats(allTips));

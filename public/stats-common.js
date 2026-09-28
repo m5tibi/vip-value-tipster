@@ -56,3 +56,18 @@ function statYearMonth(dateStr) {
 }
 // Egy tipp hónapja: a hozzáadás napja, ennek hiányában a meccs kezdése
 function statTipMonth(t) { return statYearMonth(t.addedAt || t.commence); }
+
+// Egy tipp napja ("YYYY-MM-DD") – ugyanabból a dátumból, mint a hónap (egyéni időszak szűréséhez)
+function statTipDay(t) {
+  var s = String(t.addedAt || t.commence || '');
+  var p = function (n) { return ('0' + n).slice(-2); };
+  var hu = s.match(/^(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/);
+  if (hu) return hu[1] + '-' + p(hu[2]) + '-' + p(hu[3]);
+  var iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
+  var cm = s.match(/^(\d{2})\.\s*(\d{2})/);
+  if (cm) return new Date().getFullYear() + '-' + cm[1] + '-' + cm[2];
+  var d = new Date(s);
+  if (!isNaN(d.getTime())) return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  return null;
+}
