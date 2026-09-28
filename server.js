@@ -487,6 +487,27 @@ function poissonForTip(pe, market, pick, match) {
 
 // ── AI tippek ─────────────────────────────────────────────
 // Visszatér: { singles: [...], comboLegs: [...] }
+// Tömör odds-szöveg a prompthoz: piaconként csoportosítva, fogadóiroda neve nélkül, csak a fő
+// vonalakkal (gólszám 1,5/2,5/3,5; hendikep legfeljebb ±2,5, negyedes vonalak nélkül). A prompt
+// minden webes keresés után újra beolvasódik, így a hossza közvetlenül a költséget adja.
+function compactOdds(odds) {
+  const groups = {};
+  for (const o of odds || []) {
+    let key = o.market;
+    if (/^(Over|Under) /.test(o.market)) {
+      const line = parseFloat(o.market.split(" ")[1]);
+      if (![1.5, 2.5, 3.5].includes(line)) continue;
+      key = "Gólszám";
+    } else if (/^Hendikep /.test(o.market)) {
+      const pt = parseFloat(o.market.replace("Hendikep ", ""));
+      if (Math.abs(pt) > 2.5 || Math.round(pt * 2) !== pt * 2) continue;
+      key = "Hendikep";
+    }
+    (groups[key] = groups[key] || []).push(`${o.name} ${o.odds}`);
+  }
+  return Object.entries(groups).map(([k, v]) => `${k}: ${v.join(", ")}`).join(" | ");
+}
+
 async function fetchAiTips(matchList, alreadyTipped = [], poissonEdge = new Map()) {
   if (!ANTHROPIC_KEY || !matchList.length) return { singles: [], comboLegs: [] };
 
@@ -509,7 +530,7 @@ async function fetchAiTips(matchList, alreadyTipped = [], poissonEdge = new Map(
   console.log(`AI elemzés: ${capped.length} meccs`);
 
   const matchText = capped.map(m => {
-    const oddsStr = m.odds.map(o => `${o.market} / ${o.name}: ${o.odds} (${o.bookmaker})`).join(", ");
+    const oddsStr = compactOdds(m.odds);
     let standingsStr = "";
     if (m.homeStandings || m.awayStandings) {
       const fmt = (d, name) => d
@@ -581,7 +602,7 @@ KÉT dolgot adj – MINDKETTŐ KÖTELEZŐ:
 KÖZÖS szabályok:
 - Az "odds" mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd (a megfelelő piac/kimenet oddsát).
 - A "market" és "pick" pontosan egyezzen egy valós piaccal/kimenettel; a csapatnév a fent megadott formában szerepeljen.
-- Rövid (1-2 mondat) magyar indoklás valós adatok alapján (csak a "tippek"-hez kell note).
+- Részletes, 3-4 mondatos magyar indoklás valós adatok alapján, konkrét számokkal (forma, gólátlag, egymás elleni eredmények, hiányzók) – csak a "tippek"-hez kell note.
 
 Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
 {"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ Premier League","commence":"07.05 20:00","market":"Over 2.5","pick":"Over 2.5","odds":1.85,"note":"..."},{"match":"...","sport":"soccer","sportLabel":"⚽ La Liga","commence":"07.05 21:00","market":"BTTS","pick":"Igen","odds":1.78,"note":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ Bundesliga","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28},{"match":"...","sportLabel":"⚽ Serie A","commence":"07.05 20:00","market":"1X2","pick":"Csapat A","odds":1.35}]}`;
@@ -916,9 +937,9 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
 const COUNTRY_ALIASES = {
   "magyarorszag": "hungary", "franciaorszag": "france", "nemetorszag": "germany", "olaszorszag": "italy",
   "spanyolorszag": "spain", "portugalia": "portugal", "anglia": "england", "skocia": "scotland",
-  "eszak irorszag": "northern ireland", "irorszag": "ireland", "republic of ireland": "ireland",
+  "eszak irorszag": "northern ireland", "irorszag": "ireland", "ir koztarsasag": "ireland", "republic of ireland": "ireland",
   "hollandia": "netherlands", "svajc": "switzerland", "ausztria": "austria",
-  "csehorszag": "czechia", "czech republic": "czechia", "szlovakia": "slovakia", "lengyelorszag": "poland",
+  "csehorszag": "czechia", "cseh koztarsasag": "czechia", "csehia": "czechia", "czech republic": "czechia", "szlovakia": "slovakia", "lengyelorszag": "poland",
   "horvatorszag": "croatia", "szerbia": "serbia", "szlovenia": "slovenia",
   "bosznia hercegovina": "bosnia and herzegovina", "bosnia herzegovina": "bosnia and herzegovina",
   "eszak macedonia": "north macedonia", "macedonia": "north macedonia", "albania": "albania", "koszovo": "kosovo",
