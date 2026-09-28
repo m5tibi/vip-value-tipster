@@ -119,32 +119,45 @@ function tabSt(name){
 // ── AI szöveg renderelő ───────────────────────────────────
 function renderAI(text){
   if(!text) return '';
-  // Szekciófejlécek azonosítása (emoji prefixek)
+  // Régi (hosszú) elemzések fejlécei – az előzményekben még ilyenek is vannak
   var HEADS=['MECCS','HAZAI','VENDEG','H2H','SERULES','FOGADASI','KONTEXTUS','FORMA','ELOZMENYEK','ERTEKELES'];
+  // Új, tömör formátum fejlécei: emojival kezdődő, kettősponttal záruló sor
+  var EMOJI_HEAD=/^\s*(📈|🤝|🚑|🎯|🧐)/;
+  var CONF=[['MAGAS','#4ade80'],['HIGH','#4ade80'],['KÖZEPES','#fbbf24'],['MEDIUM','#fbbf24'],['ALACSONY','#f87171'],['LOW','#f87171']];
   var lines=text.split('\n');
   var out='';
   for(var i=0;i<lines.length;i++){
     var line=lines[i];
-    if(!line.trim()){out+='<br>';continue;}
-    // Elválasztó vonalak kihagyása
-    if(/^[-=]{3,}$/.test(line.trim())){continue;}
-    // Szekciófejléc detektálása: nagybetűs kulcsszóra végződő sor
+    if(!line.trim()){out+='<div style="height:6px"></div>';continue;}
+    if(/^[-=━]{3,}$/.test(line.trim())){continue;}               // elválasztó vonalak
     var safe=esc(line);
-    var upper=line.toUpperCase();
-    var isHead=false;
-    for(var j=0;j<HEADS.length;j++){
-      if(upper.indexOf(HEADS[j])!==-1 && line.trim().length<80 &&
-        (line.indexOf(':')===line.length-1 || /^[^\w]/.test(line))){
-        isHead=true; break;
+    var fmt=safe.replace(/\*\*([^*]+)\*\*/g,'<strong style="color:#e2e8f0">$1</strong>');
+    // Címsor: "⚽️ Hazai – Vendég (sorozat)"
+    if(/^\s*⚽/.test(line)){
+      out+='<div style="font-size:16px;font-weight:800;color:#e2e8f0;margin:2px 0 10px">'+fmt+'</div>';
+      continue;
+    }
+    var upper=line.toUpperCase(), isHead=EMOJI_HEAD.test(line) && line.trim().slice(-1)===':';
+    // Régi fejléc csak nem behúzott, nem számozott sor lehet (az indoklásban is előfordul pl. "hazai")
+    if(!isHead && !EMOJI_HEAD.test(line) && !/^\s/.test(line) && !/^\d+\.\s/.test(line)){
+      for(var j=0;j<HEADS.length;j++){
+        if(upper.indexOf(HEADS[j])!==-1 && line.trim().length<80 &&
+          (line.indexOf(':')===line.length-1 || /^[^\w]/.test(line))){ isHead=true; break; }
       }
     }
-    // Markdown bold kezelése
-    var fmt=safe.replace(/\*\*([^*]+)\*\*/g,'<strong style="color:#e2e8f0">$1</strong>');
-    if(isHead){
-      out+='<div class="sec-hdr">'+fmt+'</div>';
-    } else {
-      out+='<div style="margin-bottom:4px">'+fmt+'</div>';
+    if(isHead){ out+='<div class="sec-hdr">'+fmt+'</div>'; continue; }
+    // Tippsor: "1. … – Megbízhatóság: MAGAS" → kiemelt sor, színes megbízhatósággal
+    if(/^\s*\d+\.\s/.test(line)){
+      for(var c=0;c<CONF.length;c++){
+        fmt=fmt.replace(new RegExp('(Megbízhatóság|Confidence):\\s*'+CONF[c][0],'i'),
+          '$1: <span style="color:'+CONF[c][1]+';font-weight:800">'+CONF[c][0]+'</span>');
+      }
+      out+='<div style="margin:6px 0 2px;color:#e2e8f0;font-weight:600">'+fmt+'</div>';
+      continue;
     }
+    // Tipp indoklása (behúzott sor) halványabban
+    if(/^\s{2,}\S/.test(line)){ out+='<div style="margin:0 0 6px 18px;color:#94a3b8">'+fmt+'</div>'; continue; }
+    out+='<div style="margin-bottom:4px">'+fmt+'</div>';
   }
   return out;
 }
@@ -330,46 +343,41 @@ function analyze(){
     }
 
     var isEN = window.getLang && window.getLang() === 'en';
+    // Tömör, Telegram-poszt jellegű formátum (a megjelenítés az emojis fejlécekre épül)
     var prompt = isEN ? (
-      'You are a professional football betting analyst for paying subscribers.\n\n'+
-      'STYLE: Write exclusively in correct, professional English. Be concise — only claims backed by numbers. Never reference other sources.\n\n'+
-      'IMPORTANT: If you cannot identify a football match, write: NOT UNDERSTOOD: [explanation]\n\n'+
+      'You are a professional football betting analyst writing for paying subscribers.\n\n'+
+      'STYLE: Correct, professional English. Short and concrete: every claim backed by a number or fact. Never reference other sources.\n\n'+
+      'IMPORTANT: If you cannot identify a football match, write exactly: NOT UNDERSTOOD: [explanation]\n\n'+
       'User request:\n"'+q+'"\n'+hiddenCtx+'\n\n'+
-      'Use web search for real data. Two cases:\n\n'+
-      '=== (A) SPECIFIC BETTING OPTION IN REQUEST ===\n'+
-      'Evaluate it in this exact structure:\n'+
-      'MATCH CONTEXT:\n[Tournament, round — 1-2 sentences]\n\n'+
-      'HOME TEAM FORM:\n[Last 5 matches with results/dates, goals average]\n\n'+
-      'AWAY TEAM FORM:\n[Last 5 matches with results/dates, goals average]\n\n'+
-      'H2H HISTORY:\n[Last 3-5 meetings, goals avg, trends]\n\n'+
-      'INJURIES / ABSENCES:\n[Key players both teams]\n\n'+
-      'BETTING OPTION EVALUATION:\n[Detailed analysis with numbers — 5-6 sentences]\n\n'+
-      'VERDICT: RECOMMENDED — [reason]\nor: VERDICT: UNCERTAIN — [reason]\nor: VERDICT: NOT RECOMMENDED — [reason]\n\n'+
-      '=== (B) MATCH ONLY, NO BETTING OPTION ===\n'+
-      'Full analysis + 4-5 tip suggestions:\n'+
-      'MATCH CONTEXT / HOME TEAM FORM / AWAY TEAM FORM / H2H HISTORY / INJURIES / TIP SUGGESTIONS\n'+
-      'Each tip: [Market] — Confidence: HIGH/MEDIUM/LOW\n   Reasoning: [2-3 sentences with numbers]\n\n'+
-      'Rules: no * or # formatting. Real verified numbers only. Professional English.'
+      'Use web search for real, current data. Output ONLY the finished analysis (no intro, no "I searched…" sentences), in EXACTLY this format:\n\n'+
+      '⚽️ [Home] – [Away] ([competition, round/group])\n\n'+
+      '📈 Form:\n[2-3 short sentences on both teams: latest results, winning run, goals]\n\n'+
+      '🤝 Head to head:\n[1-2 sentences: record, latest meeting]\n\n'+
+      '🚑 Absentees:\n[1-2 sentences: key injured/suspended players on both sides]\n\n'+
+      '🎯 Top tips:\n'+
+      '1. [Market and pick] @ [current odds if you found it] – Confidence: HIGH/MEDIUM/LOW\n   [one sentence of reasoning with a number]\n'+
+      '2. [...]\n(2-3 tips, strongest first)\n\n'+
+      'If the request contains a specific bet, add after the tips:\n'+
+      '🧐 Your bet:\n[the bet – 2-3 sentences of evaluation with numbers]\n'+
+      'VERDIKT: AJANLOTT — [short reason]  (or VERDIKT: BIZONYTALAN — … / VERDIKT: NEM AJANLOTT — …)\n\n'+
+      'Rules: no * or # formatting, no tables. Real, verified numbers only.'
     ) : (
-      'Te egy profi labdarúgás-fogadási elemző vagy, aki fizetős előfizetők számára készít elemzéseket.\n\n'+
-      'STÍLUS: Kizárólag helyes, igényes magyar nyelven írj. Légy tömör és konkrét. Csak számokkal alátámasztott állításokat tégy. Soha ne utalj más forrásra.\n\n'+
-      'FONTOS: Ha nem tudsz labdarúgó meccset azonosítani, írd pontosan: NEM ÉRTEM: [magyarázat]\n\n'+
+      'Te egy profi labdarúgás-fogadási elemző vagy, aki fizetős előfizetőknek ír.\n\n'+
+      'STÍLUS: Helyes, igényes magyar nyelv. Rövid és konkrét: minden állítás mögött szám vagy tény. Soha ne utalj más forrásra.\n\n'+
+      'FONTOS: Ha nem tudsz labdarúgó-mérkőzést azonosítani, írd pontosan: NEM ÉRTEM: [magyarázat]\n\n'+
       'A felhasználó kérése:\n"'+q+'"\n'+hiddenCtx+'\n\n'+
-      'Használj web keresést a valós, aktuális adatokhoz. Két eset lehetséges:\n\n'+
-      '=== (A) HA A KÉRÉS KONKRÉT FOGADÁSI OPCIÓT IS TARTALMAZ ===\n'+
-      'PONTOSAN ebben a struktúrában:\n'+
-      'MECCS KONTEXTUS:\n[Torna, forduló — 1-2 mondat]\n\n'+
-      'HAZAI CSAPAT FORMA:\n[Utolsó 5 meccs eredményekkel és dátummal, gólátlag]\n\n'+
-      'VENDÉG CSAPAT FORMA:\n[Utolsó 5 meccs eredményekkel és dátummal, gólátlag]\n\n'+
-      'H2H ELŐZMÉNYEK:\n[Utolsó 3-5 találkozó, gólátlag, trendek]\n\n'+
-      'SÉRÜLÉSEK / HIÁNYZÓK:\n[Kulcsjátékosok mindkét csapatnál]\n\n'+
-      'FOGADÁSI OPCIÓ ÉRTÉKELÉSE:\n[Részletes elemzés konkrét számokkal — 5-6 mondat]\n\n'+
-      'VERDIKT: AJANLOTT — [ok]\nvagy: VERDIKT: BIZONYTALAN — [ok]\nvagy: VERDIKT: NEM AJANLOTT — [ok]\n\n'+
-      '=== (B) HA A KÉRÉS CSAK EGY MECCSET TARTALMAZ ===\n'+
-      'Teljes elemzés + 4-5 tipp-javaslat:\n'+
-      'MECCS KONTEXTUS / HAZAI CSAPAT FORMA / VENDÉG CSAPAT FORMA / H2H ELŐZMÉNYEK / SÉRÜLÉSEK / TIPP JAVASLATOK\n'+
-      'Minden javaslat: [Piac és tipp] — Megbízhatóság: MAGAS/KÖZEPES/ALACSONY\n   Indoklás: [2-3 mondat konkrét számokkal]\n\n'+
-      'Szabályok: ne használj csillag (*) vagy hashtag (#) formázást. Adj valódi, ellenőrzött számokat. Kizárólag helyes, igényes magyar nyelvezet.'
+      'Használj webes keresést a valós, aktuális adatokhoz. KIZÁRÓLAG a kész elemzést írd ki (bevezető és „megkerestem…” jellegű mondatok nélkül), PONTOSAN ebben a formában:\n\n'+
+      '⚽️ [Hazai] – [Vendég] ([sorozat, forduló/csoport])\n\n'+
+      '📈 Forma:\n[2-3 rövid mondat mindkét csapatról: legutóbbi eredmények, sorozatok, gólok]\n\n'+
+      '🤝 Egymás ellen:\n[1-2 mondat: mérleg, legutóbbi találkozó]\n\n'+
+      '🚑 Hiányzók:\n[1-2 mondat: a két csapat sérült/eltiltott kulcsjátékosai]\n\n'+
+      '🎯 Top tippek:\n'+
+      '1. [Piac és tipp] @ [aktuális odds, ha megtaláltad] – Megbízhatóság: MAGAS/KÖZEPES/ALACSONY\n   [egy mondat indoklás, számmal]\n'+
+      '2. [...]\n(2-3 tipp, a legerősebb elöl)\n\n'+
+      'Ha a kérés konkrét fogadást is tartalmaz, a tippek után írd:\n'+
+      '🧐 A te fogadásod:\n[a fogadás – 2-3 mondat értékelés számokkal]\n'+
+      'VERDIKT: AJANLOTT — [rövid ok]  (vagy VERDIKT: BIZONYTALAN — … / VERDIKT: NEM AJANLOTT — …)\n\n'+
+      'Szabályok: ne használj csillag (*) vagy hashtag (#) formázást, se táblázatot. Csak valós, ellenőrzött számokat adj.'
     );
 
     fetch('https://api.anthropic.com/v1/messages',{
@@ -382,8 +390,12 @@ function analyze(){
       })
     }).then(function(r){return r.json();})
     .then(function(d){
-      var texts=[];
-      if(d.content){for(var i=0;i<d.content.length;i++){if(d.content[i].type==='text')texts.push(d.content[i].text);}}
+      // Csak az utolsó webes keresés utáni szöveg a kész elemzés; az előtte lévő szövegblokkok
+      // a keresés közbeni megjegyzések ("Az adatok összegyűjtve…"), ezeket nem mutatjuk.
+      var texts=[], blocks=d.content||[], lastTool=-1;
+      for(var i=0;i<blocks.length;i++){ if(blocks[i].type!=='text') lastTool=i; }
+      for(var j=lastTool+1;j<blocks.length;j++){ if(blocks[j].type==='text') texts.push(blocks[j].text); }
+      if(!texts.length){ for(var k=0;k<blocks.length;k++){ if(blocks[k].type==='text') texts.push(blocks[k].text); } }
       var ai=texts.length?texts.map(function(s){return (s||'').trim();}).filter(Boolean).join('\n\n'):window.t('analyzer.analysis_failed');
       ai=ai.replace(/VERDIKT\s*:\s*AJANLOTT/gi,'VERDIKT: \u2705 AJÁNLOTT')
            .replace(/VERDIKT\s*:\s*NEM AJANLOTT/gi,'VERDIKT: \u274C NEM AJÁNLOTT')
@@ -489,6 +501,9 @@ function rAnalyzer(){
       '<div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">'+window.t('analyzer.ai_label')+'</div>'+
       '<div class="aitext">'+renderAI(body)+'</div>'+
       (v?'<div class="verdict-box" style="'+verdictStyle(v)+'">'+esc(v)+'</div>':'')+
+      '<div style="margin-top:14px;font-size:12px;color:#6b7280">⚠️ '+(window.getLang&&window.getLang()==='en'
+        ?'This analysis is for information only and is not betting advice. Please gamble responsibly.'
+        :'Ez az elemzés tájékoztató jellegű, nem minősül fogadási tanácsnak. Felelősségteljesen játssz!')+'</div>'+
       '</div></div>';
   }
   if(S.result&&S.result.error){
