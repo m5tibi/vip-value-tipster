@@ -320,6 +320,9 @@ function setEx(idx){
 }
 
 // ── Elemzés ───────────────────────────────────────────────
+// Elemzésenként legfeljebb ennyi webes keresés (a Claude web_search eszköz max_uses beállítása)
+var MAX_SEARCHES=5;
+
 function analyze(){
   if(!S.claudeKey){alert(window.t('analyzer.no_key_alert'));return;}
   if(S.loading) return;
@@ -349,7 +352,7 @@ function analyze(){
       'STYLE: Correct, professional English. Short and concrete: every claim backed by a number or fact. Never reference other sources.\n\n'+
       'IMPORTANT: If you cannot identify a football match, write exactly: NOT UNDERSTOOD: [explanation]\n\n'+
       'User request:\n"'+q+'"\n'+hiddenCtx+'\n\n'+
-      'Use web search for real, current data. Output ONLY the finished analysis (no intro, no "I searched…" sentences), in EXACTLY this format:\n\n'+
+      'Use web search for real, current data. You have at most '+MAX_SEARCHES+' searches: plan them (e.g. recent form of both teams, head to head, injuries/suspensions, current odds), combine topics into one query where possible and do not repeat searches. Output ONLY the finished analysis (no intro, no "I searched…" sentences), in EXACTLY this format:\n\n'+
       '⚽️ [Home] – [Away] ([competition, round/group])\n\n'+
       '📈 Form:\n[2-3 short sentences on both teams: latest results, winning run, goals]\n\n'+
       '🤝 Head to head:\n[1-2 sentences: record, latest meeting]\n\n'+
@@ -366,7 +369,7 @@ function analyze(){
       'STÍLUS: Helyes, igényes magyar nyelv. Rövid és konkrét: minden állítás mögött szám vagy tény. Soha ne utalj más forrásra.\n\n'+
       'FONTOS: Ha nem tudsz labdarúgó-mérkőzést azonosítani, írd pontosan: NEM ÉRTEM: [magyarázat]\n\n'+
       'A felhasználó kérése:\n"'+q+'"\n'+hiddenCtx+'\n\n'+
-      'Használj webes keresést a valós, aktuális adatokhoz. KIZÁRÓLAG a kész elemzést írd ki (bevezető és „megkerestem…” jellegű mondatok nélkül), PONTOSAN ebben a formában:\n\n'+
+      'Használj webes keresést a valós, aktuális adatokhoz. Legfeljebb '+MAX_SEARCHES+' keresésed van: tervezd meg őket (pl. a két csapat friss formája, egymás elleni eredmények, sérültek/eltiltottak, aktuális oddsok), ahol lehet, vonj össze több témát egy keresésbe, és ne ismételj keresést. KIZÁRÓLAG a kész elemzést írd ki (bevezető és „megkerestem…” jellegű mondatok nélkül), PONTOSAN ebben a formában:\n\n'+
       '⚽️ [Hazai] – [Vendég] ([sorozat, forduló/csoport])\n\n'+
       '📈 Forma:\n[2-3 rövid mondat mindkét csapatról: legutóbbi eredmények, sorozatok, gólok]\n\n'+
       '🤝 Egymás ellen:\n[1-2 mondat: mérleg, legutóbbi találkozó]\n\n'+
@@ -385,7 +388,8 @@ function analyze(){
       headers:{'Content-Type':'application/json','x-api-key':S.claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body:JSON.stringify({
         model:'claude-sonnet-4-6',max_tokens:6000,
-        tools:[{type:'web_search_20250305',name:'web_search'}],
+        // Keresési limit: a költség nagy részét a keresési találatok szövege adja
+        tools:[{type:'web_search_20250305',name:'web_search',max_uses:MAX_SEARCHES}],
         messages:[{role:'user',content:prompt}]
       })
     }).then(function(r){return r.json();})
