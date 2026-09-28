@@ -392,10 +392,22 @@ function renderTable(tips) {
   </p>`;
 }
 
+// A számláló és a grafikon alapja: a kiválasztott időszak tippjei, a Free gombnál csak a Free
+// tippek (az eredmény-szűrők – Nyert, Veszett… – csak a táblázatot szűrik)
+function scoreTips() {
+  const tips = getPeriodTips();
+  return currentFilter === 'free' ? tips.filter(t => t.type === 'free') : tips;
+}
+
 function setFilter(f, btn) {
+  const wasFree = currentFilter === 'free';
   currentFilter = f;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  if (wasFree || f === 'free') {
+    updateScoreboard(calcStats(scoreTips()));
+    drawChart(scoreTips().slice().reverse());
+  }
   renderTable(getPeriodTips());
 }
 
@@ -409,19 +421,19 @@ function setPeriod(period, btn) {
   if (typeof period === 'object') {
     const fmt = d => d ? d.replace(/-/g, '. ') + '.' : '…';
     titleNode.textContent = `${fmt(period.from)} – ${fmt(period.to)} – ${window.t?.('stat.chart_title')}`;
-    updateScoreboard(calcStats(getPeriodTips()));
+    updateScoreboard(calcStats(scoreTips()));
   } else if (period === 'all') {
     titleNode.textContent = window.t?.('stat.chart_title');
     // All time: ugyanabból a listából és ugyanúgy számolva, mint a havi nézet
-    updateScoreboard(calcStats(getPeriodTips()));
+    updateScoreboard(calcStats(scoreTips()));
   } else {
     const [year, month] = period.split('-');
     titleNode.textContent = `${year} ${monthName(parseInt(month, 10) - 1)} – ${window.t?.('stat.chart_title')}`;
-    updateScoreboard(calcStats(getPeriodTips()));
+    updateScoreboard(calcStats(scoreTips()));
   }
 
   const periodTips = getPeriodTips();
-  drawChart(periodTips.slice().reverse());
+  drawChart(scoreTips().slice().reverse());
   renderTable(periodTips);
 }
 
@@ -599,7 +611,7 @@ async function loadData() {
 
 window.addEventListener('load', loadData);
 window.addEventListener('resize', () => {
-  if (allTips.length) drawChart(getPeriodTips().slice().reverse());
+  if (allTips.length) drawChart(scoreTips().slice().reverse());
 });
 </script>
 </body>
