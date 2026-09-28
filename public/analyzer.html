@@ -183,7 +183,7 @@ function R(){
     '<span style="color:#4b5563">'+window.t('analyzer.how_example')+'</span>'+
     '</div></div>';
 
-    var html=howItWorks+(S.screen==='onboarding'?rOnboard():rApp());
+    var html=S.screen==='loading'?'':S.screen==='locked'?rLocked():howItWorks+(S.screen==='onboarding'?rOnboard():rApp());
     document.getElementById('root').innerHTML=html;
   }catch(e){
     document.getElementById('root').innerHTML='<div style="padding:20px;color:#f87171">Hiba: '+esc(String(e))+'</div>';
@@ -198,9 +198,36 @@ function boot(){
     if(k) S.claudeKey=k;
     if(h) S.history=JSON.parse(h)||[];
   }catch(e){}
-  S.screen=S.claudeKey?'app':'onboarding';
-  R();
-  if(S.claudeKey) syncHistory();
+  // Az elemző előfizetői funkció: belépés + aktív előfizetés (vagy admin) kell hozzá
+  fetch('/api/auth/me',{cache:'no-store'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      S.me=d||{};
+      if(!S.me.hasAccess){ S.screen='locked'; R(); return; }
+      S.screen=S.claudeKey?'app':'onboarding';
+      R();
+      if(S.claudeKey) syncHistory();
+    })
+    .catch(function(){ S.me={}; S.screen='locked'; R(); });
+}
+
+// Zárolt nézet: nem belépett vagy nem előfizető látogató
+function rLocked(){
+  var en=window.getLang&&window.getLang()==='en';
+  var loggedIn=!!(S.me&&S.me.user);
+  var title=loggedIn?(en?'Subscription required':'Előfizetés szükséges'):(en?'Sign in to use the analyzer':'Lépj be az elemző használatához');
+  var body=en
+    ?'The AI match analyzer is available to subscribers. It searches the web for form, injuries and head-to-head data, and gives a verdict on your bet.'
+    :'Az AI meccselemző az előfizetők funkciója: webes kereséssel nézi meg a formát, a sérüléseket és az egymás elleni eredményeket, és véleményt mond a fogadásodról.';
+  var btn=loggedIn
+    ?'<a href="/elofizetes.html" style="display:inline-block;background:#7c3aed;color:#fff;font-weight:700;padding:11px 24px;border-radius:9px;text-decoration:none">'+(en?'Subscribe':'Előfizetek')+'</a>'
+    :'<a href="/tippek.html?login=1&next=/analyzer.html" style="display:inline-block;background:#7c3aed;color:#fff;font-weight:700;padding:11px 24px;border-radius:9px;text-decoration:none">'+(en?'Sign in':'Belépés')+'</a>'+
+     '<div style="margin-top:12px;font-size:13px;color:#6b7280">'+(en?'No subscription yet? ':'Még nincs előfizetésed? ')+'<a href="/elofizetes.html" style="color:#a78bfa;font-weight:700;text-decoration:none">'+(en?'See plans':'Előfizetés')+'</a></div>';
+  return rHdr()+
+    '<div class="card" style="border-color:#7c3aed44;text-align:center;padding:28px 20px">'+
+    '<div style="font-size:34px;margin-bottom:8px">🔒</div>'+
+    '<div style="font-size:17px;font-weight:700;margin-bottom:8px">'+title+'</div>'+
+    '<div style="font-size:14px;color:#94a3b8;line-height:1.65;margin-bottom:18px">'+body+'</div>'+btn+'</div>';
 }
 if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',boot);
 else boot();

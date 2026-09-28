@@ -145,7 +145,7 @@ nav{background:var(--surf);border-bottom:1px solid var(--border);padding:12px 16
 <!-- Elemző használata -->
 <div style="padding:24px 16px 0">
   <div style="font-size:15px;font-weight:700;margin-bottom:4px">⚡ Elemző használata</div>
-  <div class="page-sub" style="margin-bottom:10px">Felhasználónként (API-kulcsonként) a szerverre mentett elemzések. Aki elemzés nélkül csak kipróbálta, itt nem látszik.</div>
+  <div class="page-sub" style="margin-bottom:10px">Felhasználónként a szerverre mentett elemzések (az elemző csak előfizetőknek érhető el). Aki elemzés nélkül csak kipróbálta, itt nem látszik.</div>
   <div id="analyzer-usage" class="page-sub">Betöltés...</div>
 </div>
 
@@ -200,14 +200,16 @@ async function loadAnalyzerUsage() {
     const d = await r.json();
     const own = await ownAnalyzerUids();
     if (!d.users.length) { el.textContent = 'Még senki nem mentett elemzést.'; return; }
-    const others = d.users.filter(u => !own.includes(u.uid)).length;
+    // A tiéd: az admin fiókhoz kötött előzmény, vagy egy régi, a te kulcsodhoz kötött fájl
+    const isOwn = u => u.isAdmin || own.includes(u.uid);
+    const others = d.users.filter(u => !isOwn(u)).length;
     el.innerHTML =
       `<div style="margin-bottom:10px;color:var(--text)">${d.totalUsers} felhasználó · ${d.totalAnalyses} mentett elemzés` +
       ` · <b style="color:${others ? 'var(--gold)' : 'var(--green)'}">${others} rajtad kívül</b></div>` +
       d.users.map(u => `
         <div class="member-card" style="margin-bottom:8px">
           <div class="member-top">
-            <div class="member-email" style="font-family:monospace">${escHtml(u.uid.slice(0, 10))}…${own.includes(u.uid) ? ' <span style="color:var(--green)">(te)</span>' : ''}${u.legacy ? ' <span style="color:var(--muted)">(régi azonosító)</span>' : ''}</div>
+            <div class="member-email">${u.email ? escHtml(u.email) : u.userId ? 'Törölt fiók' : `<span style="font-family:monospace">kulcs ${escHtml(u.uid.slice(0, 10))}…</span>`}${isOwn(u) ? ' <span style="color:var(--green)">(te)</span>' : ''}${u.legacy ? ' <span style="color:var(--muted)">(régi, kulcshoz kötött előzmény)</span>' : ''}</div>
             <span class="member-badge badge-free">${u.count} elemzés</span>
           </div>
           <div class="member-meta">
