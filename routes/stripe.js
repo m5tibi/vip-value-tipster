@@ -5,6 +5,7 @@ const auth    = require("../auth");
 const mailer  = require("../mailer");
 const { BASE_URL }     = require("../lib/config");
 const { requireAdmin } = require("../lib/admin");
+const { notifyAdmin, esc, huDate, activeSubscribers } = require("../lib/notify");
 
 const STRIPE_SECRET  = process.env.STRIPE_SECRET_KEY;
 const STRIPE_WEBHOOK = process.env.STRIPE_WEBHOOK_SECRET;
@@ -51,8 +52,12 @@ async function webhook(req, res) {
     if (u) {
       console.log(`Stripe ✓ előfizetés aktiválva: ${u.email}, lejár: ${paidUntil}`);
       mailer.sendPlanActivated(u.email, paidUntil).catch(e => console.error("Email hiba:", e.message));
+      notifyAdmin(`🎉 <b>Új előfizető!</b>\n${esc(u.email)}\nLejár: ${huDate(paidUntil)}\nAktív előfizetők: ${activeSubscribers()}`);
     }
-    else console.warn(`Stripe: felhasználó nem található – ${s.customer_details?.email}`);
+    else {
+      console.warn(`Stripe: felhasználó nem található – ${s.customer_details?.email}`);
+      notifyAdmin(`⚠️ <b>Sikeres fizetés, de nincs hozzá fiók!</b>\n${esc(s.customer_details?.email || s.customer_email || s.customer)}\nKézzel kell beállítani a tagok oldalon.`);
+    }
   }
 
   if (event.type === "invoice.payment_succeeded") {
@@ -63,7 +68,10 @@ async function webhook(req, res) {
         ? new Date(periodEnd * 1000).toISOString()
         : new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString();
       const u = updateUser(inv.customer, null, { paidUntil, subscriptionStatus: "active", currentPeriodEnd: paidUntil });
-      if (u) console.log(`Stripe ✓ megújítva: ${u.email}, lejár: ${paidUntil}`);
+      if (u) {
+        console.log(`Stripe ✓ megújítva: ${u.email}, lejár: ${paidUntil}`);
+        notifyAdmin(`💳 <b>Előfizetés megújítva</b>\n${esc(u.email)}\nÚj lejárat: ${huDate(paidUntil)}`);
+      }
     }
   }
 
@@ -92,6 +100,7 @@ async function webhook(req, res) {
           html: `<p>A <b>${u.email}</b> lemondta a 90perc.hu előfizetését.</p><p>Aktív marad: <b>${endStr}</b></p>`,
         }).catch(e => console.error("Admin email hiba:", e.message));
         mailer.sendSubscriptionCancelled(u.email, periodEnd || u.paidUntil).catch(e => console.error("Email hiba:", e.message));
+        notifyAdmin(`❌ <b>Előfizetés lemondva</b>\n${esc(u.email)}\nAktív marad: ${esc(endStr)}`);
       }
     }
   }
@@ -103,6 +112,7 @@ async function webhook(req, res) {
     if (u) {
       console.log(`Stripe: lemondva – ${u.email}`);
       mailer.sendSubscriptionExpired(u.email).catch(e => console.error("Email hiba:", e.message));
+      notifyAdmin(`⛔ <b>Előfizetés megszűnt</b>\n${esc(u.email)}\nAktív előfizetők: ${activeSubscribers()}`);
       // Admin értesítő
       const adminEmail = process.env.ADMIN_EMAIL;
       if (adminEmail) mailer.send({

@@ -6,6 +6,7 @@ const mailer  = require("../mailer");
 const { BASE_URL }   = require("../lib/config");
 const { rateLimit }  = require("../lib/security");
 const { isAdminReq } = require("../lib/admin");
+const { notifyAdmin, esc } = require("../lib/notify");
 
 const router = express.Router();
 
@@ -33,6 +34,7 @@ router.post("/api/auth/register", regLimiter, async (req, res) => {
   auth.setSession(res, r.user.id);
   sendVerifyEmail(req, r.user).catch(() => {});     // ne blokkolja a választ
   console.log(`Új regisztráció: ${r.user.email} (összes: ${usersDb.count()})`);
+  notifyAdmin(`👤 <b>Új regisztráció</b>\n${esc(r.user.email)}\nRegisztrált felhasználók: ${usersDb.count()}`);
   res.json({ ok: true, user: usersDb.publicView(r.user), hasAccess: auth.hasAccess(r.user) });
 });
 
