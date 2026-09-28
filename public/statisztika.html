@@ -156,6 +156,7 @@
 button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:#5d7a96;cursor:pointer;transition:all .15s}button.lang-toggle:hover{border-color:#00e676;color:#00e676}
 </style>
 <script src="/lang.js"></script>
+<script src="/stats-common.js"></script>
 </head>
 <body>
 
@@ -234,6 +235,8 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
 </footer>
 
 <script>
+// A statisztika-szabály a /stats-common.js-ben (közös a tippek oldallal és a szerverrel)
+const tipProfit = statProfit, calcStats = statCalc, getYearMonth = statYearMonth;
 let allTips = [];
 let currentFilter = 'all';
 let currentPeriod = 'all'; // 'all' | 'YYYY-MM'
@@ -255,21 +258,6 @@ const EN_MONTHS = ['January','February','March','April','May','June',
                    'July','August','September','October','November','December'];
 function monthName(i) { return (window.getLang&&window.getLang()==='en'?EN_MONTHS:HU_MONTHS)[i]; }
 
-function tipProfit(t) {
-  if (t.type === 'combo') {
-    if (!['won','lost','push'].includes(t.result)) return 0;
-    const payout = (typeof t.comboPayout === 'number' && t.comboPayout > 0)
-      ? t.comboPayout
-      : (t.result === 'won' ? (parseFloat(t.odds) || 0) : t.result === 'push' ? 1 : 0);
-    return +(payout - 1).toFixed(2);
-  }
-  const o = parseFloat(t.odds) || 1;
-  if (t.result === 'won')       return +(o - 1).toFixed(2);
-  if (t.result === 'lost')      return -1;
-  if (t.result === 'half_won')  return +((o - 1) / 2).toFixed(2);
-  if (t.result === 'half_lost') return -0.5;
-  return 0;
-}
 
 function formatDate(d) {
   if (!d) return '–';
@@ -288,51 +276,13 @@ function formatDate(d) {
   return dt.toLocaleDateString(window.getLang()==='en'?'en-GB':'hu-HU', { month:'short', day:'numeric' });
 }
 
-function getYearMonth(dateStr) {
-  if (!dateStr) return null;
-  const s = String(dateStr);
-  // ISO: "2026-07-30T..."
-  const iso = s.match(/^(\d{4})-(\d{2})/);
-  if (iso) return `${iso[1]}-${iso[2]}`;
-  // HU locale: "2026. 7. 30. 11:27:25" vagy "2026. 07. 30."
-  const hu = s.match(/^(\d{4})\.\s*(\d{1,2})\./);
-  if (hu) return `${hu[1]}-${String(hu[2]).padStart(2,'0')}`;
-  // Commence csak hónap.nap: "09. 17. 21:00" → hozzáadja az évet
-  const cm = s.match(/^(\d{2})\.\s*(\d{2})/);
-  if (cm) return `${new Date().getFullYear()}-${String(+cm[1]).padStart(2,'0')}`;
-  // Fallback: new Date()
-  try {
-    const d = new Date(s);
-    if (!isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-  } catch(e) {}
-  return null;
-}
 
 function getPeriodTips() {
   if (currentPeriod === 'all') return allTips;
   return allTips.filter(t => getYearMonth(t.addedAt || t.commence) === currentPeriod);
 }
 
-// A statisztikába számító tippek – ugyanaz a szabály, mint a szerveren (/api/public-stats):
-// publikált (jóváhagyott), lezárt single foci, free és kombi tippek.
-function statTip(t) {
-  if (t.type === 'value' || t.approved === false) return false;
-  if (!['won','lost','push','half_won','half_lost'].includes(t.result)) return false;
-  return t.type === 'combo' || t.type === 'free' || /soccer|foci|⚽/i.test((t.sport || '') + ' ' + (t.sportLabel || ''));
-}
 
-function calcStats(tips) {
-  const settled = tips.filter(t => ['won','lost','push','half_won','half_lost'].includes(t.result));
-  const won      = settled.filter(t => t.result === 'won').length;
-  const lost     = settled.filter(t => t.result === 'lost').length;
-  const halfWon  = settled.filter(t => t.result === 'half_won').length;
-  const halfLost = settled.filter(t => t.result === 'half_lost').length;
-  const decN     = won + lost + halfWon + halfLost;
-  const winRate  = decN ? (((won + halfWon * 0.5) / decN) * 100).toFixed(1) : null;
-  const profit   = settled.reduce((sum, t) => sum + tipProfit(t), 0);
-  const roi      = settled.length ? ((profit / settled.length) * 100).toFixed(1) : null;
-  return { settled: settled.length, winRate, profit: parseFloat(profit.toFixed(2)), roi };
-}
 
 let CURRENT_ME = { user: null, isAdmin: false };
 function isAdminUser() { return !!CURRENT_ME.isAdmin || !!(CURRENT_ME.user && CURRENT_ME.user.isAdmin); }

@@ -92,6 +92,7 @@
 button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:#546e7a;cursor:pointer;transition:all .15s}button.lang-toggle:hover{border-color:#00e676;color:#00e676}
 </style>
 <script src="/lang.js"></script>
+<script src="/stats-common.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -770,47 +771,12 @@ function renderHistory() {
     const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
     const monthName = now.toLocaleDateString('hu-HU', { month: 'long', year: 'numeric' });
 
-    // Aktuális hónap lezárt tippjei (commence vagy addedAt alapján)
-    const tipMonth = t => {
-      const c = t.commence || t.addedAt || '';
-      const md = String(c).match(/^(\d{2})\.\s*(\d{2})/);
-      if (md) return `${now.getFullYear()}-${md[1]}`;
-      const hu = String(c).match(/(\d{4})\.\s*(\d{1,2})\./);
-      if (hu) return `${hu[1]}-${String(hu[2]).padStart(2,'0')}`;
-      const iso = String(c).match(/^(\d{4})-(\d{2})/);
-      if (iso) return `${iso[1]}-${iso[2]}`;
-      return null;
-    };
-    const SETTLED_R = ['won','lost','push','half_won','half_lost'];
-    const monthSettled = history.filter(t =>
-      SETTLED_R.includes(t.result) && isApprovedH(t) && tipMonth(t) === currentMonthKey
-    );
-    const mWon  = monthSettled.filter(t => t.result === 'won').length;
-    const mHW   = monthSettled.filter(t => t.result === 'half_won').length;
-    const mLost = monthSettled.filter(t => t.result === 'lost').length;
-    const mHL   = monthSettled.filter(t => t.result === 'half_lost').length;
-    const decN  = mWon + mLost + mHW + mHL;
-    const mWR   = decN ? (((mWon + mHW * 0.5) / decN) * 100).toFixed(1) : '0.0';
-    let mProfit = 0;
-    monthSettled.forEach(t => {
-      const o = parseFloat(t.odds) || 1;
-      // Kombikhoz comboPayout-ot használunk (mint a statisztika.html /api/admin/stats endpointja)
-      if (t.type === 'combo') {
-        const cp = parseFloat(t.comboPayout);
-        if      (t.result === 'won')       mProfit += isNaN(cp) ? o - 1 : cp - 1;
-        else if (t.result === 'lost')      mProfit -= 1;
-        else if (t.result === 'half_won')  mProfit += (o - 1) / 2;
-        else if (t.result === 'half_lost') mProfit -= 0.5;
-        // push: 0
-      } else {
-        if      (t.result === 'won')       mProfit += o - 1;
-        else if (t.result === 'lost')      mProfit -= 1;
-        else if (t.result === 'half_won')  mProfit += (o - 1) / 2;
-        else if (t.result === 'half_lost') mProfit -= 0.5;
-      }
-    });
-    // ROI nevező: monthSettled.length (pusht is beleértve) – azonos a statisztika.html-lel
-    const mROI  = monthSettled.length ? (mProfit / monthSettled.length * 100).toFixed(1) : '0.0';
+    // Aktuális hónap: ugyanaz a szabály és számítás, mint a statisztika oldalon (/stats-common.js)
+    const monthSettled = history.filter(t => statTip(t) && statTipMonth(t) === currentMonthKey);
+    const mStats  = statCalc(monthSettled);
+    const mWR     = mStats.winRate ?? '0.0';
+    const mProfit = mStats.profit;
+    const mROI    = mStats.roi ?? '0.0';
     const col   = mProfit >= 0 ? "#00e676" : "#ef9a9a";
     const sign  = v => (v >= 0 ? '+' : '') + parseFloat(v).toFixed(2);
 
