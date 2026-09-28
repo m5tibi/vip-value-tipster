@@ -743,13 +743,15 @@ function buildCombos(legs, matchList = []) {
 const isApproved = t => t.approved !== false;
 
 // ── Fő frissítő ───────────────────────────────────────────
+const huDateTime = d => d.toLocaleString("hu-HU", { timeZone: "Europe/Budapest", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+
 async function fetchAndProcess(fromTs = null, toTs = null) {
   const now   = new Date();
   // Időablak: ha a frontend küldött fromTs/toTs-t, azt használjuk; egyébként a default ±24h
   const windowFrom = fromTs ? new Date(fromTs) : now;
   const windowTo   = toTs   ? new Date(toTs)   : new Date(now.getTime() + WINDOW_HOURS * 3600000);
   const isCustomWindow = !!(fromTs || toTs);
-  console.log(`Elemzés indul: ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}${isCustomWindow ? ` | Ablak: ${windowFrom.toISOString()} – ${windowTo.toISOString()}` : ""}`);
+  console.log(`Elemzés indul: ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}${isCustomWindow ? ` | Ablak (magyar idő): ${huDateTime(windowFrom)} – ${huDateTime(windowTo)}` : ""}`);
 
   // Minden MÉG LE NEM ZÁRT (pending) single tipp meccse – dátumtól függetlenül.
   // Így egy előre (pl. tegnap) felvett, még el nem kezdődött meccsre nem ad újabb tippet.

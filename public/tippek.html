@@ -1451,8 +1451,8 @@ function _dtLocal(date) {
 function openRefreshModal() {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const from = new Date(tomorrow); from.setHours(10, 0, 0, 0);
-  const to   = new Date(tomorrow); to.setHours(23, 0, 0, 0);
+  const from = new Date(tomorrow); from.setHours(0, 0, 0, 0);    // alapból a teljes holnapi nap
+  const to   = new Date(tomorrow); to.setHours(23, 59, 0, 0);
   const fi = document.getElementById('rng-from');
   const ti = document.getElementById('rng-to');
   const mo = document.getElementById('refresh-range-modal');
