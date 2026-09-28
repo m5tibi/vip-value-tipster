@@ -219,6 +219,7 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
 <div class="table-wrap">
   <div class="filter-bar">
     <button class="filter-btn active" onclick="setFilter('all',this)" data-i18n="stat.f_all">Összes</button>
+    <button class="filter-btn" onclick="setFilter('free',this)" data-i18n="stat.f_free">🆓 Free</button>
     <button class="filter-btn" onclick="setFilter('won',this)" data-i18n="stat.f_won">✅ Nyert</button>
     <button class="filter-btn" onclick="setFilter('half_won',this)" data-i18n="stat.f_half_won">½✅ Fél nyert</button>
     <button class="filter-btn" onclick="setFilter('push',this)" data-i18n="stat.f_push">↩️ Visszajár</button>
@@ -348,7 +349,10 @@ function updateScoreboard(stats) {
 
 function renderTable(tips) {
   const el = document.getElementById('tips-table');
-  const filtered = currentFilter === 'all' ? tips : tips.filter(t => t.result === currentFilter);
+  // 'free' a tipp típusára szűr (ingyenes tippek), a többi az eredményre
+  const filtered = currentFilter === 'all'  ? tips
+                 : currentFilter === 'free' ? tips.filter(t => t.type === 'free')
+                 : tips.filter(t => t.result === currentFilter);
   const settled  = filtered.filter(t => t.result && t.result !== 'pending');
 
   if (!filtered.length) { el.innerHTML = `<div class="empty">${window.t?.('stat.no_filter') || 'Nincs találat.'}</div>`; return; }
