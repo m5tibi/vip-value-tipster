@@ -499,7 +499,7 @@ function refreshSummary(run) {
       : "Az időablakban nincs meccs a figyelt ligákban (az Odds API a legtöbb női, alsóbb osztályú és egzotikus meccset nem kínálja).";
   else if (run.aiError) why = `Volt meccs, de az AI nem adott tippet: ${run.aiError}.`;
   else if (!run.aiSingles && !run.aiLegs) why = "Volt meccs, de az AI egyiket sem találta tippelhetőnek.";
-  else why = `Az AI ${run.aiSingles} tippet és ${run.aiLegs} kombi lábat adott, de mind kiszűrődött (már van rá tipp, túl alacsony odds vagy nem állt össze kombi).`;
+  else why = `Az AI ${run.aiSingles} tippet és ${run.aiLegs} kombi lábat adott, de mind kiszűrődött (listán kívüli meccs, már van rá tipp, túl alacsony odds vagy nem állt össze kombi).`;
   return { msg: `ℹ️ Nincs új tipp. ${why}\n${scan}${errs}`, color: "#ffcc80" };
 }
 

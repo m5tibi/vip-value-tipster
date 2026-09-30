@@ -625,6 +625,7 @@ KÉT dolgot adj – MINDKETTŐ KÖTELEZŐ:
    - Ha egy kombi nem érné el a minimumot, válassz magasabb oddsú lábakat vagy ne generáld!
 
 KÖZÖS szabályok:
+- KIZÁRÓLAG a fenti listában szereplő meccsekre adj tippet, pontosan az ott megadott párosítással. Ha a webes keresés más meccset (más ellenfelet, más napot) mutat, azt hagyd figyelmen kívül – a listán kívüli tippeket a rendszer eldobja.
 - Az "odds" mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd (a megfelelő piac/kimenet oddsát).
 - A "market" és "pick" pontosan egyezzen egy valós piaccal/kimenettel; a csapatnév a fent megadott formában szerepeljen.
 - Részletes, 3-4 mondatos magyar indoklás valós adatok alapján, konkrét számokkal (forma, gólátlag, egymás elleni eredmények, hiányzók) – csak a "tippek"-hez kell note.
@@ -696,9 +697,17 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
         addedAt: nowHu(), result: "pending"
       };
     });
+    // Csak a kapott meccslistában szereplő meccsre lehet tipp: az AI a webes keresésből néha
+    // olyan meccset is „talál”, ami nincs a listában (más nap, rossz ellenfél, nem létező meccs)
+    const inList = (name, kind) => {
+      if (findMatchEntry(matchList, name)) return true;
+      console.log(`${kind} kiszűrve (nincs a meccslistában – az AI találta ki): "${name}"`);
+      return false;
+    };
     // Backstop: minimum odds szűrő + meccsenként legfeljebb 1 single (az AI a legerősebbet teszi előre)
     const seenMatch = new Set();
     const singles = singlesAll
+      .filter(t => inList(t.match, "Single tipp"))
       .filter(t => (parseFloat(t.odds) || 0) >= MIN_SINGLE_ODDS)
       .filter(t => { if (seenMatch.has(t.match)) return false; seenMatch.add(t.match); return true; });
     const comboLegs = (Array.isArray(obj.kombi_labak) ? obj.kombi_labak : []).map(l => ({
@@ -707,6 +716,7 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       odds: parseFloat(l.odds) || 0, commence: l.commence || null
     })).filter(l => {
       if (!l.match || !l.market || !l.pick || l.odds <= 1) return false;
+      if (!inList(l.match, "Kombi láb")) return false;
       // Hiányos meccs név kiszűrése
       const hasVs = /\svs\.?\s|\s@\s/i.test(l.match);
       if (!hasVs) { console.log(`Kombi láb kiszűrve (hiányos meccs név): "${l.match}"`); return false; }
