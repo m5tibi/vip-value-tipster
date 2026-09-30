@@ -82,6 +82,13 @@ const SPORT_MAP = {
   "soccer_uefa_europa_league":           { sport: "soccer", label: "⚽ EL" },
   "soccer_uefa_europa_conference_league":{ sport: "soccer", label: "⚽ Konferencia Liga" },
   "soccer_uefa_nations_league":          { sport: "soccer", label: "⚽ Nemzetek Ligája" },
+  "soccer_uefa_champs_league_women":     { sport: "soccer", label: "⚽ Női BL" },
+  "soccer_fa_cup":                       { sport: "soccer", label: "⚽ FA Kupa" },
+  "soccer_england_efl_cup":              { sport: "soccer", label: "⚽ Ligakupa (EFL)" },
+  "soccer_germany_dfb_pokal":            { sport: "soccer", label: "⚽ DFB Pokal" },
+  "soccer_italy_coppa_italia":           { sport: "soccer", label: "⚽ Coppa Italia" },
+  "soccer_spain_copa_del_rey":           { sport: "soccer", label: "⚽ Copa del Rey" },
+  "soccer_france_coupe_de_france":       { sport: "soccer", label: "⚽ Francia Kupa" },
   "soccer_conmebol_copa_libertadores":   { sport: "soccer", label: "⚽ Copa Libertadores" },
   "soccer_conmebol_copa_sudamericana":   { sport: "soccer", label: "⚽ Copa Sudamericana" },
   // Anglia
@@ -509,7 +516,8 @@ function compactOdds(odds) {
 }
 
 async function fetchAiTips(matchList, alreadyTipped = [], poissonEdge = new Map()) {
-  if (!ANTHROPIC_KEY || !matchList.length) return { singles: [], comboLegs: [] };
+  if (!ANTHROPIC_KEY) return { singles: [], comboLegs: [], error: "nincs ANTHROPIC_API_KEY" };
+  if (!matchList.length) return { singles: [], comboLegs: [] };
 
   // Maximum 20 meccs küldése Claude-nak – 28+ meccs esetén a JSON levágódik a token limit miatt.
   // Prioritás: top ligák előre, azon belül legkorábbi kezdés.
@@ -613,9 +621,9 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
     const data = await callClaudeWithSearch({
       apiKey: ANTHROPIC_KEY, prompt, maxTokens: 16000, maxSearches: 12, label: "tippgenerálás",
     });
-    if (data.error) { console.error("AI API hiba:", JSON.stringify(data.error)); return { singles: [], comboLegs: [] }; }
+    if (data.error) { console.error("AI API hiba:", JSON.stringify(data.error)); return { singles: [], comboLegs: [], error: "AI API hiba: " + (data.error.message || data.error.type || "ismeretlen") }; }
     const text = data.text;
-    if (!text.trim()) { console.log("AI: üres szöveges válasz. stop_reason:", data.stopReason); return { singles: [], comboLegs: [] }; }
+    if (!text.trim()) { console.log("AI: üres szöveges válasz. stop_reason:", data.stopReason); return { singles: [], comboLegs: [], error: "az AI üres választ adott" }; }
 
     // JSON kinyerés: 1) ```json...``` blokk, 2) nyers {} blokk
     let jsonStr = null;
@@ -630,12 +638,12 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
     }
     if (!jsonStr) {
       console.log("AI: nem sikerült JSON-t kinyerni. Válasz eleje:\n" + text.slice(0, 500));
-      return { singles: [], comboLegs: [] };
+      return { singles: [], comboLegs: [], error: "az AI válaszából nem sikerült tippeket kiolvasni" };
     }
     let obj;
     try { obj = JSON.parse(jsonStr); } catch(e) {
       console.log("AI: JSON parse hiba –", e.message, "\nPróbált JSON eleje:\n" + jsonStr.slice(0, 400));
-      return { singles: [], comboLegs: [] };
+      return { singles: [], comboLegs: [], error: "az AI válasza hibás JSON volt" };
     }
     // A valós kezdési idő a meccslistából (odds API), nem az AI adatából
     const realCommence = name => findMatchEntry(matchList, name)?.commence || null;
@@ -691,7 +699,7 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
     });
     // Ingyenes tipp nincs – az admin manuálisan tesz free-vé bármely single tippet
     return { singles, comboLegs };
-  } catch (e) { console.error("AI tipp hiba:", e.message); return { singles: [], comboLegs: [] }; }
+  } catch (e) { console.error("AI tipp hiba:", e.message); return { singles: [], comboLegs: [], error: "AI hiba: " + e.message }; }
 }
 
 function comboHash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0; return h.toString(36); }
@@ -760,13 +768,20 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
   );
 
   const matchList = [];
-  let scannedLeagues = 0, oddsCalls = 0;
+  let scannedLeagues = 0, oddsCalls = 0, quotaLeft = null;
+  const oddsErrors = [];          // Odds API hibák (pl. elfogyott havi kvóta) – eddig csendben elnyeltük
+  const noteOddsError = async (resp, sportKey) => {
+    if (resp.status === 404) return;   // az API nem ismeri a ligát (pl. szezonon kívül) – nem hiba
+    let msg = "";
+    try { msg = (await resp.json())?.message || ""; } catch {}
+    oddsErrors.push(`${sportKey}: HTTP ${resp.status}${msg ? " – " + msg : ""}`);
+  };
   for (const [sportKey, meta] of Object.entries(SPORT_MAP)) {
     try {
       // 1) INGYENES esemény-lekérdezés (/events = 0 kredit): van-e meccs az ablakban?
       const er = await fetch(`https://api.the-odds-api.com/v4/sports/${sportKey}/events?apiKey=${ODDS_API_KEY}&dateFormat=iso`);
       scannedLeagues++;
-      if (!er.ok) continue;
+      if (!er.ok) { await noteOddsError(er, sportKey); continue; }
       const events = await er.json();
       const hasUpcoming = (Array.isArray(events) ? events : []).some(e => {
         const t = new Date(e.commence_time);
@@ -778,7 +793,9 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
       const url   = `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h,totals,spreads&oddsFormat=decimal&dateFormat=iso`;
       const r     = await fetch(url);
       oddsCalls++;
-      if (!r.ok) continue;
+      const left = r.headers.get("x-requests-remaining");
+      if (left != null) quotaLeft = Number(left);
+      if (!r.ok) { await noteOddsError(r, sportKey); continue; }
       const games = await r.json();
       for (const game of games) {
         const t = new Date(game.commence_time);
@@ -835,16 +852,18 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
         const allOdds = [...h2hOdds, ...totalsOdds, ...spreadsOdds];
         if (allOdds.length) matchList.push({ sport: meta.label, match: `${game.home_team} vs ${game.away_team}`, commence: huTime(game.commence_time), odds: allOdds });
       }
-    } catch {}
+    } catch (e) { oddsErrors.push(`${sportKey}: ${e.message}`); }
   }
-  console.log(`Ligák átnézve (ingyenes): ${scannedLeagues} · odds-hívás (fizetős, ~3 kredit/liga): ${oddsCalls} · feldolgozható meccs: ${matchList.length}`);
+  console.log(`Ligák átnézve (ingyenes): ${scannedLeagues} · odds-hívás (fizetős, ~3 kredit/liga): ${oddsCalls} · feldolgozható meccs: ${matchList.length}` +
+    (quotaLeft != null ? ` · Odds API maradék kredit: ${quotaLeft}` : ""));
+  if (oddsErrors.length) console.error(`Odds API hibák (${oddsErrors.length}): ${oddsErrors.slice(0, 5).join(" | ")}`);
 
   // Poisson value filter: API-Football gólstatisztikák → edge számítás
   const poissonEdge = await computePoissonEdge(matchList);
 
   // Standings gazdagítás (football-data.org, ha elérhető)
   const enrichedList = await Promise.all(matchList.map(m => enrichMatchWithStandings(m)));
-  const { singles, comboLegs } = await fetchAiTips(enrichedList, [...tippedMatches], poissonEdge);
+  const { singles, comboLegs, error: aiError } = await fetchAiTips(enrichedList, [...tippedMatches], poissonEdge);
 
   // Backstop: a már ma tippelt meccsekre ne kerüljön újabb SINGLE (a prompt mellett is szűrünk)
   const newAiTips = singles.filter(t => !tippedMatches.has(t.match));
@@ -926,6 +945,13 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
   if (extraSlip) console.log(`Extra szelvény mentve: ${(extraSlip.legs||[]).length} láb, össz odds ${extraSlip.odds}`);
   else if (freshCombos.length === 0) console.log("Extra szelvény eredmény: NEM GENERÁLT");
   console.log(`Frissítve – ${fresh.length} új AI tipp, ${freshCombos.length} új kombi (jóváhagyásra várnak)`);
+  // Összegzés az admin felületnek: 0 tipp esetén ebből látszik, melyik lépésnél akadt el
+  return {
+    leagues: scannedLeagues, oddsCalls, matches: matchList.length, quotaLeft,
+    oddsErrors: oddsErrors.slice(0, 5), oddsErrorCount: oddsErrors.length,
+    aiError: aiError || null, aiSingles: singles.length, aiLegs: comboLegs.length,
+    newTips: fresh.length, newCombos: freshCombos.length,
+  };
 }
 
 // ── football-data.org: 90 perces (rendes idejű) eredmény ──
@@ -1645,8 +1671,8 @@ app.post("/api/refresh", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const { fromTs, toTs } = req.body || {};
   try {
-    await fetchAndProcess(fromTs || null, toTs || null);
-    res.json({ ok: true, aiTips: aiTips.length });
+    const run = await fetchAndProcess(fromTs || null, toTs || null);
+    res.json({ ok: true, aiTips: aiTips.length, run });
   } catch(e) {
     console.error("[refresh] Hiba:", e.message);
     res.status(500).json({ error: e.message });

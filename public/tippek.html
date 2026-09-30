@@ -477,10 +477,30 @@ async function handleAdminResp(r, okMsg) {
 
 document.getElementById("today").textContent = new Date().toLocaleDateString(window.getLang()==="en"?"en-GB":"hu-HU", {year:"numeric",month:"long",day:"numeric"});
 
-function showStatus(msg, color) {
+function showStatus(msg, color, ms) {
   const el = document.getElementById("tg-status");
   el.textContent = msg; el.style.color = color||"#00e676"; el.style.display = "block";
-  setTimeout(() => el.style.display = "none", 4000);
+  el.style.whiteSpace = "pre-line";
+  clearTimeout(showStatus._t);
+  showStatus._t = setTimeout(() => el.style.display = "none", ms || 4000);
+}
+// Generálás összegzése: 0 új tipp esetén megmondja, melyik lépésnél akadt el
+function refreshSummary(run) {
+  if (!run) return null;
+  const quota = run.quotaLeft != null ? ` · Odds API maradék kredit: ${run.quotaLeft}` : "";
+  const scan = `${run.leagues} liga átnézve, ${run.matches} meccs oddsokkal az ablakban${quota}`;
+  const errs = run.oddsErrorCount ? `\n⚠️ Odds API hiba (${run.oddsErrorCount} liga): ${run.oddsErrors.join(" | ")}` : "";
+  if (run.newTips || run.newCombos)
+    return { msg: `✅ ${run.newTips} új tipp, ${run.newCombos} új kombi (jóváhagyásra várnak)\n${scan}${errs}`, color: null };
+  let why;
+  if (!run.matches)
+    why = run.oddsErrorCount
+      ? "Az Odds API hibát adott (lásd lent) – valószínűleg elfogyott a havi kredit vagy rossz a kulcs."
+      : "Az időablakban nincs meccs a figyelt ligákban (az Odds API a legtöbb női, alsóbb osztályú és egzotikus meccset nem kínálja).";
+  else if (run.aiError) why = `Volt meccs, de az AI nem adott tippet: ${run.aiError}.`;
+  else if (!run.aiSingles && !run.aiLegs) why = "Volt meccs, de az AI egyiket sem találta tippelhetőnek.";
+  else why = `Az AI ${run.aiSingles} tippet és ${run.aiLegs} kombi lábat adott, de mind kiszűrődött (már van rá tipp, túl alacsony odds vagy nem állt össze kombi).`;
+  return { msg: `ℹ️ Nincs új tipp. ${why}\n${scan}${errs}`, color: "#ffcc80" };
 }
 
 function switchTab(t) {
@@ -1031,7 +1051,11 @@ async function refresh(fromTs = null, toTs = null) {
     });
     const d = await r.json();
     if (d.error) { showStatus("⛔ " + d.error, "#ef9a9a"); }
-    else { showStatus(`✅ ${d.aiTips} AI tipp`); await loadTips(); }
+    else {
+      const sum = refreshSummary(d.run);
+      if (sum) showStatus(sum.msg, sum.color, 20000); else showStatus(`✅ ${d.aiTips} AI tipp`);
+      await loadTips();
+    }
   } catch(e) { showStatus("⚠️ Hiba: "+e.message,"#ef9a9a"); }
   btn.disabled=false; btn.textContent="🔄 Frissítés most";
   msRemaining=0;
