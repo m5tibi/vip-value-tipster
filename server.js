@@ -82,6 +82,14 @@ const SPORT_MAP = {
   "soccer_uefa_europa_league":           { sport: "soccer", label: "⚽ EL" },
   "soccer_uefa_europa_conference_league":{ sport: "soccer", label: "⚽ Konferencia Liga" },
   "soccer_uefa_nations_league":          { sport: "soccer", label: "⚽ Nemzetek Ligája" },
+  "soccer_uefa_champs_league_qualification": { sport: "soccer", label: "⚽ BL-selejtező" },
+  "soccer_fifa_world_cup_qualifiers_europe":        { sport: "soccer", label: "⚽ VB-selejtező (Európa)" },
+  "soccer_fifa_world_cup_qualifiers_south_america": { sport: "soccer", label: "⚽ VB-selejtező (Dél-Amerika)" },
+  "soccer_uefa_euro_qualification":      { sport: "soccer", label: "⚽ Eb-selejtező" },
+  "soccer_uefa_european_championship":   { sport: "soccer", label: "⚽ Európa-bajnokság" },
+  "soccer_conmebol_copa_america":        { sport: "soccer", label: "⚽ Copa América" },
+  "soccer_africa_cup_of_nations":        { sport: "soccer", label: "⚽ Afrikai Nemzetek Kupája" },
+  "soccer_international_friendlies":     { sport: "soccer", label: "⚽ Válogatott barátságos" },
   "soccer_uefa_champs_league_women":     { sport: "soccer", label: "⚽ Női BL" },
   "soccer_fa_cup":                       { sport: "soccer", label: "⚽ FA Kupa" },
   "soccer_england_efl_cup":              { sport: "soccer", label: "⚽ Ligakupa (EFL)" },
@@ -99,6 +107,7 @@ const SPORT_MAP = {
   // Németország
   "soccer_germany_bundesliga":           { sport: "soccer", label: "⚽ Bundesliga" },
   "soccer_germany_bundesliga2":          { sport: "soccer", label: "⚽ 2. Bundesliga" },
+  "soccer_germany_liga3":                { sport: "soccer", label: "⚽ 3. Liga (német)" },
   // Spanyolország
   "soccer_spain_la_liga":                { sport: "soccer", label: "⚽ La Liga" },
   "soccer_spain_segunda_division":       { sport: "soccer", label: "⚽ La Liga 2" },
@@ -122,9 +131,17 @@ const SPORT_MAP = {
   "soccer_norway_eliteserien":           { sport: "soccer", label: "⚽ Norvég Eliteserien" },
   "soccer_sweden_allsvenskan":           { sport: "soccer", label: "⚽ Svéd Allsvenskan" },
   "soccer_poland_ekstraklasa":           { sport: "soccer", label: "⚽ Lengyel Ekstraklasa" },
+  "soccer_sweden_superettan":            { sport: "soccer", label: "⚽ Svéd Superettan" },
+  "soccer_finland_veikkausliiga":        { sport: "soccer", label: "⚽ Finn Veikkausliiga" },
+  "soccer_league_of_ireland":            { sport: "soccer", label: "⚽ Ír Premier Division" },
   // Amerika / Ázsia / Óceánia
   "soccer_brazil_campeonato":            { sport: "soccer", label: "⚽ Brazil Serie A" },
   "soccer_argentina_primera_division":   { sport: "soccer", label: "⚽ Argentin Primera" },
+  "soccer_brazil_serie_b":               { sport: "soccer", label: "⚽ Brazil Serie B" },
+  "soccer_chile_campeonato":             { sport: "soccer", label: "⚽ Chilei Primera" },
+  "soccer_saudi_arabia_pro_league":      { sport: "soccer", label: "⚽ Szaúdi Pro Liga" },
+  "soccer_korea_kleague1":               { sport: "soccer", label: "⚽ K League 1" },
+  "soccer_china_superleague":            { sport: "soccer", label: "⚽ Kínai Szuperliga" },
   "soccer_usa_mls":                      { sport: "soccer", label: "⚽ MLS" },
   "soccer_mexico_ligamx":                { sport: "soccer", label: "⚽ Liga MX" },
   "soccer_japan_j_league":               { sport: "soccer", label: "⚽ J1 League" },
@@ -522,9 +539,9 @@ async function fetchAiTips(matchList, alreadyTipped = [], poissonEdge = new Map(
   // Maximum 20 meccs küldése Claude-nak – 28+ meccs esetén a JSON levágódik a token limit miatt.
   // Prioritás: top ligák előre, azon belül legkorábbi kezdés.
   const LEAGUE_PRIORITY = [
-    "Premier League","La Liga","Bundesliga","Serie A","Ligue 1","Champions League",
-    "Europa League","Conference League","Eredivisie","Primeira Liga","Championship",
-    "Skót Premiership","Román Liga 1","MLS","Brasileirao","Argentin Primera","Liga MX"
+    "⚽ Premier League","⚽ La Liga","⚽ Bundesliga","⚽ Serie A","⚽ Ligue 1","⚽ BL",
+    "⚽ EL","Konferencia Liga","selejtező","Nemzetek Ligája","Eredivisie","Primeira Liga","Championship",
+    "Skót Premiership","Román Liga 1","MLS","Brazil Serie A","Argentin Primera","Liga MX"
   ];
   const sorted = [...matchList].sort((a, b) => {
     const pa = LEAGUE_PRIORITY.findIndex(l => (a.sport||"").includes(l));
@@ -670,6 +687,7 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
         id: `ai-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         type: "ai", sport: t.sport, sportLabel: t.sportLabel,
         match: t.match, commence: realCommence(t.match) || t.commence || null,
+        sportKey: findMatchEntry(matchList, t.match)?.sportKey || null,
         market, pick, odds: t.odds,
         live: false, note: t.note,
         poisson: (() => { const e = findMatchEntry(matchList, t.match);
@@ -733,7 +751,8 @@ function buildCombos(legs, matchList = []) {
     const n = items.length;
     const legsArr = items.map(l => ({
       match: l.match, sportLabel: l.sportLabel, market: l.market,
-      pick: l.pick, odds: l.odds, commence: realCommence(l.match) || l.commence || null, result: null
+      pick: l.pick, odds: l.odds, commence: realCommence(l.match) || l.commence || null, result: null,
+      sportKey: findMatchEntry(matchList, l.match)?.sportKey || null
     }));
     const odds = parseFloat(legsArr.reduce((p, l) => p * l.odds, 1).toFixed(2));
     const id   = "combo-" + n + "-" + comboHash(comboKey({ legs: legsArr }));
@@ -850,7 +869,7 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
         }
 
         const allOdds = [...h2hOdds, ...totalsOdds, ...spreadsOdds];
-        if (allOdds.length) matchList.push({ sport: meta.label, match: `${game.home_team} vs ${game.away_team}`, commence: huTime(game.commence_time), odds: allOdds });
+        if (allOdds.length) matchList.push({ sport: meta.label, sportKey, match: `${game.home_team} vs ${game.away_team}`, commence: huTime(game.commence_time), odds: allOdds });
       }
     } catch (e) { oddsErrors.push(`${sportKey}: ${e.message}`); }
   }
@@ -1168,8 +1187,9 @@ async function checkResults() {
   // Csak azokat a sportokat kérdezzük le, amelyekhez ténylegesen van pending tipp → kredit takarékosság
   const allPending = [...pendingSingles, ...combosToCheck.flatMap(c => c.legs || [])];
   const neededSports = new Set(allPending.map(t => t.sportKey).filter(Boolean));
-  // Ha nincs sportKey a tippeknél, fallback: összes sport
-  const sportsToCheck = neededSports.size > 0 ? [...neededSports] : Object.keys(SPORT_MAP);
+  // Ha BÁRMELY nyitott tippnél hiányzik a sportKey (régi vagy kézi tipp), az összes ligát
+  // lekérjük, különben az a tipp sosem záródna le
+  const sportsToCheck = allPending.every(t => t.sportKey) ? [...neededSports] : Object.keys(SPORT_MAP);
   console.log(`  Odds API lekérés: ${sportsToCheck.length} sport (${sportsToCheck.join(", ")})`);
   const completed = {};
   for (const sportKey of sportsToCheck) {
