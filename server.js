@@ -600,7 +600,6 @@ NYELV – MINDEN MEZŐT MAGYARUL ADJ MEG:
   * "1X2" marad "1X2"
   * "Asian Handicap" → "Ázsiai hendikep"
   * "Handicap" → "Hendikep"
-  * "Draw No Bet" → "Döntetlen esetén visszajár"
   * "Home Win" → "Hazai győzelem" | "Away Win" → "Vendég győzelem" | "Draw" → "Döntetlen"
 - A "note" indoklást természetesen magyarul írd.
 
@@ -625,6 +624,7 @@ KÉT dolgot adj – MINDKETTŐ KÖTELEZŐ:
    - Ha egy kombi nem érné el a minimumot, válassz magasabb oddsú lábakat vagy ne generáld!
 
 KÖZÖS szabályok:
+- CSAK olyan piacot és vonalat válassz, ami a meccs "Valós odds" sorában szerepel (1X2, a megadott gólvonalak, a megadott hendikepvonalak), vagy "Mindkét csapat betalál" (BTTS). Fogadáskészítő / kombinált piac (pl. "győz + több mint 2,5 gól"), döntetlen esetén visszajár és egyéb piac NEM elszámolható – ezeket a rendszer eldobja. A választott csapatnak az adott meccsen kell játszania.
 - KIZÁRÓLAG a fenti listában szereplő meccsekre adj tippet, pontosan az ott megadott párosítással. Ha a webes keresés más meccset (más ellenfelet, más napot) mutat, azt hagyd figyelmen kívül – a listán kívüli tippeket a rendszer eldobja.
 - Az "odds" mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd (a megfelelő piac/kimenet oddsát).
 - A "market" és "pick" pontosan egyezzen egy valós piaccal/kimenettel; a csapatnév a fent megadott formában szerepeljen.
@@ -704,10 +704,21 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       console.log(`${kind} kiszűrve (nincs a meccslistában – az AI találta ki): "${name}"`);
       return false;
     };
+    // A kimenetnek is ehhez a meccshez kell tartoznia; az oddsot a valós értékre cseréljük
+    const pickOk = (t, kind) => {
+      const r = checkPickAgainstOdds(findMatchEntry(matchList, t.match), t.market, t.pick);
+      if (r.error) { console.log(`${kind} kiszűrve (${r.error}): ${t.match} – ${t.market} ${t.pick}`); return false; }
+      if (r.odds && Math.abs(r.odds - parseFloat(t.odds)) > 0.001) {
+        console.log(`${kind} odds javítva: ${t.match} – ${t.pick}: AI ${t.odds} → valós ${r.odds}`);
+        t.odds = r.odds;
+      }
+      return true;
+    };
     // Backstop: minimum odds szűrő + meccsenként legfeljebb 1 single (az AI a legerősebbet teszi előre)
     const seenMatch = new Set();
     const singles = singlesAll
       .filter(t => inList(t.match, "Single tipp"))
+      .filter(t => pickOk(t, "Single tipp"))
       .filter(t => (parseFloat(t.odds) || 0) >= MIN_SINGLE_ODDS)
       .filter(t => { if (seenMatch.has(t.match)) return false; seenMatch.add(t.match); return true; });
     const comboLegs = (Array.isArray(obj.kombi_labak) ? obj.kombi_labak : []).map(l => ({
@@ -717,6 +728,7 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
     })).filter(l => {
       if (!l.match || !l.market || !l.pick || l.odds <= 1) return false;
       if (!inList(l.match, "Kombi láb")) return false;
+      if (!pickOk(l, "Kombi láb")) return false;
       // Hiányos meccs név kiszűrése
       const hasVs = /\svs\.?\s|\s@\s/i.test(l.match);
       if (!hasVs) { console.log(`Kombi láb kiszűrve (hiányos meccs név): "${l.match}"`); return false; }
@@ -1193,6 +1205,52 @@ async function regulationScore(game, cache) {
 
 // Egy piac kiértékelése a 90 perces eredmény alapján. Visszatér:
 // won / lost / push / half_won / half_lost, vagy null ha nem értelmezhető.
+// Az AI tippjének ellenőrzése a meccs valós oddsaival: a tipp csak akkor marad, ha a kimenet
+// létezik ezen a meccsen (a választott csapat itt játszik, a gól-/hendikepvonal szerepel az
+// oddsok között) és a rendszer el is tudja számolni. Visszaadja a valós oddsot (BTTS-nél az
+// Odds API nem ad oddsot → null), vagy { error } ha a tipp nem ehhez a meccshez tartozik.
+function checkPickAgainstOdds(entry, market, pick) {
+  const txt = x => String(x || "").toLowerCase().replace(/,/g, ".");
+  const mk = txt(market), pk = txt(pick);
+  const [home, away] = String(entry.match || "").split(/\s+vs\.?\s+/i);
+  const odds = entry.odds || [];
+  const teamOf = name => {
+    const n = normTeam(String(name || "").replace(/\s*[-+]?\d+(\.\d+)?$/, "").trim());
+    return nameSim(n, normTeam(home)) ? "home" : nameSim(n, normTeam(away)) ? "away" : null;
+  };
+  if (mk.includes("fogadáskészítő") || mk.includes("fogadaskeszito") || mk.includes("bet builder"))
+    return { error: "fogadáskészítő – nem elszámolható" };
+  if (mk === "1x2") {
+    const p = pk.trim();
+    let side = /^(draw|döntetlen|x)$/.test(p) ? "draw"
+             : /^(1|hazai győzelem|home win)$/.test(p) ? "home"
+             : /^(2|vendég győzelem|away win)$/.test(p) ? "away" : teamOf(pick);
+    if (!side) return { error: `"${pick}" nem játszik ezen a meccsen` };
+    const o = odds.find(x => x.market === "1X2" && (side === "draw" ? /^draw$/i.test(x.name) : teamOf(x.name) === side));
+    return { odds: o ? o.odds : null };
+  }
+  if (mk.includes("btts") || mk.includes("mindkét") || pk.includes("mindkét")) return { odds: null };
+  const has = (...w) => w.some(x => pk.includes(x) || mk.includes(x));
+  if (has("over", "több mint", "under", "kevesebb mint")) {
+    const isUnder = pk.includes("under") || pk.includes("kevesebb mint") || (!pk.includes("over") && !pk.includes("több mint") && (mk.includes("under") || mk.includes("kevesebb mint")));
+    const line = parseFloat((pk.match(/\d+(\.\d+)?/) || mk.match(/\d+(\.\d+)?/) || [NaN])[0]);
+    const o = odds.find(x => x.market === `${isUnder ? "Under" : "Over"} ${line}`);
+    if (!o) return { error: `nincs ${isUnder ? "Under" : "Over"} ${line} vonal az oddsok között` };
+    return { odds: o.odds };
+  }
+  if (mk.includes("hendikep") || mk.includes("handicap")) {
+    const lm = String(pick || "").match(/[-+]?\d+(\.\d+)?$/);
+    const side = teamOf(pick);
+    if (!lm || !side) return { error: `hendikep tipp nem ehhez a meccshez illik: "${pick}"` };
+    const line = parseFloat(lm[0]);
+    const o = odds.find(x => /^Hendikep/.test(x.market) && teamOf(x.name) === side &&
+                             parseFloat((String(x.name).match(/[-+]?\d+(\.\d+)?$/) || [NaN])[0]) === line);
+    if (!o) return { error: `nincs ilyen hendikep vonal: "${pick}"` };
+    return { odds: o.odds };
+  }
+  return { error: `nem elszámolható piac: "${market}"` };
+}
+
 function settleMarket(market, pick, homeTeam, awayTeam, homeScore, awayScore) {
   // Az AI magyar piac-/kimenetneveket ad ("Több mint 2,5 gól", "Mindkét csapat betalál",
   // "Hazai győzelem"), de angolul is jöhet ("Over 2.5", "BTTS") – mindkettőt felismerjük.
