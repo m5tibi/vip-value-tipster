@@ -488,7 +488,8 @@ function showStatus(msg, color, ms) {
 function refreshSummary(run) {
   if (!run) return null;
   const quota = run.quotaLeft != null ? ` · Odds API maradék kredit: ${run.quotaLeft}` : "";
-  const scan = `${run.leagues} liga átnézve, ${run.matches} meccs oddsokkal az ablakban${quota}`;
+  const skip = run.alreadyTipped ? ` (${run.alreadyTipped} már tippelve, kihagyva)` : "";
+  const scan = `${run.leagues} liga átnézve, ${run.matches} meccs oddsokkal az ablakban${skip}${quota}`;
   const errs = run.oddsErrorCount ? `\n⚠️ Odds API hiba (${run.oddsErrorCount} liga): ${run.oddsErrors.join(" | ")}` : "";
   if (run.newTips || run.newCombos)
     return { msg: `✅ ${run.newTips} új tipp, ${run.newCombos} új kombi (jóváhagyásra várnak)\n${scan}${errs}`, color: null };
@@ -497,6 +498,7 @@ function refreshSummary(run) {
     why = run.oddsErrorCount
       ? "Az Odds API hibát adott (lásd lent) – valószínűleg elfogyott a havi kredit vagy rossz a kulcs."
       : "Az időablakban nincs meccs a figyelt ligákban (az Odds API a legtöbb női, alsóbb osztályú és egzotikus meccset nem kínálja).";
+  else if (run.alreadyTipped >= run.matches) why = "Az ablak összes meccsére van már függő (jóváhagyott vagy jóváhagyásra váró) tipp.";
   else if (run.aiError) why = `Volt meccs, de az AI nem adott tippet: ${run.aiError}.`;
   else if (!run.aiSingles && !run.aiLegs) why = "Volt meccs, de az AI egyiket sem találta tippelhetőnek.";
   else why = `Az AI ${run.aiSingles} tippet és ${run.aiLegs} kombi lábat adott, de mind kiszűrődött (listán kívüli meccs, már van rá tipp, túl alacsony odds vagy nem állt össze kombi).`;

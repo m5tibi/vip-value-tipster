@@ -790,11 +790,17 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
   const isCustomWindow = !!(fromTs || toTs);
   console.log(`Elemzés indul: ${new Date().toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}${isCustomWindow ? ` | Ablak (magyar idő): ${huDateTime(windowFrom)} – ${huDateTime(windowTo)}` : ""}`);
 
-  // Minden MÉG LE NEM ZÁRT (pending) single tipp meccse – dátumtól függetlenül.
-  // Így egy előre (pl. tegnap) felvett, még el nem kezdődött meccsre nem ad újabb tippet.
-  const tippedMatches = new Set(
-    history.filter(t => t.type === "ai" && (!t.result || t.result === "pending")).map(t => t.match)
-  );
+  // Minden MÉG LE NEM ZÁRT (pending) tipp meccse – jóváhagyottaké és a jóváhagyásra várókéé is,
+  // dátumtól függetlenül: single (ai), free és a kombik lábai. Ezekre új generálás nem ad újabb
+  // tippet, és az AI meg sem kapja őket (kevesebb keresés, kisebb költség).
+  const isOpen = t => !t.result || t.result === "pending";
+  const tippedMatches = new Set([
+    ...history.filter(t => (t.type === "ai" || t.type === "free") && isOpen(t)).map(t => t.match),
+    ...history.filter(t => t.type === "combo" && isOpen(t)).flatMap(c => (c.legs || []).map(l => l.match)),
+  ].filter(Boolean));
+  // Laza névegyezés (magyar/angol név, fordított sorrend): "Bayern München" = "Bayern Munich"
+  const tippedList = [...tippedMatches].map(match => ({ match }));
+  const isTipped = name => !!findMatchEntry(tippedList, name);
 
   const matchList = [];
   let scannedLeagues = 0, oddsCalls = 0, quotaLeft = null;
@@ -892,10 +898,13 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
 
   // Standings gazdagítás (football-data.org, ha elérhető)
   const enrichedList = await Promise.all(matchList.map(m => enrichMatchWithStandings(m)));
-  const { singles, comboLegs, error: aiError } = await fetchAiTips(enrichedList, [...tippedMatches], poissonEdge);
+  const untipped = enrichedList.filter(m => !isTipped(m.match));
+  const skippedTipped = enrichedList.length - untipped.length;
+  if (skippedTipped) console.log(`Már van rá függő tipp, kihagyva: ${skippedTipped} meccs · AI-nak küldve: ${untipped.length}`);
+  const { singles, comboLegs, error: aiError } = await fetchAiTips(untipped, [], poissonEdge);
 
-  // Backstop: a már ma tippelt meccsekre ne kerüljön újabb SINGLE (a prompt mellett is szűrünk)
-  const newAiTips = singles.filter(t => !tippedMatches.has(t.match));
+  // Backstop: a már tippelt meccsekre ne kerüljön újabb SINGLE
+  const newAiTips = singles.filter(t => !isTipped(t.match));
 
   // Új single tippek hozzáadása a history-hoz (a meglévők megtartásával)
   const existingIds = new Set(history.map(t => t.id));
@@ -911,7 +920,7 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
   // duplikálódik (a dedup a lábakat nézi, nem az azonosítót).
   const existingKeys = new Set(history.filter(t => t.type === "combo").map(comboKey));
   // Backstop: ha egy kombi láb meccse már single tippként szerepel (ma, pending), kiszűrjük
-  const filteredComboLegs = comboLegs.filter(l => !tippedMatches.has(l.match));
+  const filteredComboLegs = comboLegs.filter(l => !isTipped(l.match));
   // Kombi tippek validálása: AI oddsok vs valódi Odds API oddsok
   // Ha az AI odds > 10%-kal alacsonyabb a valódinál → kizárjuk (AI kitalált oddsot adott)
   function getRealOdds(legMatch, legMarket, legPick, matchList) {
@@ -976,7 +985,7 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
   console.log(`Frissítve – ${fresh.length} új AI tipp, ${freshCombos.length} új kombi (jóváhagyásra várnak)`);
   // Összegzés az admin felületnek: 0 tipp esetén ebből látszik, melyik lépésnél akadt el
   return {
-    leagues: scannedLeagues, oddsCalls, matches: matchList.length, quotaLeft,
+    leagues: scannedLeagues, oddsCalls, matches: matchList.length, quotaLeft, alreadyTipped: skippedTipped,
     oddsErrors: oddsErrors.slice(0, 5), oddsErrorCount: oddsErrors.length,
     aiError: aiError || null, aiSingles: singles.length, aiLegs: comboLegs.length,
     newTips: fresh.length, newCombos: freshCombos.length,
