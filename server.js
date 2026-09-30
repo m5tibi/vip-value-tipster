@@ -687,9 +687,9 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       return {
         id: `ai-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         type: "ai", sport: t.sport, sportLabel: t.sportLabel,
-        match: t.match, commence: realCommence(t.match) || t.commence || null,
+        match: huMatch(t.match), commence: realCommence(t.match) || t.commence || null,
         sportKey: findMatchEntry(matchList, t.match)?.sportKey || null,
-        market, pick, odds: t.odds,
+        market, pick: huTeam(pick), odds: t.odds,
         live: false, note: t.note,
         poisson: (() => { const e = findMatchEntry(matchList, t.match);
                           return e ? poissonForTip(poissonEdge.get(e.match), market, pick, e.match) : null; })(),
@@ -711,8 +711,8 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       .filter(t => (parseFloat(t.odds) || 0) >= MIN_SINGLE_ODDS)
       .filter(t => { if (seenMatch.has(t.match)) return false; seenMatch.add(t.match); return true; });
     const comboLegs = (Array.isArray(obj.kombi_labak) ? obj.kombi_labak : []).map(l => ({
-      match: l.match, sportLabel: l.sportLabel || "⚽",
-      market: inferMarket(l.pick, l.market), pick: l.pick,
+      match: huMatch(l.match), sportLabel: l.sportLabel || "⚽",
+      market: inferMarket(l.pick, l.market), pick: huTeam(l.pick),
       odds: parseFloat(l.odds) || 0, commence: l.commence || null
     })).filter(l => {
       if (!l.match || !l.market || !l.pick || l.odds <= 1) return false;
@@ -851,7 +851,7 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
               const o = bm.markets.find(m => m.key === "h2h")?.outcomes?.find(x => x.name === name);
               if (o && o.price > best) { best = o.price; bestBM = bm.title; }
             }
-            if (best) h2hOdds.push({ market: "1X2", name, odds: parseFloat(best.toFixed(2)), bookmaker: bestBM });
+            if (best) h2hOdds.push({ market: "1X2", name: huTeam(name), odds: parseFloat(best.toFixed(2)), bookmaker: bestBM });
           });
         }
 
@@ -878,14 +878,14 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
             for (const o of bm.markets.find(m => m.key === "spreads")?.outcomes || []) {
               const key = `${o.name}_${o.point}`;
               if (!best[key] || o.price > best[key].odds)
-                best[key] = { market: `Hendikep ${o.point > 0 ? "+" : ""}${o.point}`, name: `${o.name} ${o.point > 0 ? "+" : ""}${o.point}`, odds: parseFloat(o.price.toFixed(2)), bookmaker: bm.title };
+                best[key] = { market: `Hendikep ${o.point > 0 ? "+" : ""}${o.point}`, name: `${huTeam(o.name)} ${o.point > 0 ? "+" : ""}${o.point}`, odds: parseFloat(o.price.toFixed(2)), bookmaker: bm.title };
             }
           }
           spreadsOdds.push(...Object.values(best));
         }
 
         const allOdds = [...h2hOdds, ...totalsOdds, ...spreadsOdds];
-        if (allOdds.length) matchList.push({ sport: meta.label, sportKey, match: `${game.home_team} vs ${game.away_team}`, commence: huTime(game.commence_time), odds: allOdds });
+        if (allOdds.length) matchList.push({ sport: meta.label, sportKey, match: `${huTeam(game.home_team)} vs ${huTeam(game.away_team)}`, commence: huTime(game.commence_time), odds: allOdds });
       }
     } catch (e) { oddsErrors.push(`${sportKey}: ${e.message}`); }
   }
@@ -1020,7 +1020,59 @@ const COUNTRY_ALIASES = {
   "del korea": "south korea", "korea republic": "south korea", "marokko": "morocco", "szenegal": "senegal",
   "egyiptom": "egypt", "ausztralia": "australia", "tunezia": "tunisia", "algeria": "algeria",
   "elefantcsontpart": "ivory coast", "cote d ivoire": "ivory coast", "kamerun": "cameroon",
+  "feroer": "faroe islands", "montenegro": "montenegro", "malta": "malta", "bolivia": "bolivia",
+  "argentina": "argentina", "korea republic": "south korea",
 };
+// Megjelenítéshez: az Odds API angol nevei → magyar név. Az AI a meccslistából másolja a
+// neveket, ezért a listát (és utólag a választ is) itt magyarítjuk. Minden magyar névnek
+// szerepelnie kell a COUNTRY_ALIASES-ban is, hogy az elszámolás az angol névvel párosítsa.
+const HU_TEAM_NAMES = {
+  "Hungary": "Magyarország", "France": "Franciaország", "Germany": "Németország", "Italy": "Olaszország",
+  "Spain": "Spanyolország", "Portugal": "Portugália", "England": "Anglia", "Scotland": "Skócia",
+  "Northern Ireland": "Észak-Írország", "Republic of Ireland": "Írország", "Ireland": "Írország",
+  "Netherlands": "Hollandia", "Switzerland": "Svájc", "Austria": "Ausztria",
+  "Czech Republic": "Csehország", "Czechia": "Csehország", "Slovakia": "Szlovákia", "Poland": "Lengyelország",
+  "Croatia": "Horvátország", "Serbia": "Szerbia", "Slovenia": "Szlovénia",
+  "Bosnia and Herzegovina": "Bosznia-Hercegovina", "Bosnia & Herzegovina": "Bosznia-Hercegovina",
+  "North Macedonia": "Észak-Macedónia", "Albania": "Albánia", "Kosovo": "Koszovó", "Montenegro": "Montenegró",
+  "Greece": "Görögország", "Turkey": "Törökország", "Türkiye": "Törökország", "Romania": "Románia",
+  "Bulgaria": "Bulgária", "Ukraine": "Ukrajna", "Belarus": "Fehéroroszország", "Russia": "Oroszország",
+  "Georgia": "Grúzia", "Armenia": "Örményország", "Azerbaijan": "Azerbajdzsán", "Kazakhstan": "Kazahsztán",
+  "Iceland": "Izland", "Norway": "Norvégia", "Sweden": "Svédország", "Denmark": "Dánia", "Finland": "Finnország",
+  "Estonia": "Észtország", "Latvia": "Lettország", "Lithuania": "Litvánia", "Cyprus": "Ciprus",
+  "Luxembourg": "Luxemburg", "Israel": "Izrael", "Faroe Islands": "Feröer", "Malta": "Málta",
+  "Brazil": "Brazília", "Argentina": "Argentína", "Bolivia": "Bolívia", "Colombia": "Kolumbia",
+  "Mexico": "Mexikó", "Canada": "Kanada", "Japan": "Japán", "South Korea": "Dél-Korea", "Korea Republic": "Dél-Korea",
+  "Morocco": "Marokkó", "Senegal": "Szenegál", "Egypt": "Egyiptom", "Australia": "Ausztrália",
+  "Tunisia": "Tunézia", "Algeria": "Algéria", "Ivory Coast": "Elefántcsontpart", "Cote d'Ivoire": "Elefántcsontpart",
+  "Cameroon": "Kamerun",
+  // Klubok, amelyeket magyarul másképp írunk (a névegyezés ezeket is párosítja)
+  "Bayern Munich": "Bayern München", "Ferencvaros": "Ferencváros",
+};
+const _huTeamKey = s => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const HU_TEAM_LOOKUP = Object.fromEntries(Object.entries(HU_TEAM_NAMES).map(([en, hu]) => [_huTeamKey(en), hu]));
+// Csapatnév (hendikepnél számmal a végén, pl. "Norway -1.5") magyarítása; ismeretlen név változatlan
+function huTeam(name) {
+  const m = String(name || "").match(/^(.*?)(\s+[-+]?\d+(?:\.\d+)?)?$/);
+  const base = m ? m[1] : String(name || "");
+  const hu = HU_TEAM_LOOKUP[_huTeamKey(base)];
+  return hu ? hu + ((m && m[2]) || "") : name;
+}
+// "A vs B" meccsnév magyarítása
+const huMatch = name => { const p = String(name || "").split(/\s+vs\.?\s+/i); return p.length === 2 ? `${huTeam(p[0])} vs ${huTeam(p[1])}` : name; };
+// Indításkor a még nyitott tippek angol csapatneveit is magyarítjuk (a lezártakhoz nem nyúlunk)
+(() => {
+  let n = 0;
+  const fix = t => {
+    const m = huMatch(t.match), p = huTeam(t.pick);
+    if (m !== t.match || p !== t.pick) { t.match = m; t.pick = p; n++; }
+  };
+  for (const t of history) {
+    if (t.result && t.result !== "pending") continue;
+    if (t.type === "combo") (t.legs || []).forEach(fix); else fix(t);
+  }
+  if (n) { saveHistory(); console.log(`Csapatnevek magyarítva ${n} nyitott tippnél`); }
+})();
 function normTeam(s) {
   let t = (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const key = t.replace(/[^a-z0-9]+/g, " ").trim();
