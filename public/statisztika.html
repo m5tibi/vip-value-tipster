@@ -304,7 +304,7 @@ function getPeriodTips() {
       return d && (!currentPeriod.from || d >= currentPeriod.from) && (!currentPeriod.to || d <= currentPeriod.to);
     });
   }
-  return allTips.filter(t => getYearMonth(t.addedAt || t.commence) === currentPeriod);
+  return allTips.filter(t => statTipMonth(t) === currentPeriod);
 }
 
 
@@ -458,7 +458,7 @@ function presetRange(days) {
 }
 
 function buildPeriodPicker(tips) {
-  const months = [...new Set(tips.map(t => getYearMonth(t.addedAt || t.commence)).filter(Boolean))].sort().reverse();
+  const months = [...new Set(tips.map(statTipMonth).filter(Boolean))].sort().reverse();
 
   const bar = document.getElementById('period-bar');
   months.forEach(m => {
