@@ -28,6 +28,7 @@
 button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:#5d7a96;cursor:pointer;transition:all .15s}button.lang-toggle:hover{border-color:#00e676;color:#00e676}
 </style>
 <script src="/lang.js"></script>
+<script src="/tracking.js" defer></script>
 </head>
 <body>
 <div class="card"><div style="text-align:right;margin-bottom:12px"><button class="lang-toggle" onclick="toggleLang()">🇬🇧 EN</button></div>
@@ -46,5 +47,16 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
   <hr class="divider"/>
   <p class="note"><span data-i18n="success.note">Visszaigazolót küldtünk e-mailben. Az előfizetés kezeléséhez látogass az</span> <a href="/elofizetes.html" style="color:#5d7a96" data-i18n="success.note_link">Előfizetés</a> <span data-i18n="success.note_end">oldalra.</span></p>
 </div>
+<script>
+// Meta Pixel Purchase esemény (csak hozzájárulással) – Stripe munkamenetenként egyszer,
+// hogy az oldal újratöltése ne számolja újra a vásárlást.
+document.addEventListener('DOMContentLoaded', function () {
+  var sid = new URLSearchParams(location.search).get('session_id');
+  if (!sid || !window.track) return;
+  var key = 'px_purchase_' + sid;
+  try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch (e) {}
+  window.track('Purchase', { value: window.META_PURCHASE_VALUE, currency: 'HUF' }, { eventID: sid });
+});
+</script>
 </body>
 </html>

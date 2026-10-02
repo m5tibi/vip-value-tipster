@@ -25,13 +25,14 @@
 button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:#5d7a96;cursor:pointer;transition:all .15s}button.lang-toggle:hover{border-color:#00e676;color:#00e676}
 </style>
 <script src="/lang.js"></script>
+<script src="/tracking.js" defer></script>
 </head>
 <body>
 <div class="wrap"><div id="legal-lang-notice">This document is currently only available in Hungarian.</div>
   <button class="lang-toggle" onclick="toggleLang()">🇬🇧 EN</button> <a href="/" class="back">← Vissza a főoldalra</a>
 
   <h1>Adatkezelési tájékoztató</h1>
-  <div class="meta">Hatályos: 2026. július 14-től · GDPR (EU) 2016/679 · AI Foci Tippek</div>
+  <div class="meta">Hatályos: 2026. október 1-jétől · GDPR (EU) 2016/679 · AI Foci Tippek</div>
 
   <div class="box todo">
 
@@ -79,13 +80,21 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
   </table>
   <p><b>Bankkártyaadatokat nem látunk és nem tárolunk</b> – a fizetést (a fizetős szakasz indulásakor) a Stripe kezeli.</p>
 
-  <h2>3. Sütik (cookie-k)</h2>
-  <p>A Weboldal <b>kizárólag működéshez feltétlenül szükséges sütit</b> használ:</p>
+  <h2 id="sutik">3. Sütik (cookie-k)</h2>
+  <p><b>Működéshez feltétlenül szükséges</b> (hozzájárulás nélkül, mert nélkülük a szolgáltatás nem működik):</p>
   <table>
-    <tr><th>Süti</th><th>Cél</th><th>Élettartam</th></tr>
+    <tr><th>Süti / tároló</th><th>Cél</th><th>Élettartam</th></tr>
     <tr><td><code>aft_session</code></td><td>Belépési munkamenet fenntartása (hogy belépve maradj)</td><td>30 nap</td></tr>
+    <tr><td><code>cookie_consent_v1</code> (böngésző helyi tárolója)</td><td>A süti-hozzájárulásról hozott döntésed megjegyzése</td><td>Visszavonásig / törlésig</td></tr>
   </table>
-  <p>Nem használunk marketing- vagy analitikai sütit, nyomkövetést, sem hirdetési célú profilalkotást. Emiatt <b>süti-hozzájáruló ablak (cookie banner) nem szükséges</b> – a működéshez elengedhetetlen sütik ez alól mentesülnek. (Ha a jövőben analitikát vezetnénk be, erről előzetesen tájékoztatunk, és hozzájárulást kérünk.)</p>
+  <p><b>Marketingsüti – csak a hozzájárulásoddal</b> (GDPR 6. cikk (1) a), Eht. 155. § (4)): a Facebook/Instagram-hirdetéseink hatékonyságának mérésére és hirdetési célcsoportok képzésére a <b>Meta Pixelt</b> használjuk. A pixel <b>csak akkor töltődik be, ha az oldal alján megjelenő sávban az „Elfogadom” gombra kattintasz</b>; a „Csak a szükséges” választásakor nem fut.</p>
+  <table>
+    <tr><th>Süti</th><th>Szolgáltató</th><th>Cél</th><th>Élettartam</th></tr>
+    <tr><td><code>_fbp</code>, <code>_fbc</code></td><td>Meta Platforms Ireland Ltd.</td><td>Böngésző azonosítása, hirdetésre kattintás mérése</td><td>90 nap</td></tr>
+    <tr><td><code>fr</code> és egyéb Meta-sütik</td><td>Meta Platforms Ireland Ltd.</td><td>Hirdetések megjelenítése, mérése (a facebook.com domainen)</td><td>legfeljebb 90 nap</td></tr>
+  </table>
+  <p>Hozzájárulás esetén a Meta a következőket kapja meg: a meglátogatott oldalak címe, a böngésző és az eszköz adatai, IP-cím, a fenti sütiazonosítók, valamint ezek az események: regisztráció, előfizetés indítása, sikeres előfizetés (összeggel). <b>E-mail címet, nevet vagy más közvetlen azonosítót nem küldünk a Metának.</b> Az adatok gyűjtése és továbbítása tekintetében a Meta Platforms Ireland Ltd. és mi közös adatkezelők vagyunk; a Meta további adatkezeléséről a <a href="https://www.facebook.com/privacy/policy" target="_blank" rel="noopener">Meta adatvédelmi szabályzata</a> tájékoztat. A Meta az adatokat az USA-ba is továbbíthatja (EU-USA Adatvédelmi Keret).</p>
+  <p><b>A hozzájárulásodat bármikor visszavonhatod</b> (ez nem érinti a visszavonás előtti adatkezelés jogszerűségét): <button type="button" onclick="window.openCookieSettings && window.openCookieSettings()" style="cursor:pointer;background:transparent;border:1px solid #00e676;color:#00e676;border-radius:6px;padding:3px 10px;font-weight:600">Süti-beállítások</button></p>
 
   <h2>4. Adatfeldolgozók (kinek adjuk át az adatokat?)</h2>
   <table>
@@ -104,6 +113,11 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
       <td><b>Stripe Payments Europe, Ltd.</b> (Írország) – <i>csak fizetős szakaszban</i></td>
       <td>Fizetés feldolgozása</td>
       <td>E-mail cím, fizetési adatok</td>
+    </tr>
+    <tr>
+      <td><b>Meta Platforms Ireland Ltd.</b> (Írország) – <i>csak hozzájárulás esetén</i></td>
+      <td>Hirdetésmérés (Meta Pixel), lásd a 3. pontot</td>
+      <td>Oldalmegtekintések, események, böngésző- és sütiazonosítók, IP-cím</td>
     </tr>
     <tr>
       <td><b>KBOSS.hu Kft. (szamlazz.hu)</b> – <i>csak fizetős szakaszban</i></td>

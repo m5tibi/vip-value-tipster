@@ -23,6 +23,7 @@ app.set("trust proxy", 1);                   // Render proxy mögött fut → re
 app.use(express.json());
 app.use(cookieParser());
 app.use(auth.attachUser);                    // minden kérésre beteszi a req.user-t
+app.use(require("./routes/tracking"));       // /tracking.js – Meta Pixel süti-hozzájárulással
 app.use(express.static(path.join(__dirname, "public")));
 app.use('/api/odds', require('./routes/odds'));
 

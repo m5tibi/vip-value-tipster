@@ -71,6 +71,7 @@
 button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;color:#5d7a96;cursor:pointer;transition:all .15s}button.lang-toggle:hover{border-color:#00e676;color:#00e676}
 </style>
 <script src="/lang.js"></script>
+<script src="/tracking.js" defer></script>
 </head>
 <body>
 
@@ -152,6 +153,7 @@ async function startCheckout() {
   const msg = document.getElementById('msg');
   btn.disabled = true;
   btn.textContent = window.t('sub.redirecting');
+  if (window.track) window.track('InitiateCheckout', { value: window.META_PURCHASE_VALUE, currency: 'HUF' });
   msg.textContent = '';
   msg.className   = '';
   try {

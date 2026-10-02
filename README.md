@@ -24,6 +24,7 @@ könyvtárban (Renderen a `/data` perzisztens lemez).
 | `routes/telegram.js` | Telegram bot (`/tippek`, admin `/elemzes`) |
 | `routes/analyzer.js` | Meccselemző előzmények szinkronja |
 | `routes/odds.js` | Odds API proxy |
+| `routes/tracking.js`, `lib/tracking-client.js` | Meta Pixel süti-hozzájárulással (`/tracking.js`) |
 | `lib/security.js` | XSS-szűrés az API válaszokon, próbálkozás-korlátozás |
 | `lib/admin.js` | Admin jogosultság ellenőrzése |
 | `auth.js`, `users.js`, `mailer.js` | Session, felhasználó-tár, e-mail küldés |
@@ -69,3 +70,5 @@ könyvtárban (Renderen a `/data` perzisztens lemez).
 | `MONDOMATUTIT_ADMIN_PASSWORD` | A „→ Mondomatutit” gombhoz: ezzel küldi át a tippet a mondomatutit.hu-ra |
 | `MONDOMATUTIT_URL` | A mondomatutit címe (alapértelmezés: `https://mondomatutit.hu`) |
 | `DATA_DIR` | Adatkönyvtár (alapértelmezés: `/data`) |
+| `META_PIXEL_ID` | Meta (Facebook) Pixel azonosító. Ha be van állítva, az oldal alján süti-hozzájárulási sáv jelenik meg, és a pixel csak elfogadás után töltődik be. Események: `PageView`, `CompleteRegistration`, `InitiateCheckout`, `Purchase` |
+| `META_PURCHASE_VALUE` | A `Purchase` / `InitiateCheckout` esemény értéke forintban (alapértelmezés: `14990`) |
