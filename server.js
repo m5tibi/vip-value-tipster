@@ -580,7 +580,7 @@ async function fetchAiTips(matchList, alreadyTipped = [], poissonEdge = new Map(
 
   const hasAnyPoisson = poissonEdge.size > 0;
   const poissonInstruction = hasAnyPoisson
-    ? `\n⚡ POISSON VALUE JELZÉS (ajánlás, nem tiltás): A meccsek mellett jelöltük, melyik piacokon mutat a Poisson-modell +5%+ edge-et (✅ VALUE PIACOK). Ezeket részesítsd előnyben. A ℹ️ jelölésű meccseken a modell nem talált value-t, de ezek is tippelhetők, ha a web keresés alapján megalapozottak. A kért tippszámot ettől függetlenül teljesítsd.\n`
+    ? `\n⚡ POISSON VALUE JELZÉS (ajánlás, nem tiltás): A meccsek mellett jelöltük, melyik piacokon mutat a Poisson-modell +5%+ edge-et (✅ VALUE PIACOK). Ezeket részesítsd előnyben. A ℹ️ jelölésű meccseken a modell nem talált value-t, de ezek is tippelhetők, ha a web keresés alapján megalapozottak. A kért tippszámot ettől függetlenül teljesítsd. A Poisson-jelölés csak a piac kiválasztását segíti – az indoklásban NE hivatkozz rá (se edge-re, se modell- vagy implikált valószínűségre).\n`
     : "";
 
   const prompt = `Te egy profi labdarúgás-fogadási elemző vagy. Használj web keresést az aktuális formához, sérülésekhez és keretinformációkhoz az alábbi közelgő foci meccsekre (a következő ~36 óra).
@@ -629,7 +629,11 @@ KÖZÖS szabályok:
 - KIZÁRÓLAG a fenti listában szereplő meccsekre adj tippet, pontosan az ott megadott párosítással. Ha a webes keresés más meccset (más ellenfelet, más napot) mutat, azt hagyd figyelmen kívül – a listán kívüli tippeket a rendszer eldobja.
 - Az "odds" mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd (a megfelelő piac/kimenet oddsát).
 - A "market" és "pick" pontosan egyezzen egy valós piaccal/kimenettel; a csapatnév a fent megadott formában szerepeljen.
-- Részletes, 3-4 mondatos magyar indoklás valós adatok alapján, konkrét számokkal (forma, gólátlag, egymás elleni eredmények, hiányzók) – csak a "tippek"-hez kell note.
+- Részletes, 3-4 mondatos magyar indoklás valós adatok alapján – csak a "tippek"-hez kell note. Az indoklás szabályai:
+  * LEGALÁBB KÉT konkrét, ellenőrizhető adatot tartalmazzon a következők közül: legutóbbi meccsek eredménye (pl. "az utolsó 5 meccsből 4-et megnyert, 11-3-as gólkülönbséggel"), tabellahelyzet és pontszám, egymás elleni eredmények (H2H, dátummal vagy eredménnyel), gólátlag / kapott gólok, konkrét hiányzók név szerint.
+  * TILOS az oddsot, a szorzót, a piaci árat vagy az irodák árazását érvként használni: ne írj olyat, hogy "az 1.85-ös odds értéket kínál", "a piac alulárazza", "jó ár", "value", "a szorzó indokolt". Az odds nem érv – az indoklás csak a csapatokról és a meccsről szóljon.
+  * Ne írj általánosságot adat nélkül ("jó formában van", "esélyes", "papíron erősebb") – minden állítás mögött legyen szám vagy tény.
+  * Ha nem találsz legalább két konkrét adatot egy meccsről, arra a meccsre NE adj single tippet.
 
 Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
 {"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ Premier League","commence":"07.05 20:00","market":"Over 2.5","pick":"Over 2.5","odds":1.85,"note":"..."},{"match":"...","sport":"soccer","sportLabel":"⚽ La Liga","commence":"07.05 21:00","market":"BTTS","pick":"Igen","odds":1.78,"note":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ Bundesliga","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28},{"match":"...","sportLabel":"⚽ Serie A","commence":"07.05 20:00","market":"1X2","pick":"Csapat A","odds":1.35}]}`;
