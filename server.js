@@ -1833,22 +1833,92 @@ app.post("/api/refresh", async (req, res) => {
   }
 });
 
+// ── Kézi tippszerkesztés (admin) ────────────────────────────
+// Szöveges mező tisztítása: string, levágva, hosszkorláttal
+const cleanStr = (v, max = 200) => String(v == null ? "" : v).trim().slice(0, max);
+const cleanOdds = v => { const n = parseFloat(String(v == null ? "" : v).replace(",", ".")); return n > 1 && n < 1000 ? parseFloat(n.toFixed(2)) : null; };
+// Kombi lábak tisztítása. A régi lábak közül az azonos meccsű láb eredményét és liga-kulcsát
+// megtartjuk; kicserélt (más meccsű) lábnál ezek törlődnek, hogy az elszámolás újra keressen.
+function cleanLegs(legs, oldLegs = []) {
+  if (!Array.isArray(legs)) return null;
+  const out = [];
+  for (const l of legs.slice(0, 12)) {
+    const match = cleanStr(l && l.match), pick = cleanStr(l && l.pick), odds = cleanOdds(l && l.odds);
+    if (!match || !pick || !odds) return null;
+    const old = oldLegs.find(o => o && o.match === match);
+    out.push({
+      match, pick, odds,
+      market:     cleanStr(l.market, 80) || "1X2",
+      sportLabel: cleanStr(l.sportLabel, 60) || "⚽",
+      commence:   cleanStr(l.commence, 40) || null,
+      result:     old ? (old.result ?? null) : null,
+      sportKey:   old ? (old.sportKey || null) : null,
+    });
+  }
+  return out.length ? out : null;
+}
+const comboOdds = legs => parseFloat(legs.reduce((p, l) => p * l.odds, 1).toFixed(2));
+function refreshTipLists() {
+  const open = t => !t.result || t.result === "pending";
+  aiTips    = history.filter(t => t.type === "ai"    && open(t));
+  comboTips = history.filter(t => t.type === "combo" && open(t));
+  freeTips  = history.filter(t => t.type === "free"  && open(t));
+}
+
+// Biankó tipp: az admin mindent maga ad meg (single / free / kombi)
+app.post("/api/history", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const b = req.body || {};
+  const kind = b.kind === "combo" ? "combo" : b.kind === "free" ? "free" : "ai";
+  const note = cleanStr(b.note, 3000);
+  const base = { approved: !!b.approved, sent: false, addedAt: nowHu(), result: "pending", custom: true, note };
+  let tip;
+  if (kind === "combo") {
+    const legs = cleanLegs(b.legs);
+    if (!legs || legs.length < 2) return res.status(400).json({ error: "A kombihoz legalább 2 kitöltött láb kell (meccs, tipp, odds)" });
+    tip = { ...base, id: `combo-man-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, type: "combo",
+            legN: legs.length, legs, odds: comboOdds(legs), comboPayout: null, note: note || `${legs.length} lábas kötés` };
+  } else {
+    const match = cleanStr(b.match), pick = cleanStr(b.pick), odds = cleanOdds(b.odds);
+    if (!/\svs\.?\s/i.test(match) || !pick || !odds) return res.status(400).json({ error: "Hiányzó adat: mindkét csapat, tipp és 1-nél nagyobb odds kell" });
+    tip = { ...base, id: `man-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, type: kind, sport: "soccer",
+            sportLabel: cleanStr(b.sportLabel, 60) || "⚽", match, commence: cleanStr(b.commence, 40) || null,
+            market: cleanStr(b.market, 80) || "1X2", pick, odds, live: false };
+  }
+  history = [tip, ...history];
+  saveHistory();
+  refreshTipLists();
+  console.log(`[kézi tipp] ${tip.type}: ${tip.match || tip.legs.map(l => l.match).join(" + ")} @ ${tip.odds}`);
+  res.json({ ok: true, tip });
+});
+
 app.patch("/api/history/:id", (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const { result, note, comboPayout, odds, legs, pick, market } = req.body;
+  const { result, note, comboPayout, odds, legs, pick, market, match, commence, sportLabel } = req.body;
 
-  // Note / odds / pick / market / legs szerkesztés
-  if (note !== undefined || odds !== undefined || legs !== undefined || pick !== undefined || market !== undefined) {
+  // Szerkesztés: indoklás, odds, tipp, piac, meccs (csapatok), kezdés, liga, kombi lábak
+  if ([note, odds, legs, pick, market, match, commence, sportLabel].some(v => v !== undefined)) {
+    const cur = history.find(t => t.id === req.params.id);
+    if (!cur) return res.status(404).json({ error: "Nincs ilyen tipp" });
     const patch = {};
-    if (note   !== undefined) patch.note   = note;
-    if (odds   !== undefined) patch.odds   = parseFloat(odds);
-    if (pick   !== undefined) patch.pick   = pick;
-    if (market !== undefined) patch.market = market;
+    if (note   !== undefined) patch.note   = cleanStr(note, 3000);
+    if (odds   !== undefined && cleanOdds(odds)) patch.odds = cleanOdds(odds);
+    if (pick   !== undefined) patch.pick   = cleanStr(pick);
+    if (market !== undefined) patch.market = cleanStr(market, 80);
+    if (sportLabel !== undefined) patch.sportLabel = cleanStr(sportLabel, 60) || "⚽";
+    if (commence   !== undefined) patch.commence   = cleanStr(commence, 40) || null;
+    if (match !== undefined) {
+      const m = cleanStr(match);
+      if (!/\svs\.?\s/i.test(m)) return res.status(400).json({ error: "A meccs formája: \"Hazai vs Vendég\"" });
+      // Más meccs → a régi liga-kulcs és Poisson-adat már nem érvényes
+      if (m !== cur.match) { patch.match = m; patch.sportKey = null; patch.poisson = null; }
+    }
     if (legs !== undefined) {
-      patch.legs  = legs;
-      patch.legN  = legs.length;
-      const totalOdds = legs.reduce((p, l) => p * parseFloat(l.odds || 1), 1);
-      patch.totalOdds = parseFloat(totalOdds.toFixed(2));
+      const clean = cleanLegs(legs, cur.legs || []);
+      if (!clean) return res.status(400).json({ error: "Minden lábhoz kell meccs, tipp és 1-nél nagyobb odds" });
+      patch.legs = clean;
+      patch.legN = clean.length;
+      patch.odds = comboOdds(clean);
     }
     const upd = t => t.id === req.params.id ? { ...t, ...patch } : t;
     history = history.map(upd); latestTips = latestTips.map(upd);

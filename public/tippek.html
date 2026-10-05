@@ -235,6 +235,7 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
       <div class="last-update" id="last-update" data-i18n="tips.no_analysis">Még nem futott elemzés</div>
       <button class="btn-send" id="btn-send-tips" onclick="sendTips()" style="display:none">📤 Jóváhagyottak küldése</button>
       <button class="btn-send" id="btn-preview" onclick="openPreviewModal()" style="display:none">🔍 Meccsek</button>
+      <button class="btn-send" id="btn-new-tip" onclick="openTipEditor(null)" style="display:none">➕ Új tipp</button>
       <button class="btn-refresh" id="btn-refresh" style="display:none">🔄 Frissítés most</button>
     </div>
     <!-- Free tip section (admin sees pending, users see approved) -->
@@ -448,6 +449,7 @@ function applyAdminUI() {
   const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
   show('btn-refresh', admin);
   show('btn-preview', admin);
+  show('btn-new-tip', admin);
   show('btn-send-tips', admin);
   show('btn-login',  !loggedIn);
   show('btn-logout', loggedIn);
@@ -1253,63 +1255,163 @@ async function setFreeResult(id, result) {
   showStatus('✅ Free tipp eredmény beállítva');
 }
 
-async function editNote(id, btn) {
-  // Keresés az összes tipp tömbben
+async function editNote(id) {
   const allTips = [...(currentFreeTips||[]), ...(aiTips||[]), ...(comboTips||[]), ...(history||[])];
-  const tipData = allTips.find(t => t.id === id);
-  const isCombo = tipData && (tipData.type === "combo" || (tipData.legs && tipData.legs.length > 0));
+  const tip = allTips.find(t => t.id === id);
+  if (!tip) return showStatus("Nem található a tipp", true);
+  openTipEditor(tip);
+}
 
-  if (isCombo && tipData.legs && tipData.legs.length > 0) {
-    const newLegs = [];
-    for (let i = 0; i < tipData.legs.length; i++) {
-      const leg = tipData.legs[i];
-      const newPick = prompt(`${i+1}/${tipData.legs.length}. láb – ${leg.match}\nPick (hagyd ÜRESEN a láb TÖRLÉSÉHEZ):`, leg.pick);
-      if (newPick === null) return;
-      if (newPick.trim() === "") continue; // üres = törlés
-      const newOddsStr = prompt(`${i+1}. láb odds:`, String(leg.odds));
-      if (newOddsStr === null) return;
-      const newOdds = parseFloat(newOddsStr.replace(",","."));
-      newLegs.push({ ...leg, pick: newPick, odds: isNaN(newOdds) ? leg.odds : newOdds });
-    }
-    if (newLegs.length === 0) { alert("Legalább 1 lábnak maradnia kell!"); return; }
-    const newNote = prompt("Indoklás:", tipData.note || "");
-    if (newNote === null) return;
-    const totalOdds = newLegs.reduce((p,l) => p * parseFloat(l.odds||1), 1);
-    const patch = { legs: newLegs, note: newNote, odds: parseFloat(totalOdds.toFixed(2)) };
-    const r = await fetch("/api/history/"+encodeURIComponent(id), {
-      method:"PATCH", headers:{"Content-Type":"application/json",...adminHeaders()},
-      body: JSON.stringify(patch)
-    });
-    if (r.ok) { showStatus("✏️ Kombi szerkesztve"); await loadHistory(); await loadTips(); }
-    else showStatus("Hiba!", true);
-    return;
+// ── Tippszerkesztő (szerkesztés + biankó tipp) ───────────────
+// commence formátum: "10. 05. 20:45" (év nélkül) ↔ datetime-local: "2026-10-05T20:45"
+function commenceToInput(c) {
+  const m = String(c || "").match(/^(\d{1,2})\.\s*(\d{1,2})\.?\s+(\d{1,2}):(\d{2})/);
+  if (!m) return "";
+  const p = n => String(n).padStart(2, "0");
+  return `${new Date().getFullYear()}-${p(m[1])}-${p(m[2])}T${p(m[3])}:${m[4]}`;
+}
+function inputToCommence(v) {
+  const m = String(v || "").match(/^\d{4}-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  return m ? `${m[1]}. ${m[2]}. ${m[3]}:${m[4]}` : "";
+}
+function splitMatch(match) {
+  const p = String(match || "").split(/\s+vs\.?\s+/i);
+  return p.length === 2 ? p : [match || "", ""];
+}
+let tipEditor = null;   // { id | null, kind }
+
+function teField(label, el) {
+  const w = document.createElement("label");
+  w.className = "te-field";
+  const s = document.createElement("span"); s.textContent = label;
+  w.appendChild(s); w.appendChild(el);
+  return w;
+}
+function teInput(value, placeholder, type) {
+  const i = document.createElement("input");
+  i.type = type || "text"; i.value = value || ""; if (placeholder) i.placeholder = placeholder;
+  if (type === "datetime-local") i.style.colorScheme = "dark";
+  return i;
+}
+function teMarketInput(value) {
+  const i = teInput(value || "1X2", "1X2 / Gólszám / Hendikep / BTTS");
+  i.setAttribute("list", "te-markets");
+  return i;
+}
+
+// Egy meccs-blokk (single-nél egy, kombinál lábanként egy)
+function teMatchBlock(data, isLeg) {
+  const box = document.createElement("div");
+  box.className = isLeg ? "te-leg" : "te-single";
+  const [home, away] = splitMatch(data.match);
+  const f = {
+    home: teInput(home, "Hazai csapat"), away: teInput(away, "Vendég csapat"),
+    league: teInput(data.sportLabel || "⚽", "⚽ Premier League"),
+    commence: teInput(commenceToInput(data.commence), "", "datetime-local"),
+    market: teMarketInput(data.market), pick: teInput(data.pick, "Pl. Ferencváros / Több mint 2,5 gól / Igen"),
+    odds: teInput(data.odds ? String(data.odds) : "", "1.85", "text"),
+  };
+  f.odds.inputMode = "decimal";
+  box._f = f; box._orig = data;
+  if (isLeg) {
+    const head = document.createElement("div"); head.className = "te-leg-head";
+    const t = document.createElement("b"); t.className = "te-leg-title"; head.appendChild(t);
+    const del = document.createElement("button"); del.type = "button"; del.className = "te-del"; del.textContent = "✕ Láb törlése";
+    del.onclick = () => { box.remove(); teRenumber(); teUpdateTotal(); };
+    head.appendChild(del); box.appendChild(head);
   }
+  const row = (...els) => { const r = document.createElement("div"); r.className = "te-row"; els.forEach(e => r.appendChild(e)); box.appendChild(r); };
+  row(teField("Hazai", f.home), teField("Vendég", f.away));
+  row(teField("Liga", f.league), teField("Kezdés", f.commence));
+  row(teField("Piac", f.market), teField("Tipp", f.pick), teField("Odds", f.odds));
+  f.odds.addEventListener("input", teUpdateTotal);
+  return box;
+}
+function teRenumber() {
+  document.querySelectorAll("#te-legs .te-leg-title").forEach((t, i) => t.textContent = `${i + 1}. láb`);
+}
+function teUpdateTotal() {
+  const el = document.getElementById("te-total");
+  if (!el) return;
+  const legs = [...document.querySelectorAll("#te-legs .te-leg")];
+  const tot = legs.reduce((p, b) => p * (parseFloat(String(b._f.odds.value).replace(",", ".")) || 1), 1);
+  el.textContent = legs.length ? `Össz odds: ${tot.toFixed(2)} (${legs.length} láb)` : "";
+}
+function teAddLeg(data) {
+  document.getElementById("te-legs").appendChild(teMatchBlock(data || {}, true));
+  teRenumber(); teUpdateTotal();
+}
+function teSetKind(kind) {
+  tipEditor.kind = kind;
+  document.querySelectorAll("#te-kind button").forEach(b => b.classList.toggle("active", b.dataset.kind === kind));
+  const combo = kind === "combo";
+  document.getElementById("te-single-wrap").style.display = combo ? "none" : "";
+  document.getElementById("te-combo-wrap").style.display  = combo ? "" : "none";
+  if (combo && !document.querySelector("#te-legs .te-leg")) { teAddLeg(); teAddLeg(); }
+}
 
-  // Single / free szerkesztés
-  const currentNote  = tipData ? (tipData.note   || "") : "";
-  const currentOdds  = tipData ? String(tipData.odds  || "") : "";
-  const currentPick  = tipData ? (tipData.pick   || "") : "";
-  const currentMkt   = tipData ? (tipData.market || "") : "";
+function openTipEditor(tip) {
+  const isNew = !tip;
+  const kind = tip ? (tip.type === "combo" || (tip.legs && tip.legs.length) ? "combo" : tip.type === "free" ? "free" : "ai") : "ai";
+  tipEditor = { id: tip ? tip.id : null, kind };
+  document.getElementById("te-title").textContent = isNew ? "➕ Új tipp (biankó)" : "✏️ Tipp szerkesztése";
+  document.getElementById("te-kind").style.display = isNew ? "" : "none";     // meglévő tipp típusa nem változik
+  document.getElementById("te-approved-wrap").style.display = isNew ? "" : "none";
+  document.getElementById("te-approved").checked = false;
+  document.getElementById("te-err").textContent = "";
+  const sw = document.getElementById("te-single-wrap"); sw.innerHTML = "";
+  sw.appendChild(teMatchBlock(tip && kind !== "combo" ? tip : {}, false));
+  const lw = document.getElementById("te-legs"); lw.innerHTML = "";
+  if (tip && kind === "combo") (tip.legs || []).forEach(l => teAddLeg(l));
+  document.getElementById("te-note").value = tip ? (tip.note || "") : "";
+  teSetKind(kind);
+  document.getElementById("tip-editor").classList.add("open");
+}
+function closeTipEditor() { document.getElementById("tip-editor").classList.remove("open"); }
 
-  const newMkt = prompt("Piac (pl. 1X2 / Over 2.5 / BTTS / Hendikep -1):", currentMkt);
-  if (newMkt === null) return;
-  const newPick = prompt("Tipp (pick):", currentPick);
-  if (newPick === null) return;
-  const newOddsStr = prompt("Odds:", currentOdds);
-  if (newOddsStr === null) return;
-  const newNote = prompt("Indoklás:", currentNote);
-  if (newNote === null) return;
+function teReadBlock(box) {
+  const f = box._f;
+  const home = f.home.value.trim(), away = f.away.value.trim();
+  return {
+    match: home && away ? `${home} vs ${away}` : "",
+    sportLabel: f.league.value.trim() || "⚽",
+    commence: inputToCommence(f.commence.value),
+    market: f.market.value.trim() || "1X2",
+    pick: f.pick.value.trim(),
+    odds: parseFloat(String(f.odds.value).replace(",", ".")),
+  };
+}
 
-  const patch = { note: newNote, pick: newPick, market: newMkt };
-  const parsedOdds = parseFloat(newOddsStr.replace(",","."));
-  if (!isNaN(parsedOdds) && parsedOdds > 1) patch.odds = parsedOdds;
-
-  const r = await fetch("/api/history/"+encodeURIComponent(id), {
-    method:"PATCH", headers:{"Content-Type":"application/json",...adminHeaders()},
-    body: JSON.stringify(patch)
+async function saveTipEditor() {
+  const err = document.getElementById("te-err");
+  err.textContent = "";
+  const note = document.getElementById("te-note").value.trim();
+  let body;
+  if (tipEditor.kind === "combo") {
+    const legs = [...document.querySelectorAll("#te-legs .te-leg")].map(teReadBlock);
+    const bad = legs.findIndex(l => !l.match || !l.pick || !(l.odds > 1));
+    if (legs.length < 2) return err.textContent = "A kombihoz legalább 2 láb kell.";
+    if (bad >= 0) return err.textContent = `${[1, 5].includes(bad + 1) ? "Az" : "A"} ${bad + 1}. lábnál hiányzik a csapat, a tipp vagy az odds (1-nél nagyobb szám).`;
+    body = { legs, note };
+  } else {
+    const d = teReadBlock(document.querySelector("#te-single-wrap .te-single"));
+    if (!d.match) return err.textContent = "Add meg mindkét csapatot.";
+    if (!d.pick)  return err.textContent = "Add meg a tippet.";
+    if (!(d.odds > 1)) return err.textContent = "Az odds 1-nél nagyobb szám legyen (pl. 1.85).";
+    body = { ...d, note };
+  }
+  const isNew = !tipEditor.id;
+  if (isNew) { body.kind = tipEditor.kind; body.approved = document.getElementById("te-approved").checked; }
+  const r = await fetch(isNew ? "/api/history" : "/api/history/" + encodeURIComponent(tipEditor.id), {
+    method: isNew ? "POST" : "PATCH",
+    headers: { "Content-Type": "application/json", ...adminHeaders() },
+    body: JSON.stringify(body)
   });
-  if (r.ok) { showStatus("✏️ Szerkesztés mentve"); await loadHistory(); await loadTips(); }
-  else showStatus("Hiba!", true);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) return err.textContent = "Hiba: " + (d.error || ("HTTP " + r.status));
+  closeTipEditor();
+  showStatus(isNew ? "➕ Tipp létrehozva" + (body.approved ? " és jóváhagyva" : " – jóváhagyásra vár") : "✏️ Szerkesztés mentve");
+  await loadHistory(); await loadTips();
 }
 
 async function setResult(id, result) {
@@ -1675,6 +1777,53 @@ async function syncStripe() {
     </div>
   </div>
 </div>
+
+<!-- ── Tippszerkesztő (szerkesztés + biankó tipp) ─────────────── -->
+<style>
+  #tip-editor{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:700;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto}
+  #tip-editor.open{display:flex}
+  #tip-editor .te-card{background:#0d1b2a;border:1px solid #1e3a2f;border-radius:14px;padding:20px;width:min(640px,100%);box-shadow:0 8px 32px rgba(0,0,0,.6);margin:auto 0}
+  #tip-editor .te-kind{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+  #tip-editor .te-kind button{flex:1;padding:8px;border-radius:8px;border:1px solid #1e3a2f;background:transparent;color:#78909c;font-weight:700;cursor:pointer;min-width:90px}
+  #tip-editor .te-kind button.active{border-color:#00e676;color:#00e676;background:rgba(0,230,118,.08)}
+  #tip-editor .te-row{display:flex;gap:10px;flex-wrap:wrap}
+  #tip-editor .te-field{flex:1 1 140px;display:flex;flex-direction:column;gap:4px;margin-bottom:10px;min-width:0}
+  #tip-editor .te-field span{font-size:11px;font-weight:700;color:#80cbc4;letter-spacing:.4px;text-transform:uppercase}
+  #tip-editor input,#tip-editor textarea{width:100%;box-sizing:border-box;padding:9px 10px;border-radius:8px;border:1px solid #1e3a2f;background:#07111d;color:#e0e0e0;font-size:14px;font-family:inherit}
+  #tip-editor textarea{min-height:110px;resize:vertical}
+  #tip-editor .te-leg{border:1px solid #1e3a2f;border-radius:10px;padding:10px 12px 2px;margin-bottom:10px;background:rgba(255,255,255,.02)}
+  #tip-editor .te-leg-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;color:#ffcc80;font-size:13px}
+  #tip-editor .te-del{background:transparent;border:1px solid #5d2a2a;color:#ef9a9a;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer}
+  #tip-editor .te-add{width:100%;padding:9px;border-radius:8px;border:1px dashed #1e3a2f;background:transparent;color:#80cbc4;font-weight:700;cursor:pointer;margin-bottom:6px}
+  #tip-editor .te-hint{font-size:11px;color:#546e7a;margin:-4px 0 12px;line-height:1.5}
+</style>
+<div id="tip-editor" onclick="if(event.target===this)closeTipEditor()">
+  <div class="te-card">
+    <div id="te-title" style="font-size:17px;font-weight:700;color:#00e676;margin-bottom:12px">✏️ Tipp</div>
+    <div class="te-kind" id="te-kind">
+      <button type="button" data-kind="ai" onclick="teSetKind('ai')">🤖 Single</button>
+      <button type="button" data-kind="free" onclick="teSetKind('free')">🆓 Free</button>
+      <button type="button" data-kind="combo" onclick="teSetKind('combo')">🎰 Kombi</button>
+    </div>
+    <div id="te-single-wrap"></div>
+    <div id="te-combo-wrap" style="display:none">
+      <div id="te-legs"></div>
+      <button type="button" class="te-add" onclick="teAddLeg()">➕ Láb hozzáadása</button>
+      <div id="te-total" style="font-size:13px;color:#ffcc80;font-weight:700;margin-bottom:10px"></div>
+    </div>
+    <div class="te-hint">Az automatikus elszámoláshoz: Piac „1X2” → Tipp: csapatnév vagy „Döntetlen”; gólszám → Tipp: „Több mint 2,5 gól” / „Kevesebb mint 2,5 gól”; „Hendikep” → Tipp: „Csapat -1.5”; „BTTS” → Tipp: „Igen” / „Nem”. Más piacot kézzel kell lezárni.</div>
+    <label class="te-field"><span>Indoklás</span><textarea id="te-note" placeholder="Miért ez a tipp? (eredmények, tabella, H2H, hiányzók)"></textarea></label>
+    <label id="te-approved-wrap" style="display:flex;align-items:center;gap:8px;font-size:13px;color:#b0bec5;margin-bottom:12px;cursor:pointer">
+      <input type="checkbox" id="te-approved" style="width:auto"> Azonnal jóváhagyva (publikus)
+    </label>
+    <div id="te-err" style="color:#ef9a9a;font-size:13px;min-height:18px;margin-bottom:8px"></div>
+    <div style="display:flex;gap:10px">
+      <button type="button" onclick="closeTipEditor()" style="flex:1;padding:11px;border-radius:8px;border:1px solid #1e3a2f;background:transparent;color:#78909c;font-weight:700;font-size:14px;cursor:pointer">Mégse</button>
+      <button type="button" onclick="saveTipEditor()" style="flex:2;padding:11px;border-radius:8px;border:none;background:#00e676;color:#060e1b;font-weight:700;font-size:14px;cursor:pointer">💾 Mentés</button>
+    </div>
+  </div>
+</div>
+<datalist id="te-markets"><option value="1X2"><option value="Gólszám"><option value="Hendikep"><option value="BTTS"></datalist>
 
 </body>
 </html>
