@@ -1293,11 +1293,70 @@ function teInput(value, placeholder, type) {
   if (type === "datetime-local") i.style.colorScheme = "dark";
   return i;
 }
+// Piac: választómező a négy elszámolható piaccal + "Egyéb" szabad szöveggel. Ha a tipp eredeti
+// piaca nem pontosan ezek egyike (pl. "Over 2.5"), "Egyéb"-ként, változatlan szöveggel jelenik meg,
+// így mentéskor nem íródik át.
+const TE_MARKETS = ["1X2", "Gólszám", "Hendikep", "BTTS"];
 function teMarketInput(value) {
-  const i = teInput(value || "1X2", "1X2 / Gólszám / Hendikep / BTTS");
-  i.setAttribute("list", "te-markets");
-  return i;
+  const v = value || "1X2";
+  const wrap = document.createElement("div");
+  wrap.className = "te-market";
+  const sel = document.createElement("select");
+  [...TE_MARKETS, "Egyéb…"].forEach(m => { const o = document.createElement("option"); o.value = m; o.textContent = m; sel.appendChild(o); });
+  const other = teInput("", "Piac neve");
+  const known = TE_MARKETS.includes(v);
+  sel.value = known ? v : "Egyéb…";
+  other.value = known ? "" : v;
+  other.style.display = known ? "none" : "";
+  sel.addEventListener("change", () => { other.style.display = sel.value === "Egyéb…" ? "" : "none"; });
+  wrap.appendChild(sel); wrap.appendChild(other);
+  return { el: wrap, sel, get value() { return sel.value === "Egyéb…" ? other.value.trim() : sel.value; } };
 }
+// A piachoz és a csapatokhoz illő gyakori tippek
+function teSuggestions(market, home, away) {
+  home = home || "Hazai"; away = away || "Vendég";
+  const lines = ["0,5", "1,5", "2,5", "3,5", "4,5"];
+  if (market === "Gólszám") return [...lines.map(l => `Több mint ${l} gól`), ...lines.map(l => `Kevesebb mint ${l} gól`)];
+  if (market === "Hendikep") {
+    const h = ["-0.5", "-1", "-1.5", "-2", "+0.5", "+1", "+1.5"];
+    return [...h.map(x => `${home} ${x}`), ...h.map(x => `${away} ${x}`)];
+  }
+  if (market === "BTTS") return ["Igen", "Nem"];
+  if (market === "1X2") return [home, "Döntetlen", away];
+  return [];
+}
+// Tipp mező saját legördülővel (a böngésző javaslatlistája szűr az aktuális értékre, ezért nem mutatna semmit)
+function tePickInput(value, getOptions) {
+  const wrap = document.createElement("div");
+  wrap.className = "te-pick";
+  const i = teInput(value, "Pl. Ferencváros / Több mint 2,5 gól / Igen");
+  const btn = document.createElement("button");
+  btn.type = "button"; btn.className = "te-pick-btn"; btn.textContent = "▾"; btn.title = "Gyakori tippek";
+  const menu = document.createElement("div");
+  menu.className = "te-pick-menu";
+  btn.onclick = e => {
+    e.stopPropagation();
+    const open = menu.classList.contains("open");
+    document.querySelectorAll(".te-pick-menu.open").forEach(m => m.classList.remove("open"));
+    if (open) return;
+    menu.innerHTML = "";
+    const opts = getOptions();
+    if (!opts.length) { const d = document.createElement("div"); d.className = "te-pick-empty"; d.textContent = "Ehhez a piachoz nincs javaslat"; menu.appendChild(d); }
+    opts.forEach(o => {
+      const d = document.createElement("div"); d.className = "te-pick-opt"; d.textContent = o;
+      d.onmousedown = ev => ev.preventDefault();
+      d.onclick = () => { i.value = o; menu.classList.remove("open"); i.focus(); };
+      menu.appendChild(d);
+    });
+    menu.classList.add("open");
+  };
+  wrap.appendChild(i); wrap.appendChild(btn); wrap.appendChild(menu);
+  wrap.input = i;
+  return wrap;
+}
+document.addEventListener("click", e => {
+  if (!e.target.closest || !e.target.closest(".te-pick")) document.querySelectorAll(".te-pick-menu.open").forEach(m => m.classList.remove("open"));
+});
 
 // Egy meccs-blokk (single-nél egy, kombinál lábanként egy)
 function teMatchBlock(data, isLeg) {
@@ -1308,10 +1367,12 @@ function teMatchBlock(data, isLeg) {
     home: teInput(home, "Hazai csapat"), away: teInput(away, "Vendég csapat"),
     league: teInput(data.sportLabel || "⚽", "⚽ Premier League"),
     commence: teInput(commenceToInput(data.commence), "", "datetime-local"),
-    market: teMarketInput(data.market), pick: teInput(data.pick, "Pl. Ferencváros / Több mint 2,5 gól / Igen"),
+    market: teMarketInput(data.market),
     odds: teInput(data.odds ? String(data.odds) : "", "1.85", "text"),
   };
   f.odds.inputMode = "decimal";
+  const pickWrap = tePickInput(data.pick, () => teSuggestions(f.market.value, f.home.value.trim(), f.away.value.trim()));
+  f.pick = pickWrap.input;
   box._f = f; box._orig = data;
   if (isLeg) {
     const head = document.createElement("div"); head.className = "te-leg-head";
@@ -1323,7 +1384,7 @@ function teMatchBlock(data, isLeg) {
   const row = (...els) => { const r = document.createElement("div"); r.className = "te-row"; els.forEach(e => r.appendChild(e)); box.appendChild(r); };
   row(teField("Hazai", f.home), teField("Vendég", f.away));
   row(teField("Liga", f.league), teField("Kezdés", f.commence));
-  row(teField("Piac", f.market), teField("Tipp", f.pick), teField("Odds", f.odds));
+  row(teField("Piac", f.market.el), teField("Tipp", pickWrap), teField("Odds", f.odds));
   f.odds.addEventListener("input", teUpdateTotal);
   return box;
 }
@@ -1376,7 +1437,7 @@ function teReadBlock(box) {
     match: home && away ? `${home} vs ${away}` : "",
     sportLabel: f.league.value.trim() || "⚽",
     commence: inputToCommence(f.commence.value),
-    market: f.market.value.trim() || "1X2",
+    market: f.market.value || "1X2",
     pick: f.pick.value.trim(),
     odds: parseFloat(String(f.odds.value).replace(",", ".")),
   };
@@ -1789,7 +1850,16 @@ async function syncStripe() {
   #tip-editor .te-row{display:flex;gap:10px;flex-wrap:wrap}
   #tip-editor .te-field{flex:1 1 140px;display:flex;flex-direction:column;gap:4px;margin-bottom:10px;min-width:0}
   #tip-editor .te-field span{font-size:11px;font-weight:700;color:#80cbc4;letter-spacing:.4px;text-transform:uppercase}
-  #tip-editor input,#tip-editor textarea{width:100%;box-sizing:border-box;padding:9px 10px;border-radius:8px;border:1px solid #1e3a2f;background:#07111d;color:#e0e0e0;font-size:14px;font-family:inherit}
+  #tip-editor .te-market{display:flex;flex-direction:column;gap:6px}
+  #tip-editor .te-pick{position:relative}
+  #tip-editor .te-pick input{padding-right:36px}
+  #tip-editor .te-pick-btn{position:absolute;right:4px;top:4px;bottom:4px;width:28px;border:0;border-radius:6px;background:#132a3a;color:#80cbc4;font-size:14px;cursor:pointer}
+  #tip-editor .te-pick-menu{display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;background:#0b1a28;border:1px solid #1e3a2f;border-radius:8px;max-height:240px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  #tip-editor .te-pick-menu.open{display:block}
+  #tip-editor .te-pick-opt{padding:9px 12px;font-size:14px;color:#e0e0e0;cursor:pointer}
+  #tip-editor .te-pick-opt:hover{background:rgba(0,230,118,.1);color:#00e676}
+  #tip-editor .te-pick-empty{padding:9px 12px;font-size:12px;color:#546e7a}
+  #tip-editor input,#tip-editor textarea,#tip-editor select{width:100%;box-sizing:border-box;padding:9px 10px;border-radius:8px;border:1px solid #1e3a2f;background:#07111d;color:#e0e0e0;font-size:14px;font-family:inherit}
   #tip-editor textarea{min-height:110px;resize:vertical}
   #tip-editor .te-leg{border:1px solid #1e3a2f;border-radius:10px;padding:10px 12px 2px;margin-bottom:10px;background:rgba(255,255,255,.02)}
   #tip-editor .te-leg-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;color:#ffcc80;font-size:13px}
@@ -1797,7 +1867,7 @@ async function syncStripe() {
   #tip-editor .te-add{width:100%;padding:9px;border-radius:8px;border:1px dashed #1e3a2f;background:transparent;color:#80cbc4;font-weight:700;cursor:pointer;margin-bottom:6px}
   #tip-editor .te-hint{font-size:11px;color:#546e7a;margin:-4px 0 12px;line-height:1.5}
 </style>
-<div id="tip-editor" onclick="if(event.target===this)closeTipEditor()">
+<div id="tip-editor" onmousedown="this._downOnBg=(event.target===this)" onclick="if(event.target===this&&this._downOnBg)closeTipEditor();this._downOnBg=false">
   <div class="te-card">
     <div id="te-title" style="font-size:17px;font-weight:700;color:#00e676;margin-bottom:12px">✏️ Tipp</div>
     <div class="te-kind" id="te-kind">
@@ -1823,7 +1893,6 @@ async function syncStripe() {
     </div>
   </div>
 </div>
-<datalist id="te-markets"><option value="1X2"><option value="Gólszám"><option value="Hendikep"><option value="BTTS"></datalist>
 
 </body>
 </html>
