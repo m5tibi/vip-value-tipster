@@ -1443,7 +1443,7 @@ async function clearHistory() {
 }
 
 async function deleteTip(id) {
-  if (!confirm("Biztosan törlöd ezt a tippet?")) return;
+  if (!confirm("Biztosan törlöd (elveted) ezt a tippet?\nHa még nyitott, a generátor 7 napig nem adja újra pontosan ugyanezt a tippet.")) return;
   const r = await fetch("/api/history/"+encodeURIComponent(id),{method:"DELETE", headers: adminHeaders()});
   if (!(await handleAdminResp(r))) return;
   await loadTips();

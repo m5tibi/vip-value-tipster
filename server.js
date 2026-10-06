@@ -533,7 +533,7 @@ function compactOdds(odds) {
   return Object.entries(groups).map(([k, v]) => `${k}: ${v.join(", ")}`).join(" | ");
 }
 
-async function fetchAiTips(matchList, alreadyTipped = [], poissonEdge = new Map()) {
+async function fetchAiTips(matchList, alreadyTipped = [], poissonEdge = new Map(), rejected = []) {
   if (!ANTHROPIC_KEY) return { singles: [], comboLegs: [], error: "nincs ANTHROPIC_API_KEY" };
   if (!matchList.length) return { singles: [], comboLegs: [] };
 
@@ -578,6 +578,9 @@ async function fetchAiTips(matchList, alreadyTipped = [], poissonEdge = new Map(
     ? `\nEZEKRE A MECCSEKRE MÁR VAN TIPP – NE szerepeljen sem SINGLE tippként, sem KOMBI LÁBKÉNT: ${alreadyTipped.join("; ")}\n`
     : "";
 
+  const rejectedNote = rejected.length
+    ? `\nEZEKET A SINGLE TIPPEKET AZ ADMIN ELVETETTE – pontosan ezeket NE add újra single tippként (ugyanarra a meccsre más piac/kimenet megengedett): ${rejected.join("; ")}\n`
+    : "";
   const hasAnyPoisson = poissonEdge.size > 0;
   const poissonInstruction = hasAnyPoisson
     ? `\n⚡ POISSON VALUE JELZÉS (ajánlás, nem tiltás): A meccsek mellett jelöltük, melyik piacokon mutat a Poisson-modell +5%+ edge-et (✅ VALUE PIACOK). Ezeket részesítsd előnyben. A ℹ️ jelölésű meccseken a modell nem talált value-t, de ezek is tippelhetők, ha a web keresés alapján megalapozottak. A kért tippszámot ettől függetlenül teljesítsd. A Poisson-jelölés csak a piac kiválasztását segíti – az indoklásban NE hivatkozz rá (se edge-re, se modell- vagy implikált valószínűségre).\n`
@@ -588,7 +591,7 @@ Legfeljebb 12 webes keresésed van: a tabella- és oddsadatok alapján először
 ${poissonInstruction}
 Mai meccsek (valós bookmaker oddsokkal):
 ${matchText}
-${skipNote}
+${skipNote}${rejectedNote}
 NYELV – MINDEN MEZŐT MAGYARUL ADJ MEG:
 - Nemzeti csapatneveknél használd a magyar nevet: pl. Norway → Norvégia, Denmark → Dánia, Austria → Ausztria, Germany → Németország, France → Franciaország, Portugal → Portugália, Spain → Spanyolország, England → Anglia, Scotland → Skócia, Netherlands → Hollandia stb.
 - Klubcsapatneveknél maradj az eredeti névnél (pl. "Bayer Leverkusen", "Manchester City") – ezeknek nincs magyar nevük.
@@ -918,10 +921,16 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
   const untipped = enrichedList.filter(m => !isTipped(m.match));
   const skippedTipped = enrichedList.length - untipped.length;
   if (skippedTipped) console.log(`Már van rá függő tipp, kihagyva: ${skippedTipped} meccs · AI-nak küldve: ${untipped.length}`);
-  const { singles, comboLegs, error: aiError } = await fetchAiTips(untipped, [], poissonEdge);
+  saveRejected();   // lejárt elvetések törlése
+  const rejectedForPrompt = rejectedTips.filter(r => r.kind === "single").map(r => `${r.match} – ${r.pick}`);
+  const { singles, comboLegs, error: aiError } = await fetchAiTips(untipped, [], poissonEdge, rejectedForPrompt);
 
-  // Backstop: a már tippelt meccsekre ne kerüljön újabb SINGLE
-  const newAiTips = singles.filter(t => !isTipped(t.match));
+  // Backstop: a már tippelt meccsekre ne kerüljön újabb SINGLE, és az elvetett tipp se jöjjön vissza
+  const newAiTips = singles.filter(t => !isTipped(t.match)).filter(t => {
+    if (!isRejectedSingle(t)) return true;
+    console.log(`Single kiszűrve (korábban elvetve): ${t.match} – ${t.pick}`);
+    return false;
+  });
 
   // Új single tippek hozzáadása a history-hoz (a meglévők megtartásával)
   const existingIds = new Set(history.map(t => t.id));
@@ -977,6 +986,11 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
 
   const freshCombos = buildCombos(validatedComboLegs, matchList)
     .filter(c => !existingKeys.has(comboKey(c)))
+    .filter(c => {
+      if (!isRejectedCombo(c)) return true;
+      console.log(`Kombi kiszűrve (korábban elvetve): ${(c.legs || []).map(l => `${l.match} – ${l.pick}`).join(" + ")}`);
+      return false;
+    })
     .filter(c => {
       const legs = c.legs || [];
       const totalOdds = legs.reduce((p, l) => p * parseFloat(l.odds || 1), 1);
@@ -1964,9 +1978,68 @@ app.delete("/api/history", (req, res) => {
 });
 
 // Egyetlen tipp/kombi törlése azonosító alapján
+// ── Elvetett tippek ─────────────────────────────────────────
+// Ha az admin egy még nyitott tippet töröl (elvet), azt 7 napig megjegyezzük, és a generátor
+// PONTOSAN ugyanazt a tippet nem adja újra: singlenél ugyanaz a meccs + ugyanaz a kimenet,
+// kombinál ugyanazok a lábak ugyanazokkal a kimenetekkel. Ugyanarra a meccsre más tipp, vagy
+// az elvetett single kombi lábként továbbra is jöhet.
+const REJECTED_FILE = path.join(DATA_DIR, "rejected.json");
+const REJECT_TTL_MS = 7 * 24 * 3600 * 1000;
+let rejectedTips = (() => {
+  try { return JSON.parse(fs.readFileSync(REJECTED_FILE, "utf8")).filter(r => Date.now() - r.ts < REJECT_TTL_MS); }
+  catch (e) { return []; }
+})();
+function saveRejected() {
+  rejectedTips = rejectedTips.filter(r => Date.now() - r.ts < REJECT_TTL_MS);
+  try { fs.writeFileSync(REJECTED_FILE, JSON.stringify(rejectedTips), "utf8"); }
+  catch (e) { console.error("Elvetett tippek mentési hiba:", e.message); }
+}
+// Egy kimenet egységes alakja, hogy "Over 2.5" = "Több mint 2,5 gól", "Bayern Munich" = "Bayern München"
+function canonPick(market, pick) {
+  const txt = x => String(x || "").toLowerCase().replace(/,/g, ".").replace(/\s+/g, " ").trim();
+  const mk = txt(market), pk = txt(pick);
+  const num = s => { const m = s.match(/[-+]?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; };
+  if (mk.includes("btts") || mk.includes("mindkét") || pk.includes("mindkét") || pk.includes("nem talál"))
+    return { kind: "btts", side: /^(nem|no)$/.test(pk) || pk.includes("nem talál") ? "no" : "yes" };
+  if (/over|több mint/.test(pk) || (/over|több mint/.test(mk) && !/under|kevesebb/.test(pk)))
+    return { kind: "over", line: num(pk) ?? num(mk) };
+  if (/under|kevesebb mint/.test(pk) || /under|kevesebb mint/.test(mk))
+    return { kind: "under", line: num(pk) ?? num(mk) };
+  if (mk.includes("hendikep") || mk.includes("handicap"))
+    return { kind: "hcp", team: normTeam(String(pick || "").replace(/\s*[-+]?\d+(\.\d+)?$/, "")), line: num(pk.match(/[-+]?\d+(\.\d+)?$/)?.[0] || "") };
+  if (/^(x|draw|döntetlen)$/.test(pk)) return { kind: "1x2", team: "draw" };
+  return { kind: "1x2", team: normTeam(pick) };
+}
+function samePick(a, b) {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "btts") return a.side === b.side;
+  if (a.kind === "over" || a.kind === "under") return a.line === b.line;
+  if (a.kind === "hcp") return a.line === b.line && nameSim(a.team, b.team);
+  return a.team === b.team || (a.team !== "draw" && b.team !== "draw" && nameSim(a.team, b.team));
+}
+const sameLeg = (a, b) => !!findMatchEntry([{ match: a.match }], b.match) &&
+                          samePick(canonPick(a.market, a.pick), canonPick(b.market, b.pick));
+function isRejectedSingle(t) {
+  return rejectedTips.some(r => r.kind === "single" && sameLeg(r, t));
+}
+function isRejectedCombo(c) {
+  const legs = c.legs || [];
+  return rejectedTips.some(r => r.kind === "combo" && r.legs.length === legs.length &&
+    legs.every(l => r.legs.some(rl => sameLeg(rl, l))));
+}
+function rememberRejected(tip) {
+  if (!tip || (tip.result && tip.result !== "pending")) return;   // lezárt tipp törlése nem elvetés
+  const leg = l => ({ match: l.match, market: l.market, pick: l.pick });
+  rejectedTips.push(tip.type === "combo"
+    ? { kind: "combo", legs: (tip.legs || []).map(leg), ts: Date.now() }
+    : { kind: "single", ...leg(tip), ts: Date.now() });
+  saveRejected();
+}
+
 app.delete("/api/history/:id", (req, res) => {
   if (!requireAdmin(req, res)) return;
   const id = req.params.id;
+  rememberRejected(history.find(t => t.id === id));
   const before = history.length;
   history   = history.filter(t => t.id !== id);
   aiTips    = aiTips.filter(t => t.id !== id);
