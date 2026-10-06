@@ -637,6 +637,9 @@ KÖZÖS szabályok:
   * TILOS az oddsot, a szorzót, a piaci árat vagy az irodák árazását érvként használni: ne írj olyat, hogy "az 1.85-ös odds értéket kínál", "a piac alulárazza", "jó ár", "value", "a szorzó indokolt". Az odds nem érv – az indoklás csak a csapatokról és a meccsről szóljon.
   * Ne írj általánosságot adat nélkül ("jó formában van", "esélyes", "papíron erősebb") – minden állítás mögött legyen szám vagy tény.
   * Ha nem találsz legalább két konkrét adatot egy meccsről, arra a meccsre NE adj single tippet.
+  * Az érvek PONTOSAN a választott tipphez és vonalhoz illeszkedjenek. "Több mint 3,5 gól" tippnél a 4+ gólos meccsek arányát / 3,5 feletti gólátlagot kell bizonyítani – a 2,5-ös vonalról szóló adat ezt NEM támasztja alá. Ugyanígy: hendikepnél a győzelmi különbséget, BTTS-nél a mindkét csapat gólját, 1X2-nél a győzelmeket/vereségeket támaszd alá.
+  * CSAK olyan eredményt, számot és tényt írj, amit a webes keresésben ténylegesen megtaláltál. Ne találj ki meccset, eredményt vagy statisztikát (pl. csoportkörben nincs "visszavágó"); ha egy adatban bizonytalan vagy, hagyd ki.
+  * TILOS a "garantál", "biztos", "biztosan", "100%", "nem kérdés", "kizárt" és hasonló kifejezés – a fogadás kimenete soha nem biztos. Fogalmazz mérlegelve (pl. "jó eséllyel", "a számok alapján valószínű").
 
 Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
 {"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ Premier League","commence":"07.05 20:00","market":"Over 2.5","pick":"Over 2.5","odds":1.85,"note":"..."},{"match":"...","sport":"soccer","sportLabel":"⚽ La Liga","commence":"07.05 21:00","market":"BTTS","pick":"Igen","odds":1.78,"note":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ Bundesliga","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28},{"match":"...","sportLabel":"⚽ Serie A","commence":"07.05 20:00","market":"1X2","pick":"Csapat A","odds":1.35}]}`;
