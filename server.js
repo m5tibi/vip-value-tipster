@@ -442,13 +442,10 @@ async function computePoissonEdge(matchList) {
     const { lambdaHome, lambdaAway } = _lambdaFromStandings(stats.league, home, away);
     const base = _computePoissonProbs(lambdaHome, lambdaAway, 2.5);
 
-    // Bookmaker implikált valószínűség a legjobb odds alapján
+    // Piaci valószínűség: az irodák mediánjából, árrés nélkül (fairProb). A legjobb oddsból
+    // számolt esély túl alacsony lenne, és ezzel a modell értéket "találna", ahol nincs.
     const impliedProb = {};
-    for (const o of (m.odds || [])) {
-      const key = `${o.market}|${o.name}`;
-      const imp = 1 / o.odds;
-      if (!impliedProb[key] || imp < impliedProb[key]) impliedProb[key] = imp;
-    }
+    for (const o of (m.odds || [])) impliedProb[`${o.market}|${o.name}`] = o.fairProb || 1 / o.odds;
 
     const markets = [];
     const addEdge = (market, name, modelProb) => {
@@ -510,6 +507,60 @@ function poissonForTip(pe, market, pick, match) {
     : null;
 }
 
+// ── Piaci esély és érték (EV) ────────────────────────────
+const median = arr => { const a = [...arr].sort((x, y) => x - y), n = a.length; return n ? (n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2) : 0; };
+// Árrés nélküli piaci esély (fairProb) minden kimenethez, az irodák mediánoddsából:
+// 1X2 a 3 kimenet, gólszám az Over/Under pár, hendikep a két csapat ellentétes vonala szerint normálva.
+function addFairProbs(odds) {
+  const norm = group => {
+    const inv = group.map(o => 1 / (o.median || o.odds));
+    const sum = inv.reduce((a, b) => a + b, 0);
+    if (group.length >= 2 && sum > 0) group.forEach((o, i) => { o.fairProb = Math.round(inv[i] / sum * 10000) / 10000; });
+  };
+  norm(odds.filter(o => o.market === "1X2"));
+  const tot = {};
+  odds.filter(o => /^(Over|Under) /.test(o.market)).forEach(o => (tot[o.point] = tot[o.point] || []).push(o));
+  Object.values(tot).forEach(g => g.length === 2 && norm(g));
+  const hcp = odds.filter(o => /^Hendikep/.test(o.market));
+  const used = new Set();
+  for (const a of hcp) {
+    if (used.has(a)) continue;
+    const b = hcp.find(x => x !== a && !used.has(x) && x.point === -a.point && x.name.replace(/\s+[-+]?[\d.]+$/, "") !== a.name.replace(/\s+[-+]?[\d.]+$/, ""));
+    if (b) { used.add(a); used.add(b); norm([a, b]); }
+  }
+}
+
+// A TippmixPro jellemzően a piaci legjobb oddsnál kevesebbet ad (kb. 4–6%-kal). Amíg az admin
+// nem írja be a valós oddsot, az EV-t ezzel a becsült TippmixPro-oddsszal számoljuk.
+const TMP_FACTOR      = parseFloat(process.env.TMP_FACTOR) || 0.95;
+const FREE_ONLY_GAP   = 6;   // modell és piac eltérése (százalékpont), e fölött a tipp csak free lehet
+const VIP_MIN_EV      = 3;   // legalább ennyi % EV kell a VIP-hez
+function tipValuation(t) {
+  if (t.type === "combo") return null;
+  const odds = parseFloat(t.odds);
+  if (!(odds > 1)) return null;
+  const tmpOdds = t.oddsManual ? odds : parseFloat((odds * TMP_FACTOR).toFixed(2));
+  const market = t.marketProb != null ? t.marketProb : null;                      // 0..1
+  const model  = t.poisson && t.poisson.modelProb != null ? t.poisson.modelProb / 100 : null;
+  const pct = x => Math.round(x * 1000) / 10;
+  const ev       = model  != null ? pct(model  * tmpOdds - 1) : null;
+  const marketEv = market != null ? pct(market * tmpOdds - 1) : null;
+  const gap      = model != null && market != null ? pct(Math.abs(model - market)) : null;
+  const freeOnly = gap != null && gap > FREE_ONLY_GAP;
+  return {
+    tmpOdds, estimated: !t.oddsManual,
+    marketProb: market != null ? pct(market) : null, modelProb: model != null ? pct(model) : null,
+    ev, marketEv, gap, freeOnly, vipOk: ev == null ? null : (ev >= VIP_MIN_EV && !freeOnly),
+  };
+}
+// Csak az adminnak szóló mezők – a publikus válaszokból kiszűrjük
+const INTERNAL_TIP_FIELDS = ["risk", "valuation", "marketProb", "oddsManual"];
+function publicTip(t) {
+  const out = { ...t };
+  INTERNAL_TIP_FIELDS.forEach(k => delete out[k]);
+  return out;
+}
+
 // ── AI tippek ─────────────────────────────────────────────
 // Visszatér: { singles: [...], comboLegs: [...] }
 // Tömör odds-szöveg a prompthoz: piaconként csoportosítva, fogadóiroda neve nélkül, csak a fő
@@ -565,7 +616,8 @@ async function fetchAiTips(matchList, alreadyTipped = [], poissonEdge = new Map(
       const [homeName, awayName] = (m.match || "").split(" vs ");
       standingsStr = `\n  Tabella/Forma: ${fmt(m.homeStandings, homeName)} | ${fmt(m.awayStandings, awayName)}`;
     }
-    const base = `- ${m.sport} | ${m.match} | Kezdés: ${m.commence}\n  Valós odds: ${oddsStr}${standingsStr}`;
+    const [hn, an] = String(m.match || "").split(/\s+vs\.?\s+/i);
+    const base = `- ${m.match} | Kezdés: ${m.commence}\n  HAZAI: ${hn} | VENDÉG: ${an} | Bajnokság: ${String(m.sport || "").replace(/^⚽\s*/, "")}\n  Valós odds: ${oddsStr}${standingsStr}`;
     const pe = poissonEdge.get(m.match);
     if (!pe) return base; // nincs Poisson adat → nem szűrjük, de nem annotáljuk
     const valueStr = pe.valueMarkets.length
@@ -586,6 +638,8 @@ async function fetchAiTips(matchList, alreadyTipped = [], poissonEdge = new Map(
     ? `\n⚡ POISSON VALUE JELZÉS (ajánlás, nem tiltás): A meccsek mellett jelöltük, melyik piacokon mutat a Poisson-modell +5%+ edge-et (✅ VALUE PIACOK). Ezeket részesítsd előnyben. A ℹ️ jelölésű meccseken a modell nem talált value-t, de ezek is tippelhetők, ha a web keresés alapján megalapozottak. A kért tippszámot ettől függetlenül teljesítsd. A Poisson-jelölés csak a piac kiválasztását segíti – az indoklásban NE hivatkozz rá (se edge-re, se modell- vagy implikált valószínűségre).\n`
     : "";
 
+  const nowD = new Date(), yr = nowD.getFullYear();
+  const season = nowD.getMonth() >= 6 ? `${yr}/${String(yr + 1).slice(2)}` : `${yr - 1}/${String(yr).slice(2)}`;
   const prompt = `Te egy profi labdarúgás-fogadási elemző vagy. Használj web keresést az aktuális formához, sérülésekhez és keretinformációkhoz az alábbi közelgő foci meccsekre (a következő ~36 óra).
 Legfeljebb 12 webes keresésed van: a tabella- és oddsadatok alapján először válaszd ki a legígéretesebb meccseket, és azokra keress rá (egy keresésben több témát is összevonhatsz: forma, hiányzók, egymás elleni eredmények). Ne keress rá minden meccsre, és ne ismételj keresést.
 ${poissonInstruction}
@@ -613,13 +667,18 @@ KÉT dolgot adj – MINDKETTŐ KÖTELEZŐ:
    - MECCSENKÉNT LEGFELJEBB 1 single tipp – a legerősebb piacot válaszd az adott meccsre.
    - CSAK legalább ${MIN_SINGLE_ODDS} oddsú single tippet adj – az ennél alacsonyabb oddsú kimenetet NE tedd single tippnek (a nagyon alacsony oddsúak a kombi lábak közé valók).
    - Lehetőleg KÜLÖNBÖZŐ meccsekről legyenek – minél több meccs, annál jobb.
-   - PIACVÁLTOZATOSSÁG: ne csak győzelmet adj! Választhatsz: Over 2.5 / Under 2.5, BTTS (mindkét csapat szerez gólt), ázsiai hendikep (-0.5, -1), 1X2. A legértékesebb piacot válaszd az adott meccsre.
+   - PIACVÁLTOZATOSSÁG: ne csak győzelmet adj! Választhatsz: 1X2, hendikep, Over, BTTS (mindkét csapat szerez gólt), Under. A legértékesebb piacot válaszd az adott meccsre.
+   - PIACI SORREND (a tapasztalatok alapján): előnyben a győzelem (1X2), a hendikep, az Over és a BTTS-Igen. Under és BTTS-Nem csak nagyon erős, adatokkal alátámasztott alappal. Erős favorit HAZAI meccsére NE adj Under 2.5-öt (ha a favorit vezet, a meccs könnyen nyílttá válik).
+   - KERÜLD: a döntetlent (1X2 "Döntetlen" – túl nagy a szórás), és az ázsiai -0.5 hendikepet, ha ugyanaz a kimenet 1X2-ben is elérhető (az ugyanaz a fogadás).
+   - FAVORIT GYŐZELMÉRE (1X2 vagy mínuszos hendikep) csak akkor tippelj, ha az ellenfél az utolsó 5 meccséből LEGFELJEBB 1-et nyert. Jó formában lévő ellenfél ellen inkább más piacot válassz, vagy hagyd ki a meccset.
 
 2) "kombi_labak": 4-8 BIZTONSÁGOS, alacsony kockázatú láb kombi szelvényekhez.
    - MINDEGYIK láb MÁS meccsről legyen – használj annyi különböző meccset, amennyi elérhető (legalább 2, hogy összeálljon egy kötés; ha van elég meccs, adj 6-8 lábat, hogy több, NEM átfedő kötés is kijöjjön).
    - Ezek külön-külön NEM elég értékesek single tippnek, de kombinálva értékes össz oddsot adnak.
    - Magas valószínűségű kimenetelek: erős favorit győzelme, Over 1.5, Under 4.5, hendikep -1 / -1.5 nagy favoritnál stb.
    - PIACVÁLTOZATOSSÁG: kombi lábak lehetnek Over 1.5, BTTS, hendikep – ne csak győzelmek!
+   - +1 / +1.5 hendikep lábat csak kivételesen adj (ezek ára jellemzően nem éri meg).
+   - A kombi lábak ne a "tippek" (single) között szereplő meccsekről legyenek.
    - KÖTELEZŐ ODDS SZABÁLYOK – ezeket a rendszer szerver oldalon is ellenőrzi:
      * Egy láb odds: MINIMUM 1.20, MAXIMUM 1.60 – ezen kívüli lábak automatikusan kiszűrődnek!
      * 2 lábas kombi össz odds: MINIMUM 2.00
@@ -639,10 +698,19 @@ KÖZÖS szabályok:
   * Ha nem találsz legalább két konkrét adatot egy meccsről, arra a meccsre NE adj single tippet.
   * Az érvek PONTOSAN a választott tipphez és vonalhoz illeszkedjenek. "Több mint 3,5 gól" tippnél a 4+ gólos meccsek arányát / 3,5 feletti gólátlagot kell bizonyítani – a 2,5-ös vonalról szóló adat ezt NEM támasztja alá. Ugyanígy: hendikepnél a győzelmi különbséget, BTTS-nél a mindkét csapat gólját, 1X2-nél a győzelmeket/vereségeket támaszd alá.
   * CSAK olyan eredményt, számot és tényt írj, amit a webes keresésben ténylegesen megtaláltál. Ne találj ki meccset, eredményt vagy statisztikát (pl. csoportkörben nincs "visszavágó"); ha egy adatban bizonytalan vagy, hagyd ki.
+  * HAZAI és VENDÉG csapat: pontosan a listában megadott (HAZAI: … | VENDÉG: …) szerint – SOHA ne cseréld fel, ne írd, hogy a vendég "hazai pályán" játszik.
+  * A bajnokság neve a listában megadott – ne írj más ligát.
+  * CSAK az aktuális szezon adatait használd (európai ligáknál ${season}, naptári éves ligáknál – pl. skandináv, MLS, Brazília – ${yr}). Előző szezonra csak egymás elleni eredménynél hivatkozhatsz, dátummal vagy szezonnal.
+  * Hiányzót, sérültet, eltiltottat csak akkor írj, ha a keresés 7 napon belüli forrásban megerősíti; edzőváltást csak friss forrás alapján. Ha bizonytalan, hagyd ki.
+  * A meccsszám stimmeljen: ha a szezonban eddig N forduló volt, nem írhatsz N-nél több meccses statisztikát.
+  * Ne legyen önellentmondás a szövegben (pl. "egyenlőtlen erők közötti erőegyensúly").
+  * TILOS a "cotózik" szó.
   * TILOS a "garantál", "biztos", "biztosan", "100%", "nem kérdés", "kizárt" és hasonló kifejezés – a fogadás kimenete soha nem biztos. Fogalmazz mérlegelve (pl. "jó eséllyel", "a számok alapján valószínű").
 
+- "kockazat" mező (csak a "tippek"-hez, KÖTELEZŐ): EGY mondat arról, mi szól a tipp ELLEN (a legfontosabb ellenérv tényszerűen). Ez belső audit-mező, a posztba nem kerül – a "note" ne tartalmazza.
+
 Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
-{"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ Premier League","commence":"07.05 20:00","market":"Over 2.5","pick":"Over 2.5","odds":1.85,"note":"..."},{"match":"...","sport":"soccer","sportLabel":"⚽ La Liga","commence":"07.05 21:00","market":"BTTS","pick":"Igen","odds":1.78,"note":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ Bundesliga","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28},{"match":"...","sportLabel":"⚽ Serie A","commence":"07.05 20:00","market":"1X2","pick":"Csapat A","odds":1.35}]}`;
+{"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ Premier League","commence":"07.05 20:00","market":"Over 2.5","pick":"Over 2.5","odds":1.85,"note":"...","kockazat":"..."},{"match":"...","sport":"soccer","sportLabel":"⚽ La Liga","commence":"07.05 21:00","market":"BTTS","pick":"Igen","odds":1.78,"note":"...","kockazat":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ Bundesliga","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28},{"match":"...","sportLabel":"⚽ Serie A","commence":"07.05 20:00","market":"1X2","pick":"Csapat A","odds":1.35}]}`;
 
   try {
     // Legfeljebb 12 keresés: a meccsek jó részét a tabella- és oddsadatokból is meg tudja
@@ -697,7 +765,9 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       const pick   = fixPick(t.pick, market);
       return {
         id: `ai-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        type: "ai", sport: t.sport, sportLabel: t.sportLabel,
+        // A liga a meccslistából (Odds API), nem az AI-tól – az AI néha rossz bajnokságot írt
+        type: "ai", sport: "soccer", sportLabel: findMatchEntry(matchList, t.match)?.sport || t.sportLabel || "⚽",
+        risk: String(t.kockazat || t.risk || "").trim().slice(0, 500) || null,
         match: huMatch(t.match), commence: realCommence(t.match) || t.commence || null,
         sportKey: findMatchEntry(matchList, t.match)?.sportKey || null,
         market, pick: huTeam(pick), odds: t.odds,
@@ -723,6 +793,7 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
         console.log(`${kind} odds javítva: ${t.match} – ${t.pick}: AI ${t.odds} → valós ${r.odds}`);
         t.odds = r.odds;
       }
+      if (r.fairProb != null) t.marketProb = r.fairProb;
       return true;
     };
     // Backstop: minimum odds szűrő + meccsenként legfeljebb 1 single (az AI a legerősebbet teszi előre)
@@ -730,10 +801,11 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
     const singles = singlesAll
       .filter(t => inList(t.match, "Single tipp"))
       .filter(t => pickOk(t, "Single tipp"))
+      .map(t => ({ ...t, valuation: tipValuation(t) }))
       .filter(t => (parseFloat(t.odds) || 0) >= MIN_SINGLE_ODDS)
       .filter(t => { if (seenMatch.has(t.match)) return false; seenMatch.add(t.match); return true; });
     const comboLegs = (Array.isArray(obj.kombi_labak) ? obj.kombi_labak : []).map(l => ({
-      match: huMatch(l.match), sportLabel: l.sportLabel || "⚽",
+      match: huMatch(l.match), sportLabel: findMatchEntry(matchList, l.match)?.sport || l.sportLabel || "⚽",
       market: inferMarket(l.pick, l.market), pick: huTeam(l.pick),
       odds: parseFloat(l.odds) || 0, commence: l.commence || null
     })).filter(l => {
@@ -864,50 +936,31 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
         const validBMs = (game.bookmakers || []).filter(bm => !EXCLUDED_BM.includes(bm.key) && bm.markets?.length > 0);
         if (validBMs.length < 2) continue;
 
-        const h2hOdds = [];
-        const h2hBMs  = validBMs.filter(bm => bm.markets.find(m => m.key === "h2h"));
-        if (h2hBMs.length) {
-          const names = h2hBMs[0].markets.find(m => m.key === "h2h").outcomes.map(o => o.name);
-          names.forEach(name => {
-            let best = 0, bestBM = "";
-            for (const bm of h2hBMs) {
-              const o = bm.markets.find(m => m.key === "h2h")?.outcomes?.find(x => x.name === name);
-              if (o && o.price > best) { best = o.price; bestBM = bm.title; }
-            }
-            if (best) h2hOdds.push({ market: "1X2", name: huTeam(name), odds: parseFloat(best.toFixed(2)), bookmaker: bestBM });
-          });
-        }
-
-        const totalsOdds = [];
-        const totalsBMs  = validBMs.filter(bm => bm.markets.find(m => m.key === "totals"));
-        if (totalsBMs.length) {
-          const best = {};
-          for (const bm of totalsBMs) {
-            for (const o of bm.markets.find(m => m.key === "totals")?.outcomes || []) {
-              if (o.name !== "Over" && o.name !== "Under") continue;
-              const key = `${o.name} ${o.point}`;
-              if (!best[key] || o.price > best[key].odds)
-                best[key] = { market: key, name: key, odds: parseFloat(o.price.toFixed(2)), bookmaker: bm.title };
+        // Kimenetenként a legjobb odds (ezt kapja a tipp) és az irodák mediánja (ebből számoljuk
+        // az árrés nélküli piaci esélyt – a legjobb odds túl optimista képet adna).
+        const collect = (key, build) => {
+          const acc = {};
+          for (const bm of validBMs) {
+            for (const o of bm.markets.find(m => m.key === key)?.outcomes || []) {
+              const b = build(o);
+              if (!b) continue;
+              const a = acc[b.id] || (acc[b.id] = { ...b.entry, prices: [], odds: 0, bookmaker: "" });
+              a.prices.push(o.price);
+              if (o.price > a.odds) { a.odds = o.price; a.bookmaker = bm.title; }
             }
           }
-          totalsOdds.push(...Object.values(best));
-        }
-
-        const spreadsOdds = [];
-        const spreadsBMs  = validBMs.filter(bm => bm.markets.find(m => m.key === "spreads"));
-        if (spreadsBMs.length) {
-          const best = {};
-          for (const bm of spreadsBMs) {
-            for (const o of bm.markets.find(m => m.key === "spreads")?.outcomes || []) {
-              const key = `${o.name}_${o.point}`;
-              if (!best[key] || o.price > best[key].odds)
-                best[key] = { market: `Hendikep ${o.point > 0 ? "+" : ""}${o.point}`, name: `${huTeam(o.name)} ${o.point > 0 ? "+" : ""}${o.point}`, odds: parseFloat(o.price.toFixed(2)), bookmaker: bm.title };
-            }
-          }
-          spreadsOdds.push(...Object.values(best));
-        }
+          return Object.values(acc).map(({ prices, ...e }) => ({
+            ...e, odds: parseFloat(e.odds.toFixed(2)), median: parseFloat(median(prices).toFixed(3)),
+          }));
+        };
+        const h2hOdds = collect("h2h", o => ({ id: o.name, entry: { market: "1X2", name: huTeam(o.name) } }));
+        const totalsOdds = collect("totals", o => (o.name === "Over" || o.name === "Under")
+          ? { id: `${o.name} ${o.point}`, entry: { market: `${o.name} ${o.point}`, name: `${o.name} ${o.point}`, point: o.point } } : null);
+        const spreadsOdds = collect("spreads", o => ({ id: `${o.name}_${o.point}`, entry: {
+          market: `Hendikep ${o.point > 0 ? "+" : ""}${o.point}`, name: `${huTeam(o.name)} ${o.point > 0 ? "+" : ""}${o.point}`, point: o.point } }));
 
         const allOdds = [...h2hOdds, ...totalsOdds, ...spreadsOdds];
+        addFairProbs(allOdds);
         if (allOdds.length) matchList.push({ sport: meta.label, sportKey, match: `${huTeam(game.home_team)} vs ${huTeam(game.away_team)}`, commence: huTime(game.commence_time), odds: allOdds });
       }
     } catch (e) { oddsErrors.push(`${sportKey}: ${e.message}`); }
@@ -949,7 +1002,12 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
   // duplikálódik (a dedup a lábakat nézi, nem az azonosítót).
   const existingKeys = new Set(history.filter(t => t.type === "combo").map(comboKey));
   // Backstop: ha egy kombi láb meccse már single tippként szerepel (ma, pending), kiszűrjük
-  const filteredComboLegs = comboLegs.filter(l => !isTipped(l.match));
+  const freshSingleList = fresh.map(t => ({ match: t.match }));
+  const filteredComboLegs = comboLegs.filter(l => {
+    if (isTipped(l.match)) return false;
+    if (findMatchEntry(freshSingleList, l.match)) { console.log(`Kombi láb kiszűrve (ugyanerre a meccsre most single tipp ment): ${l.match}`); return false; }
+    return true;
+  });
   // Kombi tippek validálása: AI oddsok vs valódi Odds API oddsok
   // Ha az AI odds > 10%-kal alacsonyabb a valódinál → kizárjuk (AI kitalált oddsot adott)
   function getRealOdds(legMatch, legMarket, legPick, matchList) {
@@ -1249,7 +1307,7 @@ function checkPickAgainstOdds(entry, market, pick) {
              : /^(2|vendég győzelem|away win)$/.test(p) ? "away" : teamOf(pick);
     if (!side) return { error: `"${pick}" nem játszik ezen a meccsen` };
     const o = odds.find(x => x.market === "1X2" && (side === "draw" ? /^draw$/i.test(x.name) : teamOf(x.name) === side));
-    return { odds: o ? o.odds : null };
+    return { odds: o ? o.odds : null, fairProb: o ? (o.fairProb ?? null) : null };
   }
   if (mk.includes("btts") || mk.includes("mindkét") || pk.includes("mindkét")) return { odds: null };
   const has = (...w) => w.some(x => pk.includes(x) || mk.includes(x));
@@ -1258,7 +1316,7 @@ function checkPickAgainstOdds(entry, market, pick) {
     const line = parseFloat((pk.match(/\d+(\.\d+)?/) || mk.match(/\d+(\.\d+)?/) || [NaN])[0]);
     const o = odds.find(x => x.market === `${isUnder ? "Under" : "Over"} ${line}`);
     if (!o) return { error: `nincs ${isUnder ? "Under" : "Over"} ${line} vonal az oddsok között` };
-    return { odds: o.odds };
+    return { odds: o.odds, fairProb: o.fairProb ?? null };
   }
   if (mk.includes("hendikep") || mk.includes("handicap")) {
     const lm = String(pick || "").match(/[-+]?\d+(\.\d+)?$/);
@@ -1268,7 +1326,7 @@ function checkPickAgainstOdds(entry, market, pick) {
     const o = odds.find(x => /^Hendikep/.test(x.market) && teamOf(x.name) === side &&
                              parseFloat((String(x.name).match(/[-+]?\d+(\.\d+)?$/) || [NaN])[0]) === line);
     if (!o) return { error: `nincs ilyen hendikep vonal: "${pick}"` };
-    return { odds: o.odds };
+    return { odds: o.odds, fairProb: o.fairProb ?? null };
   }
   return { error: `nem elszámolható piac: "${market}"` };
 }
@@ -1691,13 +1749,13 @@ app.get("/api/tips", (req, res) => {
       needLogin: !req.user, needSubscription: !!req.user,
       aiTips: [], comboTips: [],
       // A free tippek minden látogató számára láthatók.
-      freeTips: freeTips.filter(isApproved),
+      freeTips: freeTips.filter(isApproved).map(publicTip),
     });
   }
   res.json({
-    aiTips:    admin ? aiTips    : aiTips.filter(isApproved),
-    comboTips: admin ? comboTips : comboTips.filter(isApproved),
-    freeTips:  admin ? freeTips  : freeTips.filter(isApproved),
+    aiTips:    admin ? aiTips    : aiTips.filter(isApproved).map(publicTip),
+    comboTips: admin ? comboTips : comboTips.filter(isApproved).map(publicTip),
+    freeTips:  admin ? freeTips  : freeTips.filter(isApproved).map(publicTip),
     admin
   });
 });
@@ -1708,10 +1766,10 @@ app.get("/api/history", (req, res) => {
   if (isAdminReq(req)) return res.json(history);
   const approved = history.filter(isApproved);
   const freshUserHist = req.user ? (usersDb.findById(req.user.id) || req.user) : req.user;
-  if (auth.hasAccess(freshUserHist)) return res.json(approved);
+  if (auth.hasAccess(freshUserHist)) return res.json(approved.map(publicTip));
   // Track record: minden publikált (jóváhagyott) lezárt tipp látható, bejelentkezés nélkül is
   const settledOnly = approved.filter(t => t.result && t.result !== "pending");
-  res.json(settledOnly);
+  res.json(settledOnly.map(publicTip));
 });
 
 app.get("/api/status", (req, res) => {
@@ -1900,7 +1958,7 @@ app.post("/api/history", (req, res) => {
     if (!/\svs\.?\s/i.test(match) || !pick || !odds) return res.status(400).json({ error: "Hiányzó adat: mindkét csapat, tipp és 1-nél nagyobb odds kell" });
     tip = { ...base, id: `man-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, type: kind, sport: "soccer",
             sportLabel: cleanStr(b.sportLabel, 60) || "⚽", match, commence: cleanStr(b.commence, 40) || null,
-            market: cleanStr(b.market, 80) || "1X2", pick, odds, live: false };
+            market: cleanStr(b.market, 80) || "1X2", pick, odds, live: false, oddsManual: true };
   }
   history = [tip, ...history];
   saveHistory();
@@ -1930,6 +1988,11 @@ app.patch("/api/history/:id", (req, res) => {
       // Más meccs → a régi liga-kulcs és Poisson-adat már nem érvényes
       if (m !== cur.match) { patch.match = m; patch.sportKey = null; patch.poisson = null; }
     }
+    if (patch.odds !== undefined && cur.type !== "combo" && patch.odds !== parseFloat(cur.odds)) patch.oddsManual = true;
+    if ((patch.pick !== undefined && patch.pick !== cur.pick) || (patch.market !== undefined && patch.market !== cur.market) || patch.match) {
+      patch.poisson = null; patch.marketProb = null;   // más kimenet → a régi modell- és piaci esély nem érvényes
+    }
+    if (cur.type !== "combo") patch.valuation = tipValuation({ ...cur, ...patch });
     if (legs !== undefined) {
       const clean = cleanLegs(legs, cur.legs || []);
       if (!clean) return res.status(400).json({ error: "Minden lábhoz kell meccs, tipp és 1-nél nagyobb odds" });

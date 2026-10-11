@@ -591,6 +591,28 @@ function yesterdayKey() {
   return p.length>=3 ? p[0]+" "+p[1]+" "+p[2] : s;
 }
 
+// Admin: érték (EV), piaci és modell szerinti esély, címkék, kockázat – a látogatók nem látják
+function adminValueBox(t) {
+  const v = t.valuation;
+  if (!v && !t.risk) return "";
+  const e = x => String(x == null ? "" : x).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const chip = (txt, bg, fg) => `<span style="background:${bg};color:${fg};font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">${txt}</span>`;
+  const parts = [];
+  if (v) {
+    const evTxt = v.ev != null ? `${v.ev > 0 ? "+" : ""}${v.ev}%` : "nincs modell";
+    const evCol = v.ev == null ? "#78909c" : v.ev >= 3 ? "#69f0ae" : v.ev >= 0 ? "#ffcc80" : "#ef9a9a";
+    parts.push(`<span style="color:${evCol};font-weight:700">EV: ${evTxt}</span>`);
+    parts.push(`<span>${v.estimated ? "becsült TMP odds" : "beírt odds"}: <b>${e(v.tmpOdds)}</b></span>`);
+    if (v.marketProb != null) parts.push(`<span>piac: ${e(v.marketProb)}%</span>`);
+    if (v.modelProb  != null) parts.push(`<span>modell: ${e(v.modelProb)}%</span>`);
+    if (v.freeOnly) parts.push(chip(`FREE-only (eltérés ${e(v.gap)} pp)`, "#4a3a12", "#ffcc80"));
+    else if (v.vipOk) parts.push(chip("VIP-ok", "#123a24", "#69f0ae"));
+  }
+  const risk = t.risk ? `<div style="margin-top:4px;color:#ef9a9a">⚠️ Ellenérv: ${e(t.risk)}</div>` : "";
+  return `<div style="margin-top:8px;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,.03);font-size:12px;color:#b0bec5">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">${parts.join("")}</div>${risk}</div>`;
+}
+
 function adminTipControls(t) {
   if (!isAdmin()) return "";
   const approved = t.approved !== false;
@@ -600,7 +622,7 @@ function adminTipControls(t) {
   const approveBtn = approved ? "" : `<button class="btn-won" style="font-size:11px;padding:4px 10px" onclick="approveTip('${t.id}')">✅ Jóváhagyás</button>`;
   const makeFreeBtn = (t.type !== "free" && t.type !== "combo") ? `<button style="background:#00c853;color:#000;border:none;font-size:11px;padding:4px 10px;border-radius:6px;font-weight:700;cursor:pointer" onclick="makeFree('${t.id}')">🆓 Free-nek</button>` : "";
   const mondomatutitBtn = `<button id="mm-btn-${t.id}" style="background:#6B46C1;color:#fff;border:none;font-size:11px;padding:4px 10px;border-radius:6px;font-weight:700;cursor:pointer" onclick="pushToMondomatutit('${t.id}')">→ Mondomatutit</button>`;
-  return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #2a3550">
+  return `${adminValueBox(t)}<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #2a3550">
     ${badge}${approveBtn}${makeFreeBtn}${mondomatutitBtn}
     <button class="btn-del" style="font-size:11px;padding:4px 10px" onclick="deleteTip('${t.id}')">🗑️ Törlés</button>
     <button class="btn-push" style="font-size:11px;padding:4px 10px" onclick="editNote('${t.id}',this)">✏️ Szerkesztés</button>
