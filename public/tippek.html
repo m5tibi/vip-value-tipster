@@ -229,6 +229,36 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
     </div>
   </div>
 
+  <!-- Tippszótár: a fogadási fogalmak magyarázata – mindenki számára elérhető -->
+  <style>
+    .gl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+    .gl-item{background:#07111d;border:1px solid #1e3a2f;border-radius:8px;padding:10px 12px;font-size:12px;color:#90a4ae;line-height:1.6}
+    .gl-item b:first-child{display:block;color:#80cbc4;font-size:13px;margin-bottom:4px}
+    .gl-item b{color:#e0f7fa}
+    .gl-note{margin-top:12px;font-size:12px;color:#ffb74d;line-height:1.5}
+  </style>
+  <div style="margin-bottom:14px;background:#0d1b2a;border:1px solid #1e3a2f;border-radius:10px;overflow:hidden">
+    <div onclick="var b=document.getElementById('glossary-body');var a=document.getElementById('glossary-arr');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▼':'▲'"
+         style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer">
+      <div style="font-size:14px;font-weight:700;color:#80cbc4" data-i18n="tips.glossary_title">📚 Tippszótár – mit jelentenek a fogalmak?</div>
+      <span id="glossary-arr" style="color:#546e7a;font-size:12px">▼</span>
+    </div>
+    <div id="glossary-body" style="display:none;padding:0 16px 16px" data-i18n-html="tips.glossary_body"><div class="gl-grid">
+<div class="gl-item"><b>Odds (szorzó)</b>A tét ennyiszerese a kifizetés. 1 000 Ft tét 1,85-ös oddson nyerés esetén 1 850 Ft-ot fizet (850 Ft nyereség).</div>
+<div class="gl-item"><b>1X2</b>A meccs végeredménye: <b>1</b> = hazai győzelem, <b>X</b> = döntetlen, <b>2</b> = vendég győzelem. Nálunk a tipp a csapat nevével szerepel (pl. „Ferencváros”).</div>
+<div class="gl-item"><b>Több mint / Kevesebb mint (Over / Under)</b>A meccsen szerzett gólok összesen. „Több mint 2,5 gól” = legalább 3 gól; „Kevesebb mint 2,5 gól” = legfeljebb 2 gól. A ,5 miatt nincs visszajáró eset.</div>
+<div class="gl-item"><b>BTTS – Mindkét csapat betalál</b>„Igen”: mindkét csapat szerez legalább 1 gólt (pl. 1-1, 2-1). „Nem”: legalább az egyik csapat nem szerez gólt (pl. 2-0, 0-0).</div>
+<div class="gl-item"><b>Hendikep</b>Az egyik csapat gólhátránnyal vagy -előnnyel indul. „-1,5”: legalább 2 góllal kell nyernie. „+1,5”: nyer, döntetlen, vagy legfeljebb 1 góllal kap ki. Egész vonalnál (pl. „-1”) ha pontosan annyi a különbség, a tét visszajár.</div>
+<div class="gl-item"><b>Ázsiai hendikep (negyedes vonal)</b>A „-0,25”, „-0,75” vonalnál a tét fele-fele két szomszédos vonalra megy. Pl. „-0,75” és 1 gólos győzelem: az egyik fele nyer, a másik visszajár → <b>fél nyert</b>.</div>
+<div class="gl-item"><b>Kombi (kötés)</b>Több tipp egy szelvényen. Az oddsok összeszorzódnak (pl. 1,40 × 1,50 = 2,10), de csak akkor nyer, ha <b>minden láb</b> bejön.</div>
+<div class="gl-item"><b>Single / Free tipp</b>A single egyetlen fogadás egy meccsre. A free tipp ingyenes, mindenki számára látható tipp – a többi az előfizetőké.</div>
+<div class="gl-item"><b>Eredmények</b>✅ Nyert · ❌ Veszett · ↩️ Visszajár (a tét visszajár) · ½✅ Fél nyert · ½❌ Fél veszett (ázsiai vonalaknál).</div>
+<div class="gl-item"><b>Rendes játékidő</b>A tippek a rendes játékidő (90 perc + a játékvezető által hozzáadott ráadásidő) eredményére vonatkoznak; a kupameccsek 2×15 perces hosszabbítása és a tizenegyespárbaj nem számít.</div>
+<div class="gl-item"><b>Egység, profit, ROI</b>A statisztika tippenként 1 egység tétet számol: nyerésnél +(odds − 1), vesztésnél −1 egység. A ROI a profit és az összes tét aránya.</div>
+</div>
+<div class="gl-note">🔞 Csak 18 év felett. A fogadás kockázattal jár – csak annyit tegyél meg, amennyi elvesztését megengedheted magadnak.</div></div>
+  </div>
+
   <!-- TIPS TAB -->
   <div id="tab-tips">
     <div class="toolbar">
