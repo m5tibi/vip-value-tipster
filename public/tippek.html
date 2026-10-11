@@ -604,6 +604,11 @@ function adminValueBox(t) {
     parts.push(`<span style="color:${evCol};font-weight:700">EV: ${evTxt}</span>`);
     parts.push(`<span>${v.estimated ? "becsült TMP odds" : "beírt odds"}: <b>${e(v.tmpOdds)}</b></span>`);
     if (v.marketProb != null) parts.push(`<span>piac: ${e(v.marketProb)}%</span>`);
+    // Piaci EV csak beírt (valós TippmixPro) oddsnál értelmes: becsült oddsnál definíció szerint negatív.
+    // Ha a beírt odds mellett pozitív, a TippmixPro jobban fizet a piaci valószínűségnél – erős jelzés.
+    if (!v.estimated && v.marketEv != null) parts.push(v.marketEv > 0
+      ? chip(`piaci EV: +${e(v.marketEv)}%`, "#123a24", "#69f0ae")
+      : `<span>piaci EV: ${e(v.marketEv)}%</span>`);
     if (v.modelProb  != null) parts.push(`<span>modell: ${e(v.modelProb)}%</span>`);
     if (v.freeOnly) parts.push(chip(`FREE-only (eltérés ${e(v.gap)} pp)`, "#4a3a12", "#ffcc80"));
     else if (v.vipOk) parts.push(chip("VIP-ok", "#123a24", "#69f0ae"));

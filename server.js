@@ -665,7 +665,7 @@ KÉT dolgot adj – MINDKETTŐ KÖTELEZŐ:
 
 1) "tippek": 6-8 ERŐS single tipp (két platform számára – minimum 6, ha van elég meccs!).
    - MECCSENKÉNT LEGFELJEBB 1 single tipp – a legerősebb piacot válaszd az adott meccsre.
-   - CSAK legalább ${MIN_SINGLE_ODDS} oddsú single tippet adj – az ennél alacsonyabb oddsú kimenetet NE tedd single tippnek (a nagyon alacsony oddsúak a kombi lábak közé valók).
+   - CSAK olyan single tippet adj, amelynek a fenti listában szereplő oddsa legalább ${(MIN_SINGLE_ODDS / TMP_FACTOR).toFixed(2)} (a TippmixPro kb. ${Math.round((1 - TMP_FACTOR) * 100)}%-kal kevesebbet fizet, így ott is meglegyen a ${MIN_SINGLE_ODDS}) – az ennél alacsonyabb oddsú kimenetet NE tedd single tippnek (a nagyon alacsony oddsúak a kombi lábak közé valók).
    - Lehetőleg KÜLÖNBÖZŐ meccsekről legyenek – minél több meccs, annál jobb.
    - PIACVÁLTOZATOSSÁG: ne csak győzelmet adj! Választhatsz: 1X2, hendikep, Over, BTTS (mindkét csapat szerez gólt), Under. A legértékesebb piacot válaszd az adott meccsre.
    - PIACI SORREND (a tapasztalatok alapján): előnyben a győzelem (1X2), a hendikep, az Over és a BTTS-Igen. Under és BTTS-Nem csak nagyon erős, adatokkal alátámasztott alappal. Erős favorit HAZAI meccsére NE adj Under 2.5-öt (ha a favorit vezet, a meccs könnyen nyílttá válik).
@@ -802,7 +802,13 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       .filter(t => inList(t.match, "Single tipp"))
       .filter(t => pickOk(t, "Single tipp"))
       .map(t => ({ ...t, valuation: tipValuation(t) }))
-      .filter(t => (parseFloat(t.odds) || 0) >= MIN_SINGLE_ODDS)
+      // Minimum odds a becsült TippmixPro-oddsra (piaci legjobb × TMP_FACTOR) – ott fogadunk
+      .filter(t => {
+        const tmp = Math.round((parseFloat(t.odds) || 0) * TMP_FACTOR * 100) / 100;
+        if (tmp >= MIN_SINGLE_ODDS) return true;
+        console.log(`Single kiszűrve (becsült TippmixPro-odds ${tmp} < ${MIN_SINGLE_ODDS}): ${t.match} – ${t.pick} @ ${t.odds}`);
+        return false;
+      })
       .filter(t => { if (seenMatch.has(t.match)) return false; seenMatch.add(t.match); return true; });
     const comboLegs = (Array.isArray(obj.kombi_labak) ? obj.kombi_labak : []).map(l => ({
       match: huMatch(l.match), sportLabel: findMatchEntry(matchList, l.match)?.sport || l.sportLabel || "⚽",
