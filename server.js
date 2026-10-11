@@ -404,7 +404,8 @@ function _computePoissonProbs(lambdaHome, lambdaAway, overLine = 2.5) {
 }
 
 const POISSON_EDGE_MIN   = 5.0;  // +5% edge felett "value" a piac
-const POISSON_PRIOR_GAMES = 4;   // ennyi "átlagos" meccsel húzzuk a ligaátlag felé a csapatokat (kis minta ellen)
+const POISSON_PRIOR_GAMES = 10;  // ennyi "átlagos" meccsel húzzuk a ligaátlag felé a csapatokat (kis minta ellen –
+                                 // 4-gyel a szezon elején túl szélsőséges λ-k jöttek, minden modellezett tipp FREE-only lett)
 const POISSON_MIN_LEAGUE_GAMES = 10;  // ennél kevesebb lejátszott ligameccsnél nem modellezünk
 
 // λ becslés a tabellából: támadó-/védekezőerő a lőtt/kapott gólokból, a ligaátlag felé húzva,
@@ -533,7 +534,9 @@ function addFairProbs(odds) {
 // A TippmixPro jellemzően a piaci legjobb oddsnál kevesebbet ad (kb. 4–6%-kal). Amíg az admin
 // nem írja be a valós oddsot, az EV-t ezzel a becsült TippmixPro-oddsszal számoljuk.
 const TMP_FACTOR      = parseFloat(process.env.TMP_FACTOR) || 0.95;
-const FREE_ONLY_GAP   = 6;   // modell és piac eltérése (százalékpont), e fölött a tipp csak free lehet
+const FREE_ONLY_GAP   = 10;  // modell és piac eltérése (százalékpont), e fölött a tipp csak free lehet
+const MODEL_WEIGHT    = 0.5; // az EV-hez a modell és a piac keveréke (a modell kis mintán túl magabiztos)
+const AI_SUSPECT_GAP  = 10;  // az AI saját esélybecslése ennyi százalékpontnál jobban eltér a piactól → gyanús
 const VIP_MIN_EV      = 3;   // legalább ennyi % EV kell a VIP-hez
 function tipValuation(t) {
   if (t.type === "combo") return null;
@@ -543,18 +546,51 @@ function tipValuation(t) {
   const market = t.marketProb != null ? t.marketProb : null;                      // 0..1
   const model  = t.poisson && t.poisson.modelProb != null ? t.poisson.modelProb / 100 : null;
   const pct = x => Math.round(x * 1000) / 10;
-  const ev       = model  != null ? pct(model  * tmpOdds - 1) : null;
+  // EV a modell és a piac keverékéből (ha nincs piaci esély, csak a modellből)
+  const blend    = model != null ? (market != null ? MODEL_WEIGHT * model + (1 - MODEL_WEIGHT) * market : model) : null;
+  const ev       = blend  != null ? pct(blend  * tmpOdds - 1) : null;
   const marketEv = market != null ? pct(market * tmpOdds - 1) : null;
   const gap      = model != null && market != null ? pct(Math.abs(model - market)) : null;
   const freeOnly = gap != null && gap > FREE_ONLY_GAP;
+  // Az AI saját becslése: csak tájékoztató (a VIP-ok címke nem épül rá), de a nagy piaci eltérés gyanús
+  const ai       = t.aiProb != null ? t.aiProb : null;
+  const aiGap    = ai != null && market != null ? pct(Math.abs(ai - market)) : null;
   return {
     tmpOdds, estimated: !t.oddsManual,
     marketProb: market != null ? pct(market) : null, modelProb: model != null ? pct(model) : null,
+    blendProb: blend != null ? pct(blend) : null,
     ev, marketEv, gap, freeOnly, vipOk: ev == null ? null : (ev >= VIP_MIN_EV && !freeOnly),
+    aiProb: ai != null ? pct(ai) : null, aiEv: ai != null ? pct(ai * tmpOdds - 1) : null,
+    aiGap, aiSuspicious: aiGap != null && aiGap > AI_SUSPECT_GAP,
   };
 }
 // Csak az adminnak szóló mezők – a publikus válaszokból kiszűrjük
-const INTERNAL_TIP_FIELDS = ["risk", "valuation", "marketProb", "oddsManual"];
+const INTERNAL_TIP_FIELDS = ["risk", "valuation", "marketProb", "oddsManual", "aiProb", "warnings"];
+
+// Az indoklás gyanús elemei – figyelmeztetés az adminnak (a tippet nem dobjuk el, mert pl. egymás
+// elleni eredménynél a régi dátum megengedett):
+// - az aktuális szezonnál régebbi évszám; - irreális (4 feletti) gól/meccs érték;
+// - "N gól" és "M meccs" együtt, ahol N/M > 4.
+function noteWarnings(note, now = new Date()) {
+  const txt = String(note || "");
+  const out = [];
+  const seasonStart = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  const oldYears = [...new Set((txt.match(/\b20\d{2}\b/g) || []).map(Number).filter(y => y < seasonStart))];
+  if (oldYears.length) out.push(`régi évszám: ${oldYears.join(", ")} (aktuális szezon: ${seasonStart}-től) – csak egymás elleni eredménynél elfogadható`);
+  const num = x => parseFloat(String(x).replace(",", "."));
+  const rates = [
+    ...[...txt.matchAll(/(\d+(?:[.,]\d+)?)\+?\s*(?:lőtt|szerzett|kapott)?\s*gól\s*\/\s*(?:meccs|mérkőzés)/gi)].map(m => num(m[1])),
+    ...[...txt.matchAll(/(\d+(?:[.,]\d+)?)\s*(?:gólt?\s*)?(?:meccsenként|mérkőzésenként)/gi)].map(m => num(m[1])),
+  ].filter(v => v > 4);
+  if (rates.length) out.push(`irreális gólátlag: ${rates.join(", ")} gól/meccs`);
+  const goals = [...txt.matchAll(/(\d+)\s*(?:lőtt|szerzett|kapott|rúgott)\s*gól/gi)].map(m => +m[1]);
+  const games = [...txt.matchAll(/(\d+)\s*(?:meccs|mérkőzés|forduló)/gi)].map(m => +m[1]).filter(n => n > 0);
+  if (goals.length && games.length) {
+    const g = Math.max(...goals), n = Math.max(...games);
+    if (g / n > 4) out.push(`gyanús arány: ${g} gól ${n} meccsen`);
+  }
+  return out;
+}
 function publicTip(t) {
   const out = { ...t };
   INTERNAL_TIP_FIELDS.forEach(k => delete out[k]);
@@ -710,9 +746,10 @@ KÖZÖS szabályok:
   * TILOS a "garantál", "biztos", "biztosan", "100%", "nem kérdés", "kizárt" és hasonló kifejezés – a fogadás kimenete soha nem biztos. Fogalmazz mérlegelve (pl. "jó eséllyel", "a számok alapján valószínű").
 
 - "kockazat" mező (csak a "tippek"-hez, KÖTELEZŐ): EGY mondat arról, mi szól a tipp ELLEN (a legfontosabb ellenérv tényszerűen). Ez belső audit-mező, a posztba nem kerül – a "note" ne tartalmazza.
+- "becsult_esely" mező (csak a "tippek"-hez, KÖTELEZŐ): a TE becslésed arra, hány százalék eséllyel jön be a tipp (egész szám 1–99), a kereséssel talált adatok alapján – NE az oddsból számold vissza. Belső mező, a posztba nem kerül.
 
 Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
-{"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ Premier League","commence":"07.05 20:00","market":"Over 2.5","pick":"Over 2.5","odds":1.85,"note":"...","kockazat":"..."},{"match":"...","sport":"soccer","sportLabel":"⚽ La Liga","commence":"07.05 21:00","market":"BTTS","pick":"Igen","odds":1.78,"note":"...","kockazat":"..."}],"kombi_labak":[{"match":"...","sportLabel":"⚽ Bundesliga","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28},{"match":"...","sportLabel":"⚽ Serie A","commence":"07.05 20:00","market":"1X2","pick":"Csapat A","odds":1.35}]}`;
+{"tippek":[{"match":"...","sport":"soccer","sportLabel":"⚽ Premier League","commence":"07.05 20:00","market":"Over 2.5","pick":"Over 2.5","odds":1.85,"note":"...","kockazat":"...","becsult_esely":58},{"match":"...","sport":"soccer","sportLabel":"⚽ La Liga","commence":"07.05 21:00","market":"BTTS","pick":"Igen","odds":1.78,"note":"...","kockazat":"...","becsult_esely":61}],"kombi_labak":[{"match":"...","sportLabel":"⚽ Bundesliga","commence":"07.05 20:00","market":"Over 1.5","pick":"Over 1.5","odds":1.28},{"match":"...","sportLabel":"⚽ Serie A","commence":"07.05 20:00","market":"1X2","pick":"Csapat A","odds":1.35}]}`;
 
   try {
     // Legfeljebb 12 keresés: a meccsek jó részét a tabella- és oddsadatokból is meg tudja
@@ -770,6 +807,8 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
         // A liga a meccslistából (Odds API), nem az AI-tól – az AI néha rossz bajnokságot írt
         type: "ai", sport: "soccer", sportLabel: findMatchEntry(matchList, t.match)?.sport || t.sportLabel || "⚽",
         risk: String(t.kockazat || t.risk || "").trim().slice(0, 500) || null,
+        aiProb: (() => { const v = parseFloat(String(t.becsult_esely ?? "").replace(",", ".")); return v > 0 && v < 100 ? Math.round(v * 10) / 1000 : null; })(),
+        warnings: noteWarnings(t.note),
         match: huMatch(t.match), commence: realCommence(t.match) || t.commence || null,
         sportKey: findMatchEntry(matchList, t.match)?.sportKey || null,
         market, pick: huTeam(pick), odds: t.odds,
@@ -2011,8 +2050,9 @@ app.patch("/api/history/:id", (req, res) => {
     }
     if (patch.odds !== undefined && cur.type !== "combo" && patch.odds !== parseFloat(cur.odds)) patch.oddsManual = true;
     if ((patch.pick !== undefined && patch.pick !== cur.pick) || (patch.market !== undefined && patch.market !== cur.market) || patch.match) {
-      patch.poisson = null; patch.marketProb = null;   // más kimenet → a régi modell- és piaci esély nem érvényes
+      patch.poisson = null; patch.marketProb = null; patch.aiProb = null;   // más kimenet → a régi esélyek nem érvényesek
     }
+    if (patch.note !== undefined) patch.warnings = noteWarnings(patch.note);
     if (cur.type !== "combo") patch.valuation = tipValuation({ ...cur, ...patch });
     if (legs !== undefined) {
       const clean = cleanLegs(legs, cur.legs || []);
