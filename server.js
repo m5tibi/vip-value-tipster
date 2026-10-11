@@ -690,7 +690,7 @@ KÖZÖS szabályok:
 - CSAK olyan piacot és vonalat válassz, ami a meccs "Valós odds" sorában szerepel (1X2, a megadott gólvonalak, a megadott hendikepvonalak), vagy "Mindkét csapat betalál" (BTTS). Fogadáskészítő / kombinált piac (pl. "győz + több mint 2,5 gól"), döntetlen esetén visszajár és egyéb piac NEM elszámolható – ezeket a rendszer eldobja. A választott csapatnak az adott meccsen kell játszania.
 - KIZÁRÓLAG a fenti listában szereplő meccsekre adj tippet, pontosan az ott megadott párosítással. Ha a webes keresés más meccset (más ellenfelet, más napot) mutat, azt hagyd figyelmen kívül – a listán kívüli tippeket a rendszer eldobja.
 - Az "odds" mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd (a megfelelő piac/kimenet oddsát).
-- A "market" és "pick" pontosan egyezzen egy valós piaccal/kimenettel; a csapatnév a fent megadott formában szerepeljen.
+- A "market" és "pick" pontosan egyezzen egy valós piaccal/kimenettel; a csapatnév a fent megadott formában szerepeljen. Hendikepnél a "pick" a csapat neve ÉS a vonal (pl. "Ferencváros -1.5" vagy "Újpest +1"), ahogy a "Valós odds" sorban szerepel.
 - Részletes, 3-4 mondatos magyar indoklás valós adatok alapján – csak a "tippek"-hez kell note. Az indoklás szabályai:
   * LEGALÁBB KÉT konkrét, ellenőrizhető adatot tartalmazzon a következők közül: legutóbbi meccsek eredménye (pl. "az utolsó 5 meccsből 4-et megnyert, 11-3-as gólkülönbséggel"), tabellahelyzet és pontszám, egymás elleni eredmények (H2H, dátummal vagy eredménnyel), gólátlag / kapott gólok, konkrét hiányzók név szerint.
   * TILOS az oddsot, a szorzót, a piaci árat vagy az irodák árazását érvként használni: ne írj olyat, hogy "az 1.85-ös odds értéket kínál", "a piac alulárazza", "jó ár", "value", "a szorzó indokolt". Az odds nem érv – az indoklás csak a csapatokról és a meccsről szóljon.
@@ -787,6 +787,8 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
     };
     // A kimenetnek is ehhez a meccshez kell tartoznia; az oddsot a valós értékre cseréljük
     const pickOk = (t, kind) => {
+      const fixedPick = normalizeHandicapPick(t.market, t.pick);
+      if (fixedPick !== t.pick) { console.log(`${kind} hendikep vonal a tippbe illesztve: "${t.pick}" → "${fixedPick}" (${t.match})`); t.pick = fixedPick; }
       const r = checkPickAgainstOdds(findMatchEntry(matchList, t.match), t.market, t.pick);
       if (r.error) { console.log(`${kind} kiszűrve (${r.error}): ${t.match} – ${t.market} ${t.pick}`); return false; }
       if (r.odds && Math.abs(r.odds - parseFloat(t.odds)) > 0.001) {
@@ -1295,6 +1297,17 @@ async function regulationScore(game, cache) {
 // létezik ezen a meccsen (a választott csapat itt játszik, a gól-/hendikepvonal szerepel az
 // oddsok között) és a rendszer el is tudja számolni. Visszaadja a valós oddsot (BTTS-nél az
 // Odds API nem ad oddsot → null), vagy { error } ha a tipp nem ehhez a meccshez tartozik.
+// Hendikepnél az AI néha a vonalat a piacba írja ("Hendikep +1.5"), a tippbe csak a csapatot
+// ("Goztepe"). Az ellenőrzés és az elszámolás a tipp végén keresi a vonalat → odaillesztjük.
+function normalizeHandicapPick(market, pick) {
+  const mk = String(market || ""), pk = String(pick || "").trim();
+  if (!/hendikep|handicap/i.test(mk) || /[-+]?\d+(?:[.,]\d+)?$/.test(pk)) return pk;
+  const m = mk.match(/([-+]?\d+(?:[.,]\d+)?)\s*$/);
+  if (!m) return pk;
+  const line = m[1].replace(",", ".");
+  return `${pk} ${/^[-+]/.test(line) || parseFloat(line) === 0 ? line : "+" + line}`;
+}
+
 function checkPickAgainstOdds(entry, market, pick) {
   const txt = x => String(x || "").toLowerCase().replace(/,/g, ".");
   const mk = txt(market), pk = txt(pick);
