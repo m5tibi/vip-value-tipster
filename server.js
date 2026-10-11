@@ -588,7 +588,9 @@ async function fetchAiTips(matchList, alreadyTipped = [], poissonEdge = new Map(
   if (!ANTHROPIC_KEY) return { singles: [], comboLegs: [], error: "nincs ANTHROPIC_API_KEY" };
   if (!matchList.length) return { singles: [], comboLegs: [] };
 
-  // Maximum 20 meccs küldése Claude-nak – 28+ meccs esetén a JSON levágódik a token limit miatt.
+  // Legfeljebb MAX_AI_MATCHES meccs megy Claude-nak: több meccs hosszabb választ, lassabb és
+  // drágább generálást jelent (20 meccsnél ~8 perc és ~$0.9 volt).
+  const MAX_AI_MATCHES = 15;
   // Prioritás: top ligák előre, azon belül legkorábbi kezdés.
   const LEAGUE_PRIORITY = [
     "⚽ Premier League","⚽ La Liga","⚽ Bundesliga","⚽ Serie A","⚽ Ligue 1","⚽ BL",
@@ -602,8 +604,8 @@ async function fetchAiTips(matchList, alreadyTipped = [], poissonEdge = new Map(
     const rb = pb === -1 ? 99 : pb;
     return ra !== rb ? ra - rb : 0;
   });
-  const capped = sorted.slice(0, 20);
-  if (matchList.length > 20) console.log(`AI elemzés: ${matchList.length} meccsből top 20 küldve (liga prioritás szerint)`);
+  const capped = sorted.slice(0, MAX_AI_MATCHES);
+  if (matchList.length > MAX_AI_MATCHES) console.log(`AI elemzés: ${matchList.length} meccsből top ${MAX_AI_MATCHES} küldve (liga prioritás szerint)`);
   console.log(`AI elemzés: ${capped.length} meccs`);
 
   const matchText = capped.map(m => {
