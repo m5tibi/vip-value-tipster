@@ -71,4 +71,5 @@ könyvtárban (Renderen a `/data` perzisztens lemez).
 | `MONDOMATUTIT_URL` | A mondomatutit címe (alapértelmezés: `https://mondomatutit.hu`) |
 | `DATA_DIR` | Adatkönyvtár (alapértelmezés: `/data`) |
 | `META_PIXEL_ID` | Meta (Facebook) Pixel azonosító. Ha be van állítva, az oldal alján süti-hozzájárulási sáv jelenik meg, és a pixel csak elfogadás után töltődik be. Események: `PageView`, `CompleteRegistration`, `InitiateCheckout`, `Purchase` |
+| `TMP_FACTOR` | A TippmixPro-odds becsléséhez: piaci legjobb odds × ez (alapértelmezés: `0.95`). Az EV-t ezzel számoljuk, amíg az admin be nem írja a valós oddsot |
 | `META_PURCHASE_VALUE` | A `Purchase` / `InitiateCheckout` esemény értéke forintban (alapértelmezés: `14990`) |
