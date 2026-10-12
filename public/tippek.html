@@ -266,6 +266,8 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
       <button class="btn-send" id="btn-send-tips" onclick="sendTips()" style="display:none">📤 Jóváhagyottak küldése</button>
       <button class="btn-send" id="btn-preview" onclick="openPreviewModal()" style="display:none">🔍 Meccsek</button>
       <button class="btn-send" id="btn-new-tip" onclick="openTipEditor(null)" style="display:none">➕ Új tipp</button>
+      <button class="btn-send" id="btn-clv" onclick="showClvSummary()" style="display:none" title="Closing line value: a tipp oddsa vs a záró piac">📈 CLV</button>
+      <button class="btn-send" id="btn-markets" onclick="probeOddsMarkets()" style="display:none" title="Milyen piacokat kínál az Odds API (~1-2 kredit)">🧪 Piacok</button>
       <button class="btn-refresh" id="btn-refresh" style="display:none">🔄 Frissítés most</button>
     </div>
     <!-- Free tip section (admin sees pending, users see approved) -->
@@ -480,6 +482,8 @@ function applyAdminUI() {
   show('btn-refresh', admin);
   show('btn-preview', admin);
   show('btn-new-tip', admin);
+  show('btn-clv', admin);
+  show('btn-markets', admin);
   show('btn-send-tips', admin);
   show('btn-login',  !loggedIn);
   show('btn-logout', loggedIn);
@@ -625,7 +629,8 @@ function yesterdayKey() {
 function adminValueBox(t) {
   const v = t.valuation;
   const warns = Array.isArray(t.warnings) ? t.warnings : [];
-  if (!v && !t.risk && !warns.length) return "";
+  const legsClv = (t.legs || []).filter(l => l.closing);
+  if (!v && !t.risk && !warns.length && !t.closing && !legsClv.length) return "";
   const e = x => String(x == null ? "" : x).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const chip = (txt, bg, fg) => `<span style="background:${bg};color:${fg};font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">${txt}</span>`;
   const parts = [];
@@ -647,6 +652,16 @@ function adminValueBox(t) {
     if (v.aiProb != null) parts.push(`<span>AI-becslés: ${e(v.aiProb)}% (EV ${v.aiEv > 0 ? "+" : ""}${e(v.aiEv)}%)</span>`);
     if (v.aiSuspicious) parts.push(chip(`gyanús: AI vs piac ${e(v.aiGap)} pp`, "#4a1f1f", "#ef9a9a"));
   }
+  // CLV: a záró odds a kezdés előtt ~2–14 perccel rögzül
+  const clvChip = x => {
+    if (!x.closing) return "";
+    if (x.clv == null) return `<span style="color:#78909c">CLV: nincs záró odds</span>`;
+    const pos = x.clv > 0;
+    return chip(`CLV ${pos ? "+" : ""}${e(x.clv)}% (záró ${e(x.closing.odds)}${x.closingEv != null ? ` · záró EV ${x.closingEv > 0 ? "+" : ""}${e(x.closingEv)}%` : ""})`,
+                pos ? "#123a24" : "#4a1f1f", pos ? "#69f0ae" : "#ef9a9a");
+  };
+  if (t.closing) parts.push(clvChip(t));
+  legsClv.forEach(l => parts.push(`<span>${e(l.match)}: ${clvChip(l)}</span>`));
   const risk = t.risk ? `<div style="margin-top:4px;color:#ef9a9a">⚠️ Ellenérv: ${e(t.risk)}</div>` : "";
   const warn = warns.map(w => `<div style="margin-top:4px;color:#ffb74d">🔎 Ellenőrizd: ${e(w)}</div>`).join("");
   return `<div style="margin-top:8px;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,.03);font-size:12px;color:#b0bec5">
@@ -1358,7 +1373,7 @@ function teInput(value, placeholder, type) {
 // Piac: választómező a négy elszámolható piaccal + "Egyéb" szabad szöveggel. Ha a tipp eredeti
 // piaca nem pontosan ezek egyike (pl. "Over 2.5"), "Egyéb"-ként, változatlan szöveggel jelenik meg,
 // így mentéskor nem íródik át.
-const TE_MARKETS = ["1X2", "Gólszám", "Hendikep", "BTTS"];
+const TE_MARKETS = ["1X2", "Gólszám", "Hendikep", "BTTS", "Csapat gólszám", "1. félidő gólszám"];
 function teMarketInput(value) {
   const v = value || "1X2";
   const wrap = document.createElement("div");
@@ -1384,6 +1399,11 @@ function teSuggestions(market, home, away) {
     return [...h.map(x => `${home} ${x}`), ...h.map(x => `${away} ${x}`)];
   }
   if (market === "BTTS") return ["Igen", "Nem"];
+  if (market === "Csapat gólszám") {
+    const t = ["0,5", "1,5", "2,5"];
+    return [home, away].flatMap(c => [...t.map(l => `${c} több mint ${l} gól`), ...t.map(l => `${c} kevesebb mint ${l} gól`)]);
+  }
+  if (market === "1. félidő gólszám") return ["0,5", "1,5", "2,5"].flatMap(l => [`Több mint ${l} gól`, `Kevesebb mint ${l} gól`]);
   if (market === "1X2") return [home, "Döntetlen", away];
   return [];
 }
@@ -1600,6 +1620,40 @@ async function sendTips() {
 }
 
 async function loadStatus() {}
+
+// CLV összesítő: a tippek oddsa a záró piachoz képest (pozitív = jobb árat fogtunk)
+async function showClvSummary() {
+  const r = await fetch("/api/admin/clv", { headers: adminHeaders() });
+  if (!(await handleAdminResp(r))) return;
+  const d = await r.json().catch(() => ({}));
+  const sg = x => x == null ? "–" : `${x > 0 ? "+" : ""}${x}%`;
+  const line = (k, a) => `${k}: ${a.n} db · átlag CLV ${sg(a.avgClv)} · pozitív ${a.positivePct}%` + (a.avgClosingEv != null ? ` · záró EV (TMP odds) ${sg(a.avgClosingEv)}` : "");
+  if (!d.total || !d.total.n) {
+    alert(`Még nincs CLV-adat.\nA záró oddsot a rendszer a kezdés előtt ~2–14 perccel rögzíti (csak az új tippeknél).\nVárakozik: ${d.waiting || 0} · nem sikerült: ${d.failed || 0}`);
+    return;
+  }
+  alert([
+    line("Összesen", d.total), "",
+    "Piac szerint:", ...Object.entries(d.byMarket || {}).map(([k, a]) => "  " + line(k, a)), "",
+    "Típus szerint:", ...Object.entries(d.bySource || {}).map(([k, a]) => "  " + line(k, a)), "",
+    `Rögzítésre vár: ${d.waiting || 0} · nem sikerült: ${d.failed || 0}`,
+    "", "CLV = záró piaci esély / tippeléskori piaci esély − 1. Tartósan pozitív átlag = valódi előny.",
+  ].join("\n"));
+}
+
+// Odds API piac-próba: egy liga legközelebbi meccsére elérhető piacok
+async function probeOddsMarkets() {
+  const sport = prompt("Liga-kulcs (Odds API):", "soccer_epl");
+  if (!sport) return;
+  const r = await fetch("/api/admin/odds-markets?sport=" + encodeURIComponent(sport.trim()), { headers: adminHeaders() });
+  if (!(await handleAdminResp(r))) return;
+  const d = await r.json().catch(() => ({}));
+  if (d.error) { alert("Hiba: " + d.error); return; }
+  if (!d.event) { alert(`${d.label}: nincs közelgő meccs.`); return; }
+  alert([`${d.label} – ${d.event} (${d.commence})`, `${d.bookmakers} iroda`, "",
+    ...d.markets.map(m => `${m.key}: ${m.bookmakers} iroda`), "",
+    d.quotaLeft != null ? `Odds API maradék kredit: ${d.quotaLeft}` : ""].join("\n"));
+}
 
 // ── Meccsek előnézete modal ────────────────────────────────────
 function openPreviewModal() {
@@ -1943,7 +1997,7 @@ async function syncStripe() {
       <button type="button" class="te-add" onclick="teAddLeg()">➕ Láb hozzáadása</button>
       <div id="te-total" style="font-size:13px;color:#ffcc80;font-weight:700;margin-bottom:10px"></div>
     </div>
-    <div class="te-hint">Az automatikus elszámoláshoz: Piac „1X2” → Tipp: csapatnév vagy „Döntetlen”; gólszám → Tipp: „Több mint 2,5 gól” / „Kevesebb mint 2,5 gól”; „Hendikep” → Tipp: „Csapat -1.5”; „BTTS” → Tipp: „Igen” / „Nem”. Más piacot kézzel kell lezárni.</div>
+    <div class="te-hint">Az automatikus elszámoláshoz: Piac „1X2” → Tipp: csapatnév vagy „Döntetlen”; gólszám → Tipp: „Több mint 2,5 gól” / „Kevesebb mint 2,5 gól”; „Hendikep” → Tipp: „Csapat -1.5”; „BTTS” → Tipp: „Igen” / „Nem”; „Csapat gólszám” → Tipp: „Csapat több mint 1,5 gól”; „1. félidő gólszám” → Tipp: „Több mint 0,5 gól” (csak football-data ligáknál zárul automatikusan). Más piacot kézzel kell lezárni.</div>
     <label class="te-field"><span>Indoklás</span><textarea id="te-note" placeholder="Miért ez a tipp? (eredmények, tabella, H2H, hiányzók)"></textarea></label>
     <label id="te-approved-wrap" style="display:flex;align-items:center;gap:8px;font-size:13px;color:#b0bec5;margin-bottom:12px;cursor:pointer">
       <input type="checkbox" id="te-approved" style="width:auto"> Azonnal jóváhagyva (publikus)
