@@ -492,7 +492,7 @@ async function computePoissonEdge(matchList) {
       addEdge(o.market, o.name, o.side === "Over" ? p : 1 - p);
     }
 
-    const valueMarkets = markets.filter(mk => mk.edge >= POISSON_EDGE_MIN);
+    const valueMarkets = markets.filter(mk => mk.edge >= POISSON_EDGE_MIN && !/(^|\s)Under /.test(mk.market));
     result.set(m.match, {
       lambdaHome: Math.round(lambdaHome * 100) / 100,
       lambdaAway: Math.round(lambdaAway * 100) / 100,
@@ -678,6 +678,7 @@ function publicTip(t) {
 function compactOdds(odds) {
   const groups = {};
   for (const o of odds || []) {
+    if (/(^|\s)Under /.test(o.market)) continue;       // Under tipp tiltott → az AI nem is látja
     let key = o.market, label = o.name;
     if (/^Csapat (Over|Under) /.test(o.market)) {
       if (![0.5, 1.5, 2.5].includes(o.point)) continue;
@@ -802,14 +803,11 @@ NYELV – MINDEN MEZŐT MAGYARUL ADJ MEG:
 - Nemzeti csapatneveknél használd a magyar nevet: pl. Norway → Norvégia, Denmark → Dánia, Austria → Ausztria, Germany → Németország, France → Franciaország, Portugal → Portugália, Spain → Spanyolország, England → Anglia, Scotland → Skócia, Netherlands → Hollandia stb.
 - Klubcsapatneveknél maradj az eredeti névnél (pl. "Bayer Leverkusen", "Manchester City") – ezeknek nincs magyar nevük.
 - A "market" és "pick" mezőket MINDIG magyarul add meg:
-  * "Over 2.5" → "Több mint 2,5 gól" | "Under 2.5" → "Kevesebb mint 2,5 gól"
-  * "Over 1.5" → "Több mint 1,5 gól" | "Under 1.5" → "Kevesebb mint 1,5 gól"
-  * "Over 3.5" → "Több mint 3,5 gól" | "Under 3.5" → "Kevesebb mint 3,5 gól"
+  * "Over 2.5" → "Több mint 2,5 gól" | "Over 1.5" → "Több mint 1,5 gól" | "Over 3.5" → "Több mint 3,5 gól"
   * "BTTS Yes" / "BTTS Igen" → "Mindkét csapat betalál"
-  * "BTTS No" / "BTTS Nem" → "Nem talál be mindkét csapat"
   * "1X2" marad "1X2"
-  * Csapat gólszáma: "market": "Csapat gólszám", "pick": "<csapat> több mint 1,5 gól" vagy "<csapat> kevesebb mint 0,5 gól" (a "Csapat gól" sorból)
-  * 1. félidő gólszáma: "market": "1. félidő gólszám", "pick": "Több mint 0,5 gól" vagy "Kevesebb mint 1,5 gól" (az "1. félidő gól" sorból)
+  * Csapat gólszáma: "market": "Csapat gólszám", "pick": "<csapat> több mint 1,5 gól" (a "Csapat gól" sorból)
+  * 1. félidő gólszáma: "market": "1. félidő gólszám", "pick": "Több mint 0,5 gól" (az "1. félidő gól" sorból)
   * "Asian Handicap" → "Ázsiai hendikep"
   * "Handicap" → "Hendikep"
   * "Home Win" → "Hazai győzelem" | "Away Win" → "Vendég győzelem" | "Draw" → "Döntetlen"
@@ -821,16 +819,16 @@ KÉT dolgot adj – MINDKETTŐ KÖTELEZŐ:
    - MECCSENKÉNT LEGFELJEBB 1 single tipp – a legerősebb piacot válaszd az adott meccsre.
    - CSAK olyan single tippet adj, amelynek a fenti listában szereplő oddsa legalább ${(MIN_SINGLE_ODDS / TMP_FACTOR).toFixed(2)} (a TippmixPro kb. ${Math.round((1 - TMP_FACTOR) * 100)}%-kal kevesebbet fizet, így ott is meglegyen a ${MIN_SINGLE_ODDS}) – az ennél alacsonyabb oddsú kimenetet NE tedd single tippnek (a nagyon alacsony oddsúak a kombi lábak közé valók).
    - Lehetőleg KÜLÖNBÖZŐ meccsekről legyenek – minél több meccs, annál jobb.
-   - PIACVÁLTOZATOSSÁG: ne csak győzelmet adj! Választhatsz: 1X2, hendikep, Over, BTTS (mindkét csapat szerez gólt), Under, és ahol a "Valós odds" sorban szerepel: csapat gólszáma ("Csapat gól"), 1. félidő gólszáma ("1. félidő gól"). A legértékesebb piacot válaszd az adott meccsre.
+   - PIACVÁLTOZATOSSÁG: ne csak győzelmet adj! Választhatsz: 1X2, hendikep, Over, BTTS-Igen (mindkét csapat szerez gólt), és ahol a "Valós odds" sorban szerepel: csapat gólszáma ("Csapat gól"), 1. félidő gólszáma ("1. félidő gól"). A legértékesebb piacot válaszd az adott meccsre.
    - Csapat gólszámánál a csapat támadójátékát és az ellenfél védekezését (lőtt/kapott gólok, gól nélküli meccsek aránya) támaszd alá; 1. félidős gólszámnál a félidős eredményeket / az első félidei gólok arányát.
-   - PIACI SORREND (a tapasztalatok alapján): előnyben a győzelem (1X2), a hendikep, az Over és a BTTS-Igen. Under és BTTS-Nem csak nagyon erős, adatokkal alátámasztott alappal. Erős favorit HAZAI meccsére NE adj Under 2.5-öt (ha a favorit vezet, a meccs könnyen nyílttá válik).
+   - PIACI SORREND (a tapasztalatok alapján): előnyben a győzelem (1X2), a hendikep, az Over és a BTTS-Igen.
    - KERÜLD: a döntetlent (1X2 "Döntetlen" – túl nagy a szórás), és az ázsiai -0.5 hendikepet, ha ugyanaz a kimenet 1X2-ben is elérhető (az ugyanaz a fogadás).
    - FAVORIT GYŐZELMÉRE (1X2 vagy mínuszos hendikep) csak akkor tippelj, ha az ellenfél az utolsó 5 meccséből LEGFELJEBB 1-et nyert. Jó formában lévő ellenfél ellen inkább más piacot válassz, vagy hagyd ki a meccset.
 
 2) "kombi_labak": 4-8 BIZTONSÁGOS, alacsony kockázatú láb kombi szelvényekhez.
    - MINDEGYIK láb MÁS meccsről legyen – használj annyi különböző meccset, amennyi elérhető (legalább 2, hogy összeálljon egy kötés; ha van elég meccs, adj 6-8 lábat, hogy több, NEM átfedő kötés is kijöjjön).
    - Ezek külön-külön NEM elég értékesek single tippnek, de kombinálva értékes össz oddsot adnak.
-   - Magas valószínűségű kimenetelek: erős favorit győzelme, Over 1.5, Under 4.5, hendikep -1 / -1.5 nagy favoritnál stb.
+   - Magas valószínűségű kimenetelek: erős favorit győzelme, Over 1.5, Over 0.5 (1. félidő), hendikep -1 / -1.5 nagy favoritnál stb.
    - PIACVÁLTOZATOSSÁG: kombi lábak lehetnek Over 1.5, BTTS, hendikep – ne csak győzelmek!
    - +1 / +1.5 hendikep lábat csak kivételesen adj (ezek ára jellemzően nem éri meg).
    - A kombi lábak ne a "tippek" (single) között szereplő meccsekről legyenek.
@@ -842,6 +840,7 @@ KÉT dolgot adj – MINDKETTŐ KÖTELEZŐ:
    - Ha egy kombi nem érné el a minimumot, válassz magasabb oddsú lábakat vagy ne generáld!
 
 KÖZÖS szabályok:
+- TILOS az UNDER (kevesebb mint X gól – meccsre, csapatra és félidőre is) és a "Nem talál be mindkét csapat" (BTTS-Nem) tipp – sem single, sem kombi láb. Ezeket a rendszer eldobja. Csak gólokra / győzelemre fogadunk.
 - CSAK olyan piacot és vonalat válassz, ami a meccs "Valós odds" sorában szerepel (1X2, a megadott gólvonalak, a megadott hendikepvonalak, csapat gólszáma, 1. félidő gólszáma), vagy "Mindkét csapat betalál" (BTTS). Fogadáskészítő / kombinált piac (pl. "győz + több mint 2,5 gól"), döntetlen esetén visszajár és egyéb piac NEM elszámolható – ezeket a rendszer eldobja. A választott csapatnak az adott meccsen kell játszania.
 - KIZÁRÓLAG a fenti listában szereplő meccsekre adj tippet, pontosan az ott megadott párosítással. Ha a webes keresés más meccset (más ellenfelet, más napot) mutat, azt hagyd figyelmen kívül – a listán kívüli tippeket a rendszer eldobja.
 - Az "odds" mezőbe CSAK a fent megadott valós bookmaker oddsok egyikét írd (a megfelelő piac/kimenet oddsát).
@@ -912,7 +911,8 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
     }
     function fixPick(pick, market) {
       // BTTS tippnél a pick legyen "Igen" vagy "Nem"
-      if (market === "BTTS" && !["igen","nem","yes","no"].includes((pick||"").toLowerCase())) return "Igen";
+      if (market === "BTTS" && !["igen","nem","yes","no"].includes((pick||"").toLowerCase()))
+        return /\bnem\b|\bno\b/i.test(pick || "") ? "Nem" : "Igen";
       return pick;
     }
 
@@ -947,6 +947,7 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
     };
     // A kimenetnek is ehhez a meccshez kell tartoznia; az oddsot a valós értékre cseréljük
     const pickOk = (t, kind) => {
+      if (isBannedPick(t.market, t.pick)) { console.log(`${kind} kiszűrve (tiltott piac: Under / BTTS-Nem): ${t.match} – ${t.market} ${t.pick}`); return false; }
       const fixedPick = normalizeHandicapPick(t.market, t.pick);
       if (fixedPick !== t.pick) { console.log(`${kind} hendikep vonal a tippbe illesztve: "${t.pick}" → "${fixedPick}" (${t.match})`); t.pick = fixedPick; }
       const r = checkPickAgainstOdds(findMatchEntry(matchList, t.match), t.market, t.pick);
@@ -2463,6 +2464,12 @@ function canonPick(market, pick) {
     return { kind: "hcp", team: normTeam(String(pick || "").replace(/\s*[-+]?\d+(\.\d+)?$/, "")), line: num(pk.match(/[-+]?\d+(\.\d+)?$/)?.[0] || "") };
   if (/^(x|draw|döntetlen)$/.test(pk)) return { kind: "1x2", team: "draw" };
   return { kind: "1x2", team: normTeam(pick) };
+}
+// Tiltott tipptípusok: bármilyen Under (meccs, csapat, félidő) és a BTTS-Nem – nem fogadunk arra,
+// hogy nem lesz gól. (Az admin kézzel továbbra is felvehet ilyet.)
+function isBannedPick(market, pick) {
+  const c = canonPick(market, pick);
+  return /under/.test(c.kind) || (c.kind === "btts" && c.side === "no");
 }
 function samePick(a, b) {
   if (a.kind !== b.kind) return false;
