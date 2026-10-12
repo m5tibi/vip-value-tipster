@@ -2841,12 +2841,20 @@ function findTeam(teams, oddsName) {
   return bestScore >= 0.5 && bestScore > second ? best : null;
 }
 
+// Párhuzamos hívásoknál (Promise.all a meccslistán) ligánként csak EGY lekérés megy ki –
+// a többi ugyanarra a folyamatban lévő kérésre vár (a football-data ingyenes kerete 10 hívás/perc).
+const _standingsInFlight = {};
 async function fetchStandings(compCode) {
-  const now = Date.now();
-  if (_standingsCache[compCode] && now - _standingsCache[compCode].updatedAt < STANDINGS_TTL) {
-    return _standingsCache[compCode].teams;
-  }
+  const c = _standingsCache[compCode];
+  if (c && Date.now() - c.updatedAt < STANDINGS_TTL) return c.teams;
   if (!FOOTBALLDATA_TOKEN) return null;
+  if (!_standingsInFlight[compCode]) {
+    _standingsInFlight[compCode] = _loadStandings(compCode).finally(() => { delete _standingsInFlight[compCode]; });
+  }
+  return _standingsInFlight[compCode];
+}
+async function _loadStandings(compCode) {
+  const now = Date.now();
   try {
     const r = await fetch(`https://api.football-data.org/v4/competitions/${compCode}/standings`, {
       headers: { "X-Auth-Token": FOOTBALLDATA_TOKEN }
