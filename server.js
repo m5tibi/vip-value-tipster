@@ -2597,7 +2597,9 @@ app.post("/api/tips/send", async (req, res) => {
     if (combosToSend.length) {
       combosToSend.forEach(c => {
         const legs = (c.legs || []).map(l => `  – ${l.match} | ${l.pick} @${l.odds}`).join("\n");
-        lines.push(`\n🎰 <b>KOMBI</b> (${(c.legs||[]).length} lábas, össz odds: ${c.odds})\n${legs}`);
+        const note = String(c.note || "").trim();
+        const noteStr = note && !/^\d+\s*lábas kötés$/i.test(note) ? `\n<i>${note.replace(/[&<>]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch]))}</i>` : "";
+        lines.push(`\n🎰 <b>KOMBI</b> (${(c.legs||[]).length} lábas, össz odds: ${c.odds})\n${legs}${noteStr}`);
       });
     }
     sendTelegram(lines.join("\n")).catch(e => console.error("Telegram privát hiba:", e.message));
