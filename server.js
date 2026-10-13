@@ -3259,7 +3259,7 @@ let lastMatchListTs = 0;
 const matchListFails = security.hitCounter(10, 15 * 60 * 1000);
 function matchListAuth(req, res) {
   if (req.user?.isAdmin) return true;
-  const key = req.ip || "?";
+  const key = security.clientIp(req);
   const pwd = req.get("x-admin-password") || "";
   if (ADMIN_PWD && pwd && !matchListFails.blocked(key)) {
     const h = x => require("crypto").createHash("sha256").update(String(x)).digest();
