@@ -300,15 +300,26 @@ async function sendSubscriptionExpired(to) {
 
 // ── VIP próbaidő ─────────────────────────────────────────────
 const huLongDate = iso => new Date(iso).toLocaleDateString("hu-HU", { timeZone: "Europe/Budapest", month: "long", day: "numeric" });
-// A próbaidő alatti eredmények rövid összegzése (stats: { settled, won, lost, profit } vagy null)
-const trialStatsHtml = st => st && st.settled
-  ? `<div style="background:#07111d;border:1px solid #1e3a2f;border-radius:8px;padding:12px 14px;margin:12px 0;font-size:14px;line-height:1.7">
-       A próbaidőd alatt lezárt VIP tippek: <b>${st.settled}</b> db · ✅ ${st.won} nyert · ❌ ${st.lost} veszett<br>
-       Eredmény: <b style="color:${st.profit >= 0 ? "#00e676" : "#ef9a9a"}">${st.profit >= 0 ? "+" : ""}${st.profit.toFixed(2)} egység</b>
-       <span style="color:#78909c;font-size:12px">(1 egység = 1 tét)</span>
-     </div>` : "";
-const trialStatsText = st => st && st.settled
-  ? `\nA próbaidőd alatt lezárt VIP tippek: ${st.settled} db (${st.won} nyert, ${st.lost} veszett), eredmény: ${st.profit >= 0 ? "+" : ""}${st.profit.toFixed(2)} egység.\n` : "";
+// Eredmény-blokk az emlékeztetőbe / lejárati levélbe – CSAK pozitív eredményt mutatunk:
+// 1) a próbaidő alatti VIP tippek eredménye, ha pozitív; 2) különben a hosszú távú track record,
+// ha az pozitív; 3) különben semmit. (stats: { settled, won, lost, profit }, overall: { settled, profit, roi })
+const sgn = x => `${x >= 0 ? "+" : ""}${x.toFixed(2)}`;
+function trialResults(stats, overall) {
+  if (stats && stats.settled && stats.profit > 0) return {
+    html: `A próbaidőd alatt lezárt VIP tippek: <b>${stats.settled}</b> db · ✅ ${stats.won} nyert · ❌ ${stats.lost} veszett<br>
+       Eredmény: <b style="color:#00e676">${sgn(stats.profit)} egység</b> <span style="color:#78909c;font-size:12px">(1 egység = 1 tét)</span>`,
+    text: `A próbaidőd alatt lezárt VIP tippek: ${stats.settled} db (${stats.won} nyert, ${stats.lost} veszett), eredmény: ${sgn(stats.profit)} egység.`,
+  };
+  if (overall && overall.settled && overall.profit > 0) return {
+    html: `Hosszú távú eredményünk: <b>${overall.settled}</b> lezárt tipp · <b style="color:#00e676">${sgn(overall.profit)} egység</b>${overall.roi > 0 ? ` · ROI <b style="color:#00e676">+${overall.roi}%</b>` : ""}<br>
+       <a href="https://90perc.hu/statisztika.html" style="color:#80cbc4;font-size:12px">Minden tipp nyilvános – nézd meg a teljes track recordot</a>`,
+    text: `Hosszú távú eredményünk: ${overall.settled} lezárt tipp, ${sgn(overall.profit)} egység${overall.roi > 0 ? ` (ROI +${overall.roi}%)` : ""} – https://90perc.hu/statisztika.html`,
+  };
+  return null;
+}
+const trialStatsHtml = (st, ov) => { const r = trialResults(st, ov); return r
+  ? `<div style="background:#07111d;border:1px solid #1e3a2f;border-radius:8px;padding:12px 14px;margin:12px 0;font-size:14px;line-height:1.7">${r.html}</div>` : ""; };
+const trialStatsText = (st, ov) => { const r = trialResults(st, ov); return r ? `\n${r.text}\n` : ""; };
 
 async function sendTrialOffer(to, url, days, validDays = 7) {
   return send({
@@ -324,29 +335,29 @@ async function sendTrialOffer(to, url, days, validDays = 7) {
   });
 }
 
-async function sendTrialReminder(to, endsAt, stats) {
+async function sendTrialReminder(to, endsAt, stats, overall) {
   const until = huLongDate(endsAt);
   return send({
     to, bulk: true,
     subject: "⏳ Holnap lejár a VIP próbaidőd – 90perc.hu",
-    text: `Üdv!\n\nA VIP próbaidőd ${until}-ig tart.${trialStatsText(stats)}\nHa továbbra is kérnéd a napi tippeket, itt fizethetsz elő (havonta lemondható):\nhttps://90perc.hu/elofizetes.html`,
+    text: `Üdv!\n\nA VIP próbaidőd ${until}-ig tart.${trialStatsText(stats, overall)}\nHa továbbra is kérnéd a napi tippeket, itt fizethetsz elő (havonta lemondható):\nhttps://90perc.hu/elofizetes.html`,
     html: shell("⏳ Holnap lejár a VIP próbaidőd", `
       <p style="line-height:1.7;margin:0 0 6px">A VIP próbaidőd <b>${until}</b>-ig tart.</p>
-      ${trialStatsHtml(stats)}
+      ${trialStatsHtml(stats, overall)}
       <p style="line-height:1.7;margin:0 0 6px">Ha továbbra is kérnéd a napi tippeket, fizess elő – havonta lemondható.</p>
       ${button("https://90perc.hu/elofizetes.html", "⭐ Előfizetek")}
     `),
   });
 }
 
-async function sendTrialExpired(to, stats) {
+async function sendTrialExpired(to, stats, overall) {
   return send({
     to, bulk: true,
     subject: "Lejárt a VIP próbaidőd – 90perc.hu",
-    text: `Üdv!\n\nLejárt a VIP próbaidőd.${trialStatsText(stats)}\nAz ingyenes tippeket továbbra is látod. A VIP tippekhez itt fizethetsz elő (havonta lemondható):\nhttps://90perc.hu/elofizetes.html`,
+    text: `Üdv!\n\nLejárt a VIP próbaidőd.${trialStatsText(stats, overall)}\nAz ingyenes tippeket továbbra is látod. A VIP tippekhez itt fizethetsz elő (havonta lemondható):\nhttps://90perc.hu/elofizetes.html`,
     html: shell("Lejárt a VIP próbaidőd", `
       <p style="line-height:1.7;margin:0 0 6px">Köszönjük, hogy kipróbáltad a VIP tippeket!</p>
-      ${trialStatsHtml(stats)}
+      ${trialStatsHtml(stats, overall)}
       <p style="line-height:1.7;margin:0 0 6px;color:#78909c">Az ingyenes tippeket és a track recordot továbbra is látod. A VIP tippekhez fizess elő – havonta lemondható.</p>
       ${button("https://90perc.hu/elofizetes.html", "⭐ Előfizetek")}
     `),
