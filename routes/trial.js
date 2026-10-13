@@ -7,6 +7,7 @@ const trial   = require("../lib/trial");
 const { requireAdmin } = require("../lib/admin");
 const { notifyAdmin, esc } = require("../lib/notify");
 const quota   = require("../lib/mailQuota");
+const { clientIp } = require("../lib/security");
 
 const router = express.Router();
 
@@ -49,9 +50,10 @@ function startFor(u, req, source) {
   if (source !== "signup" && !offerOpen(u) && capacityState().free <= 0)
     return { ok: false, reason: "A próbaidős helyek most beteltek – egyszerre csak korlátozott számú próbaidő futhat. Pár nap múlva próbáld újra!" };
   const days = u.trialOffer?.days || trial.TRIAL_DAYS;
-  const r = trial.start(u, usersDb.update, { days, source: u.trialOffer ? "campaign" : source, deviceId: req.deviceId, ip: req.ip });
+  const ip = clientIp(req);
+  const r = trial.start(u, usersDb.update, { days, source: u.trialOffer ? "campaign" : source, deviceId: req.deviceId, ip });
   if (r.ok) {
-    const flag = trial.ipCount(req.ip) > 1 ? `\n⚠️ Ugyanarról az IP-ről ${trial.ipCount(req.ip)} próbaidő 30 napon belül` : "";
+    const flag = trial.ipCount(ip) > 1 ? `\n⚠️ Ugyanarról az IP-ről ${trial.ipCount(ip)} próbaidő 30 napon belül` : "";
     console.log(`VIP próbaidő indult: ${u.email} – ${days} nap (${r.user.trialSource})`);
     notifyAdmin(`💎 <b>VIP próbaidő indult</b>\n${esc(u.email)} – ${days} nap (${r.user.trialSource === "campaign" ? "kampány" : "új regisztráció"})${flag}`);
   }
