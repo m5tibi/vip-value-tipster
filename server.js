@@ -10,6 +10,7 @@ const { callClaudeWithSearch } = require("./lib/claude");
 const auth    = require("./auth");
 const mailer  = require("./mailer");
 const trial   = require("./lib/trial");
+const mailQuota = require("./lib/mailQuota");
 const { BASE_URL } = require("./lib/config");
 
 const app = express();
@@ -1827,9 +1828,10 @@ function checkExpiredSubscriptions() {
 checkExpiredSubscriptions();
 
 // ── VIP próbaidő e-mailek: kampány-ajánlatok (napi kerettel), lejárat előtti emlékeztető, lejárat ──
-// A Resend ingyenes csomagja napi 100 levelet enged (a tipp-értesítők is ebbe számítanak), ezért
-// a kampány naponta legfeljebb TRIAL_CAMPAIGN_DAILY_LIMIT ajánlatot küld, a többi másnap megy.
-const TRIAL_CAMPAIGN_DAILY_LIMIT = parseInt(process.env.TRIAL_CAMPAIGN_DAILY_LIMIT, 10) || 60;
+// A Resend ingyenes csomagja napi 100 levelet enged (a tipp-értesítők is ebbe számítanak), ezért a
+// kampány hullámokban megy: csak annyi ajánlat, amennyi próbaidős belefér a napi tipp-e-mailekbe
+// (routes/trial.js capacityState, lib/mailQuota.js) – a többiek várólistán várnak, akár hetekig.
+const trialRoutes = require("./routes/trial");
 const parseHuStamp = s => {
   const m = String(s || "").match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.?\s+(\d{1,2}):(\d{2})/);
   return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]).getTime() : NaN;
@@ -1846,7 +1848,7 @@ function trialTipStats(u) {
   };
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-let _trialMailRunning = false;
+let _trialMailRunning = false, _trialQueueLogged = false;
 async function processTrialMail() {
   if (_trialMailRunning || !auth.PAID_MODE) return;
   _trialMailRunning = true;
@@ -1856,36 +1858,43 @@ async function processTrialMail() {
     for (const u of raw()) {
       if (!u.trialEndsAt || trial.isPayer(u)) continue;
       const end = new Date(u.trialEndsAt).getTime();
+      // A napi keretbe nem férő levél nem vész el: a jelző nem áll be, a következő kör újra próbálja
+      // (az emlékeztető csak a lejárat előtt, a lejárati levél 3 napig)
       if (!u.trialReminderSent && end > now && end - now <= 24 * 3600e3 && (u.trialDays || 0) >= 2) {
-        usersDb.update(u.id, { trialReminderSent: true });
-        await mailer.sendTrialReminder(u.email, u.trialEndsAt, trialTipStats(u));
+        const r = await mailer.sendTrialReminder(u.email, u.trialEndsAt, trialTipStats(u));
+        if (!(r && r.quota)) usersDb.update(u.id, { trialReminderSent: true });
         await sleep(700);
       } else if (!u.trialExpiredSent && end <= now) {
+        if (now - end >= 3 * 86400e3) { usersDb.update(u.id, { trialExpiredSent: true }); continue; }   // régen lejártaknak már nem írunk
+        const st = trialTipStats(u);
+        const r = await mailer.sendTrialExpired(u.email, st);
+        if (r && r.quota) continue;
         usersDb.update(u.id, { trialExpiredSent: true });
-        if (now - end < 3 * 86400e3) {                     // régen lejártaknak már nem írunk
-          const st = trialTipStats(u);
-          await mailer.sendTrialExpired(u.email, st);
-          console.log(`VIP próbaidő lejárt: ${u.email} (${st.settled} lezárt tipp, ${st.profit >= 0 ? "+" : ""}${st.profit} egység)`);
-          await sleep(700);
-        }
+        console.log(`VIP próbaidő lejárt: ${u.email} (${st.settled} lezárt tipp, ${st.profit >= 0 ? "+" : ""}${st.profit} egység)`);
+        await sleep(700);
       }
     }
-    // Kampány-ajánlatok
-    const today = todayHU();
-    let budget = TRIAL_CAMPAIGN_DAILY_LIMIT - raw().filter(u => u.trialOffer?.emailedDay === today).length;
-    const queue = raw().filter(u => u.trialOffer && !u.trialOffer.emailedAt && !u.trialStartedAt && u.plan !== "pro");
+    // Kampány-ajánlatok – csak a szabad helyekre és a mai tömeges e-mail keretig
+    // A mai még hátralévő tippküldésekre helyet hagyunk: minden (lehetséges) címzettnek minden küldés
+    const cs = trialRoutes.capacityState();
+    const sendsLeft = Math.max(0, mailQuota.sendsPerDay() - mailQuota.tipSendsToday());
+    const tipNeed = (cs.payers + cs.active + cs.outstanding) * sendsLeft;
+    let slots = Math.min(cs.free, Math.floor((mailQuota.bulkLeft() - tipNeed) / (1 + sendsLeft)));
     let sent = 0;
-    for (const u of queue) {
-      if (budget <= 0) break;
-      const token = auth.makePurposeToken("trial", u.id, 30 * 86400e3);
+    for (const u of cs.queue) {
+      if (slots <= 0) break;
+      const token = auth.makePurposeToken("trial", u.id, trialRoutes.OFFER_VALID_DAYS * 86400e3);
       const url = `${BASE_URL}/api/trial/activate?token=${encodeURIComponent(token)}`;
-      const r = await mailer.sendTrialOffer(u.email, url, u.trialOffer.days);
+      const r = await mailer.sendTrialOffer(u.email, url, u.trialOffer.days, trialRoutes.OFFER_VALID_DAYS);
       if (r && r.ok === false) { console.error(`Próbaidő-ajánlat küldése megállt (${r.error}) – a következő körben folytatjuk`); break; }
-      usersDb.update(u.id, { trialOffer: { ...u.trialOffer, emailedAt: new Date().toISOString(), emailedDay: today } });
-      budget--; sent++;
+      usersDb.update(u.id, { trialOffer: { ...u.trialOffer, emailedAt: new Date().toISOString() } });
+      slots--; sent++;
       await sleep(700);
     }
-    if (sent) console.log(`Próbaidő-kampány: ${sent} ajánlat elküldve ma · hátra: ${queue.length - sent}`);
+    if (sent || (cs.queue.length && !_trialQueueLogged)) {
+      console.log(`Próbaidő-kampány: ${sent} ajánlat elküldve · kapacitás ${cs.cap} (fut ${cs.active}, élő ajánlat ${cs.outstanding}) · várólista: ${cs.queue.length - sent} · ma ${mailQuota.used()}/${mailQuota.LIMIT} levél`);
+      _trialQueueLogged = true;
+    }
   } catch (e) { console.error("Próbaidő e-mail hiba:", e.message); }
   finally { _trialMailRunning = false; }
 }
@@ -2694,11 +2703,22 @@ app.post("/api/tips/send", async (req, res) => {
     !u.isAdmin && u.emailVerified !== false &&
     (u.plan === "pro" || !auth.PAID_MODE || trial.isActive(u))      // a VIP próbaidősök is megkapják
   );
-  console.log(`Tip e-mail küldése ${recipients.length} felhasználónak...`);
-  for (const u of recipients) {
-    mailer.sendNewTips(u.email, singlesToSend, combosToSend, freesToSend)
-      .catch(e => console.error(`Tip email hiba (${u.email}):`, e.message));
-  }
+  // A napi e-mail keret miatt a fizetők kapják elsőként; ha elfogy a keret, a maradék próbaidős
+  // csak az oldalon látja a tippeket (a mailer kihagyja és naplózza őket)
+  recipients.sort((a, b) => (b.plan === "pro") - (a.plan === "pro"));
+  mailQuota.noteTipSend();
+  console.log(`Tip e-mail küldése ${recipients.length} felhasználónak (napi keret: ${mailQuota.used()}/${mailQuota.LIMIT}, tömegesre még ${mailQuota.bulkLeft()})...`);
+  // Egymás után, kis szünettel (a Resend kb. 2 levél/mp-et enged) – a válasz nem vár rá
+  (async () => {
+    let ok = 0, skipped = 0;
+    for (const u of recipients) {
+      const r = await mailer.sendNewTips(u.email, singlesToSend, combosToSend, freesToSend)
+        .catch(e => ({ ok: false, error: e.message }));
+      if (r && r.quota) skipped++; else if (!r || r.ok !== false) ok++;
+      await sleep(600);
+    }
+    console.log(`Tip e-mail: ${ok} elküldve${skipped ? `, ${skipped} kihagyva (napi e-mail keret)` : ""} · ma ${mailQuota.used()}/${mailQuota.LIMIT} levél`);
+  })();
 
   res.json({ ok: true, sent: total });
 });
