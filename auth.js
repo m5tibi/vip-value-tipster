@@ -67,11 +67,12 @@ function attachUser(req, res, next) {
 // Hozzáférés a tippekhez:
 //  - admin: mindig
 //  - ingyenes szakasz (PAID_MODE=false): minden belépett felhasználó
-//  - fizetős szakasz (PAID_MODE=true): csak aktív előfizető
+//  - fizetős szakasz (PAID_MODE=true): aktív előfizető vagy futó VIP próbaidő (lib/trial.js)
 function hasAccess(user) {
   if (!user) return false;
   if (user.isAdmin) return true;
   if (!PAID_MODE) return true;
+  if (user.trialEndsAt && new Date(user.trialEndsAt) > new Date()) return true;
   if (user.plan !== "pro") return false;
   if (!["active", "trialing"].includes(user.subscriptionStatus || "")) return false;
   if (user.currentPeriodEnd && new Date(user.currentPeriodEnd) < new Date()) return false;

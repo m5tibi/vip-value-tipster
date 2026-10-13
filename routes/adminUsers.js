@@ -2,12 +2,15 @@
 const express = require("express");
 const usersDb = require("../users");
 const mailer  = require("../mailer");
+const trial   = require("../lib/trial");
 const { requireAdmin } = require("../lib/admin");
 
 const router = express.Router();
 
 router.get("/api/admin/users", (req, res) => {
   if (!requireAdmin(req, res)) return;
+  const canonCount = {};
+  usersDb.all().forEach(u => { const c = trial.canonEmail(u.email); canonCount[c] = (canonCount[c] || 0) + 1; });
   const list = usersDb.all().map(u => ({
     id: u.id,
     email: u.email,
@@ -19,6 +22,11 @@ router.get("/api/admin/users", (req, res) => {
     cancelledAt: u.cancelledAt || null,
     subscriptionStatus: u.subscriptionStatus || null,
     stripeCustomerId: u.stripeCustomerId || null,
+    trialStartedAt: u.trialStartedAt || null,
+    trialEndsAt: u.trialEndsAt || null,
+    trialSource: u.trialSource || null,
+    trialOffer: u.trialOffer || null,
+    trialFlags: trial.flags(usersDb.findById(u.id) || u, canonCount[trial.canonEmail(u.email)]),
   }));
   res.json(list);
 });

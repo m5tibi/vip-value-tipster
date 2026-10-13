@@ -288,4 +288,59 @@ async function sendSubscriptionExpired(to) {
   });
 }
 
-module.exports = { send, sendVerification, sendPasswordReset, sendPlanActivated, sendPlanCancelled, sendSubscriptionCancelled, sendSubscriptionExpired, sendNewTips, sendWeeklySummary, configured };
+// ── VIP próbaidő ─────────────────────────────────────────────
+const huLongDate = iso => new Date(iso).toLocaleDateString("hu-HU", { timeZone: "Europe/Budapest", month: "long", day: "numeric" });
+// A próbaidő alatti eredmények rövid összegzése (stats: { settled, won, lost, profit } vagy null)
+const trialStatsHtml = st => st && st.settled
+  ? `<div style="background:#07111d;border:1px solid #1e3a2f;border-radius:8px;padding:12px 14px;margin:12px 0;font-size:14px;line-height:1.7">
+       A próbaidőd alatt lezárt VIP tippek: <b>${st.settled}</b> db · ✅ ${st.won} nyert · ❌ ${st.lost} veszett<br>
+       Eredmény: <b style="color:${st.profit >= 0 ? "#00e676" : "#ef9a9a"}">${st.profit >= 0 ? "+" : ""}${st.profit.toFixed(2)} egység</b>
+       <span style="color:#78909c;font-size:12px">(1 egység = 1 tét)</span>
+     </div>` : "";
+const trialStatsText = st => st && st.settled
+  ? `\nA próbaidőd alatt lezárt VIP tippek: ${st.settled} db (${st.won} nyert, ${st.lost} veszett), eredmény: ${st.profit >= 0 ? "+" : ""}${st.profit.toFixed(2)} egység.\n` : "";
+
+async function sendTrialOffer(to, url, days) {
+  return send({
+    to,
+    subject: `🎁 ${days} nap VIP ajándékba – 90perc.hu`,
+    text: `Üdv!\n\nAjándékba ${days} napos VIP próbaidőt kapsz a 90perc.hu-n: minden napi AI tippet és kombit látsz, és e-mailben is megkapod őket. Bankkártya nem kell, a próbaidő magától lejár.\n\nAktiválás egy kattintással (a ${days} nap az aktiváláskor indul):\n${url}\n\nMinden tippünk eredménye nyilvános: https://90perc.hu/statisztika.html`,
+    html: shell(`🎁 ${days} nap VIP ajándékba`, `
+      <p style="line-height:1.7;margin:0 0 10px">Ajándékba <b>${days} napos VIP próbaidőt</b> kapsz: minden napi AI tippet és kombit látsz, és e-mailben is megkapod őket.</p>
+      <p style="line-height:1.7;margin:0 0 6px;color:#78909c">Bankkártya nem kell, a próbaidő magától lejár. A ${days} nap az aktiváláskor indul.</p>
+      ${button(url, `💎 Aktiválom a ${days} napot`)}
+      <p style="color:#78909c;font-size:12px;margin:10px 0 0">Minden tippünk eredménye nyilvános, nem törlünk semmit: <a href="https://90perc.hu/statisztika.html" style="color:#80cbc4">track record</a>.</p>
+    `),
+  });
+}
+
+async function sendTrialReminder(to, endsAt, stats) {
+  const until = huLongDate(endsAt);
+  return send({
+    to,
+    subject: "⏳ Holnap lejár a VIP próbaidőd – 90perc.hu",
+    text: `Üdv!\n\nA VIP próbaidőd ${until}-ig tart.${trialStatsText(stats)}\nHa továbbra is kérnéd a napi tippeket, itt fizethetsz elő (havonta lemondható):\nhttps://90perc.hu/elofizetes.html`,
+    html: shell("⏳ Holnap lejár a VIP próbaidőd", `
+      <p style="line-height:1.7;margin:0 0 6px">A VIP próbaidőd <b>${until}</b>-ig tart.</p>
+      ${trialStatsHtml(stats)}
+      <p style="line-height:1.7;margin:0 0 6px">Ha továbbra is kérnéd a napi tippeket, fizess elő – havonta lemondható.</p>
+      ${button("https://90perc.hu/elofizetes.html", "⭐ Előfizetek")}
+    `),
+  });
+}
+
+async function sendTrialExpired(to, stats) {
+  return send({
+    to,
+    subject: "Lejárt a VIP próbaidőd – 90perc.hu",
+    text: `Üdv!\n\nLejárt a VIP próbaidőd.${trialStatsText(stats)}\nAz ingyenes tippeket továbbra is látod. A VIP tippekhez itt fizethetsz elő (havonta lemondható):\nhttps://90perc.hu/elofizetes.html`,
+    html: shell("Lejárt a VIP próbaidőd", `
+      <p style="line-height:1.7;margin:0 0 6px">Köszönjük, hogy kipróbáltad a VIP tippeket!</p>
+      ${trialStatsHtml(stats)}
+      <p style="line-height:1.7;margin:0 0 6px;color:#78909c">Az ingyenes tippeket és a track recordot továbbra is látod. A VIP tippekhez fizess elő – havonta lemondható.</p>
+      ${button("https://90perc.hu/elofizetes.html", "⭐ Előfizetek")}
+    `),
+  });
+}
+
+module.exports = { send, sendTrialOffer, sendTrialReminder, sendTrialExpired, sendVerification, sendPasswordReset, sendPlanActivated, sendPlanCancelled, sendSubscriptionCancelled, sendSubscriptionExpired, sendNewTips, sendWeeklySummary, configured };

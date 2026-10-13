@@ -73,6 +73,8 @@ nav{background:var(--surf);border-bottom:1px solid var(--border);padding:12px 16
 .badge-pro{background:rgba(0,230,118,.15);color:var(--green)}
 .badge-free{background:rgba(93,122,150,.15);color:var(--muted)}
 .badge-cancelled{background:rgba(239,68,68,.1);color:var(--red)}
+.badge-trial{background:rgba(64,196,255,.13);color:#80d8ff}
+.meta-item.blue{color:#80d8ff}
 
 .member-meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .meta-item{font-size:11px;color:var(--muted);background:rgba(26,47,74,.5);
@@ -109,6 +111,7 @@ nav{background:var(--surf);border-bottom:1px solid var(--border);padding:12px 16
 <nav>
   <a class="nav-logo" href="/tippek.html"><img src="/logo-horizontal.png" alt="90perc.hu"/></a>
   <div class="nav-actions">
+    <button class="btn btn-ghost btn-sm" onclick="trialCampaign()" title="Egyszeri VIP próbaidő-ajánlat e-mailben a nem előfizető tagoknak">🎁 Próbaidő-kampány</button>
     <button class="btn btn-ghost btn-sm" onclick="syncStripe()">🔄 Stripe</button>
     <button class="btn btn-primary btn-sm" onclick="loadMembers()">↺ Frissít</button>
   </div>
@@ -125,7 +128,10 @@ nav{background:var(--surf);border-bottom:1px solid var(--border);padding:12px 16
   <div class="stat"><div class="stat-num" id="s-total">–</div><div class="stat-label">Összes tag</div></div>
   <div class="stat"><div class="stat-num gold" id="s-mrr">–</div><div class="stat-label">MRR (Ft)</div></div>
   <div class="stat"><div class="stat-num red" id="s-cancelled">–</div><div class="stat-label">Lemondott</div></div>
+  <div class="stat"><div class="stat-num" style="color:#80d8ff" id="s-trial">–</div><div class="stat-label">Próbaidőn</div></div>
+  <div class="stat"><div class="stat-num green" id="s-trialconv">–</div><div class="stat-label">Próbaidőből fizető</div></div>
 </div>
+<div class="page-sub" id="trial-sub" style="padding:0 16px"></div>
 
 <!-- Filter + Search -->
 <div class="filter-bar">
@@ -133,6 +139,7 @@ nav{background:var(--surf);border-bottom:1px solid var(--border);padding:12px 16
   <button class="filter-btn" onclick="setFilter('pro',this)">✅ Fizető</button>
   <button class="filter-btn" onclick="setFilter('free',this)">🔓 Ingyenes</button>
   <button class="filter-btn" onclick="setFilter('cancelled',this)">❌ Lemondott</button>
+  <button class="filter-btn" onclick="setFilter('trial',this)">💎 Próbaidő</button>
 </div>
 
 <div class="search-wrap">
@@ -242,6 +249,7 @@ function renderList() {
   if (currentFilter === 'pro') list = list.filter(u => u.plan === 'pro' && !u.cancelledAt);
   if (currentFilter === 'free') list = list.filter(u => u.plan !== 'pro' && !u.cancelledAt);
   if (currentFilter === 'cancelled') list = list.filter(u => u.cancelledAt);
+  if (currentFilter === 'trial') list = list.filter(u => u.trialStartedAt || u.trialOffer);
   if (search) list = list.filter(u => u.email.toLowerCase().includes(search));
   list = list.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
 
@@ -253,7 +261,11 @@ function renderList() {
     const hasCancelled = !!u.cancelledAt;
     const isActiveButCancelled = isPro && hasCancelled;
     const cardClass = isActiveButCancelled ? 'cancelled' : isPro ? 'pro' : hasCancelled ? 'cancelled' : 'free';
-    const badge = isActiveButCancelled
+    const trialOn = u.trialEndsAt && new Date(u.trialEndsAt) > new Date();
+    const trialLeft = trialOn ? Math.max(1, Math.ceil((new Date(u.trialEndsAt) - Date.now()) / 86400000)) : 0;
+    const badge = !isPro && trialOn
+      ? `<span class="member-badge badge-trial">💎 Próbaidő (még ${trialLeft} nap)</span>`
+      : isActiveButCancelled
       ? '<span class="member-badge badge-cancelled">⚠️ Lemondva (még aktív)</span>'
       : isPro
         ? '<span class="member-badge badge-pro">✅ FIZETŐ</span>'
@@ -266,6 +278,14 @@ function renderList() {
     if (u.paidUntil) metaItems.push(`<span class="meta-item highlight">Lejárat: ${new Date(u.paidUntil).toLocaleDateString('hu-HU')}</span>`);
     if (u.cancelledAt) metaItems.push(`<span class="meta-item red">Lemondva: ${new Date(u.cancelledAt).toLocaleDateString('hu-HU')}</span>`);
     if (!u.emailVerified) metaItems.push('⏳ Nem megerősített');
+    const hd = d => new Date(d).toLocaleDateString('hu-HU');
+    if (u.trialStartedAt) {
+      const src = { signup: 'regisztráció', campaign: 'kampány', banner: 'sáv' }[u.trialSource] || u.trialSource || '';
+      metaItems.push(`<span class="meta-item blue">💎 Próbaidő: ${hd(u.trialStartedAt)} – ${hd(u.trialEndsAt)}${src ? ' (' + src + ')' : ''}${isPro ? ' → előfizetett ✅' : ''}</span>`);
+    } else if (u.trialOffer) {
+      metaItems.push(`<span class="meta-item blue">🎁 Ajánlat: ${u.trialOffer.emailedAt ? 'elküldve ' + hd(u.trialOffer.emailedAt) : 'küldésre vár'}</span>`);
+    }
+    (u.trialFlags || []).forEach(f => metaItems.push(`<span class="meta-item red">⚠️ ${f}</span>`));
 
     const actions = isPro
       ? `<button class="btn btn-danger btn-sm" onclick="setFree('${u.id}')">→ Ingyenes</button>`
@@ -309,6 +329,7 @@ async function loadMembers() {
     allMembers = await r.json();
     updateStats();
     renderList();
+    loadTrialStats();
   } catch(e) {
     showStatus('Betöltési hiba: ' + e.message, true);
   }
@@ -364,6 +385,35 @@ async function syncStripe() {
     showStatus(d.ok ? `✅ ${d.updated} tag frissítve Stripe-ból` : '❌ Hiba', !d.ok);
     if (d.ok) await loadMembers();
   } catch(e) { showStatus('❌ Hiba: ' + e.message, true); }
+}
+
+// ── VIP próbaidő ──
+async function loadTrialStats() {
+  try {
+    const r = await fetch('/api/admin/trial-stats', { headers: adminHeaders() });
+    if (!r.ok) return;
+    const d = await r.json();
+    document.getElementById('s-trial').textContent = d.active;
+    document.getElementById('s-trialconv').textContent = d.conversionPct == null ? '–' : `${d.converted} (${d.conversionPct}%)`;
+    const c = d.campaign;
+    document.getElementById('trial-sub').textContent =
+      `Próbaidő: ${d.started} indult (új regisztráció ${d.bySource.signup || 0}, kampány ${d.bySource.campaign || 0}, sáv ${d.bySource.banner || 0}) · ${d.active} fut · ${d.ended} lejárt · ${d.converted} előfizetett` +
+      (c.offered ? ` · Kampány: ${c.offered} ajánlat, ${c.emailed} elküldve, ${c.pending} küldésre vár, ${c.activated} aktiválta` : '') +
+      ` · Új regisztrálóknak ${d.trialDays} nap, kampányban ${d.campaignDays} nap`;
+  } catch (e) {}
+}
+async function trialCampaign() {
+  try {
+    const r0 = await fetch('/api/admin/trial-campaign', { method: 'POST', headers: adminHeaders(true), body: JSON.stringify({ dryRun: true }) });
+    const d0 = await r0.json();
+    if (!r0.ok) { showStatus('❌ ' + (d0.error || 'Hiba'), true); return; }
+    if (!d0.count) { showStatus('Nincs olyan tag, akinek még járna kampány-ajánlat.'); return; }
+    if (!confirm(`${d0.count} tag kap ${d0.days} napos VIP próbaidő-ajánlatot e-mailben (aktiváló linkkel; a napok az aktiváláskor indulnak).\n\nA levelek naponta legfeljebb 60-as adagokban mennek ki (a Resend napi kerete miatt).\n\nIndítod?`)) return;
+    const r = await fetch('/api/admin/trial-campaign', { method: 'POST', headers: adminHeaders(true), body: JSON.stringify({}) });
+    const d = await r.json();
+    showStatus(d.ok ? `✅ Kampány elindítva: ${d.count} ajánlat küldésre vár (az első adag pár percen belül megy ki)` : '❌ ' + (d.error || 'Hiba'), !d.ok);
+    await loadMembers();
+  } catch (e) { showStatus('❌ Hiba: ' + e.message, true); }
 }
 
 loadMembers();

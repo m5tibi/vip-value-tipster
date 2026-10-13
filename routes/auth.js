@@ -7,6 +7,8 @@ const { BASE_URL }   = require("../lib/config");
 const { rateLimit }  = require("../lib/security");
 const { isAdminReq } = require("../lib/admin");
 const { notifyAdmin, esc } = require("../lib/notify");
+const trial = require("../lib/trial");
+const { startFor: startTrialFor } = require("./trial");
 
 const router = express.Router();
 
@@ -31,6 +33,7 @@ router.post("/api/auth/register", regLimiter, async (req, res) => {
   const r = await usersDb.create(email, password);
   if (!r.ok) return res.status(400).json({ error: r.error });
   usersDb.update(r.user.id, { acceptedTermsAt: new Date().toISOString() });
+  trial.rememberDevice(r.user, req.deviceId, usersDb.update);
   auth.setSession(res, r.user.id);
   sendVerifyEmail(req, r.user).catch(() => {});     // ne blokkolja a választ
   console.log(`Új regisztráció: ${r.user.email} (összes: ${usersDb.count()})`);
@@ -58,6 +61,17 @@ router.get("/api/auth/verify", (req, res) => {
   if (!u) return res.status(400).send(page("⚠️", "Nincs ilyen fiók", "A fiók már nem létezik.", "#ffcc80"));
   usersDb.update(uid, { emailVerified: true });
   console.log(`E-mail megerősítve: ${u.email}`);
+  // Új felhasználó: a megerősítéssel indul a VIP próbaidő (ha jár – lásd lib/trial.js)
+  const fresh = usersDb.findById(uid);
+  if (auth.PAID_MODE && !fresh.trialStartedAt && fresh.plan !== "pro" && !fresh.isAdmin) {
+    const r = startTrialFor(fresh, req, "signup");
+    if (r.ok) {
+      const until = new Date(r.user.trialEndsAt).toLocaleDateString("hu-HU", { timeZone: "Europe/Budapest", month: "long", day: "numeric" });
+      return res.send(page("🎉", "E-mail megerősítve – indul a VIP próbaidőd!",
+        `Ajándékba ${r.days} napig, ${until}-ig minden VIP tippet látsz, és e-mailben is megkapod őket. Bankkártya nem kell, a próbaidő magától lejár.`, "#00e676"));
+    }
+    return res.send(page("✅", "E-mail cím megerősítve", `Köszönjük! A fiókod aktív. (VIP próbaidő: ${esc(r.reason)})`, "#00e676"));
+  }
   res.send(page("✅", "E-mail cím megerősítve", "Köszönjük! A fiókod aktív, jó szórakozást.", "#00e676"));
 });
 
@@ -98,6 +112,7 @@ router.post("/api/auth/login", loginLimiter, async (req, res) => {
   const u = await usersDb.verify(email, password);
   if (!u) return res.status(401).json({ error: "Hibás e-mail cím vagy jelszó." });
   auth.setSession(res, u.id);
+  trial.rememberDevice(u, req.deviceId, usersDb.update);
   res.json({ ok: true, user: usersDb.publicView(u), hasAccess: auth.hasAccess(u) });
 });
 
@@ -115,6 +130,8 @@ router.get("/api/auth/me", (req, res) => {
     hasAccess: auth.hasAccess(freshUser),
     paidMode:  auth.PAID_MODE,
     isAdmin:   !!req.user?.isAdmin || isAdminReq(req),
+    trial:     auth.PAID_MODE ? trial.status(freshUser, req.deviceId) : null,
+    trialDays: auth.PAID_MODE ? trial.TRIAL_DAYS : null,
   });
 });
 

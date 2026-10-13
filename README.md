@@ -70,7 +70,11 @@ könyvtárban (Renderen a `/data` perzisztens lemez).
 | `MONDOMATUTIT_ADMIN_PASSWORD` | A „→ Mondomatutit” gombhoz: ezzel küldi át a tippet a mondomatutit.hu-ra |
 | `MONDOMATUTIT_URL` | A mondomatutit címe (alapértelmezés: `https://mondomatutit.hu`) |
 | `DATA_DIR` | Adatkönyvtár (alapértelmezés: `/data`) |
-| `META_PIXEL_ID` | Meta (Facebook) Pixel azonosító. Ha be van állítva, az oldal alján süti-hozzájárulási sáv jelenik meg, és a pixel csak elfogadás után töltődik be. Események: `PageView`, `CompleteRegistration`, `InitiateCheckout`, `Purchase` |
+| `META_PIXEL_ID` | Meta (Facebook) Pixel azonosító. Ha be van állítva, az oldal alján süti-hozzájárulási sáv jelenik meg, és a pixel csak elfogadás után töltődik be. Események: `PageView`, `CompleteRegistration`, `StartTrial`, `InitiateCheckout`, `Purchase` |
 | `TMP_FACTOR` | A TippmixPro-odds becsléséhez: piaci legjobb odds × ez (alapértelmezés: `0.95`). Az EV-t ezzel számoljuk, amíg az admin be nem írja a valós oddsot |
 | `EXTRA_MARKETS` | Meccsenként lekért extra Odds API piacok az AI-nak küldött (≤15) meccsre (alapértelmezés: `team_totals,totals_h1` – csapat gólszáma, 1. félidő gólszáma; ~1 kredit/piac/meccs). Üresre állítva kikapcsol |
+| `TRIAL_DAYS` | Ingyenes VIP próbaidő új regisztrálóknak, az e-mail megerősítésekor indul (alapértelmezés: `5` nap; csak `PAID_MODE=true` mellett) |
+| `CAMPAIGN_TRIAL_DAYS` | A meglévő tagoknak szóló egyszeri próbaidő-kampány hossza (alapértelmezés: `7` nap; a Tagok oldal „🎁 Próbaidő-kampány” gombjával indul) |
+| `TRIAL_CAMPAIGN_DAILY_LIMIT` | Naponta legfeljebb ennyi kampány-ajánlat megy ki (alapértelmezés: `60` – a Resend ingyenes csomagja napi 100 levelet enged) |
+| `DISPOSABLE_DOMAINS` | További eldobható e-mail domainek vesszővel (ezekre nem jár próbaidő) |
 | `META_PURCHASE_VALUE` | A `Purchase` / `InitiateCheckout` esemény értéke forintban (alapértelmezés: `14990`) |

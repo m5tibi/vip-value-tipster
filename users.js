@@ -118,6 +118,11 @@ function publicView(u) {
     cancelledAt: u.cancelledAt || null,
     stripeCustomerId: u.stripeCustomerId || null,
     createdAt: u.createdAt,
+    trialStartedAt: u.trialStartedAt || null,
+    trialEndsAt: u.trialEndsAt || null,
+    trialDays: u.trialDays || null,
+    trialSource: u.trialSource || null,
+    trialOffer: u.trialOffer || null,
   };
 }
 
