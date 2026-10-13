@@ -8,7 +8,14 @@ const { rateLimit }  = require("../lib/security");
 const { isAdminReq } = require("../lib/admin");
 const { notifyAdmin, esc } = require("../lib/notify");
 const trial = require("../lib/trial");
-const { startFor: startTrialFor } = require("./trial");
+const { startFor: startTrialFor, capacityState, offerOpen } = require("./trial");
+
+// A sáv csak akkor kínálja a próbaidőt, ha el is indítható (élő ajánlat vagy szabad hely)
+function trialStatusFor(u, deviceId) {
+  const st = trial.status(u, deviceId);
+  if (st && st.eligible && !st.needVerify && !offerOpen(u) && capacityState().free <= 0) { st.eligible = false; st.full = true; }
+  return st;
+}
 
 const router = express.Router();
 
@@ -130,7 +137,7 @@ router.get("/api/auth/me", (req, res) => {
     hasAccess: auth.hasAccess(freshUser),
     paidMode:  auth.PAID_MODE,
     isAdmin:   !!req.user?.isAdmin || isAdminReq(req),
-    trial:     auth.PAID_MODE ? trial.status(freshUser, req.deviceId) : null,
+    trial:     auth.PAID_MODE ? trialStatusFor(freshUser, req.deviceId) : null,
     trialDays: auth.PAID_MODE ? trial.TRIAL_DAYS : null,
   });
 });

@@ -7,6 +7,7 @@
 
 const nodemailer = require("nodemailer");
 
+const quota = require("./lib/mailQuota");
 const RESEND_KEY = process.env.RESEND_API_KEY;
 const HOST = process.env.SMTP_HOST;
 const PORT = Number(process.env.SMTP_PORT || 587);
@@ -35,11 +36,20 @@ if (useResendApi) {
   console.log("ℹ️  E-mail küldés nincs beállítva – a levelek csak a logba íródnak (állítsd be a RESEND_API_KEY-t).");
 }
 
-async function send({ to, subject, html, text }) {
+// bulk: tömeges levél (tipp-értesítő, próbaidő-ajánlat) – csak a napi keret tartalékán felül megy ki
+// (lib/mailQuota.js). A helyet a hívás elején lefoglaljuk, hiba esetén visszaadjuk – így a párhuzamos
+// küldések sem lépik túl a keretet.
+async function send({ to, subject, html, text, bulk = false }) {
+  if (bulk && quota.bulkLeft() <= 0) {
+    console.log(`📧 Kihagyva (napi e-mail keret: ${quota.used()}/${quota.LIMIT}, ${quota.RESERVE} tartalék a fontos leveleknek): ${to} – ${subject}`);
+    return { ok: false, error: "napi e-mail keret", quota: true };
+  }
+  quota.note(1);
   if (!configured) {
     console.log(`\n📧 [E-MAIL SZIMULÁCIÓ] Címzett: ${to}\n   Tárgy: ${subject}\n   ${(text || "").split("\n").join("\n   ")}\n`);
     return { ok: true, simulated: true };
   }
+  const fail = err => { quota.note(-1); return { ok: false, error: err }; };
   try {
     if (useResendApi) {
       const r = await fetch("https://api.resend.com/emails", {
@@ -50,7 +60,7 @@ async function send({ to, subject, html, text }) {
       if (!r.ok) {
         const body = await r.text();
         console.error(`📧 Resend hiba (${to}): HTTP ${r.status} – ${body.slice(0, 200)}`);
-        return { ok: false, error: `HTTP ${r.status}` };
+        return fail(`HTTP ${r.status}`);
       }
     } else {
       await transporter.sendMail({ from: FROM, to, subject, html, text });
@@ -59,7 +69,7 @@ async function send({ to, subject, html, text }) {
     return { ok: true };
   } catch (e) {
     console.error(`📧 E-mail hiba (${to}):`, e.message);
-    return { ok: false, error: e.message };
+    return fail(e.message);
   }
 }
 
@@ -146,7 +156,7 @@ async function sendPlanCancelled(to) {
 }
 
 // ── Új tippek értesítő ────────────────────────────────────────
-async function sendNewTips(to, tips, combos, frees = []) {
+async function sendNewTips(to, tips, combos, frees = [], opts = {}) {
   if (!tips.length && !combos.length && !frees.length) return;
 
   const freeRows = frees.map(t => {
@@ -195,7 +205,7 @@ async function sendNewTips(to, tips, combos, frees = []) {
   const title   = parts.join(" + ");
 
   return send({
-    to,
+    to, bulk: true,
     subject,
     text: [...tips, ...frees].map(t => `${t.match}: ${t.pick} @ ${t.odds}`).join("\n"),
     html: shell(title, `
@@ -300,14 +310,14 @@ const trialStatsHtml = st => st && st.settled
 const trialStatsText = st => st && st.settled
   ? `\nA próbaidőd alatt lezárt VIP tippek: ${st.settled} db (${st.won} nyert, ${st.lost} veszett), eredmény: ${st.profit >= 0 ? "+" : ""}${st.profit.toFixed(2)} egység.\n` : "";
 
-async function sendTrialOffer(to, url, days) {
+async function sendTrialOffer(to, url, days, validDays = 7) {
   return send({
-    to,
+    to, bulk: true,
     subject: `🎁 ${days} nap VIP ajándékba – 90perc.hu`,
-    text: `Üdv!\n\nAjándékba ${days} napos VIP próbaidőt kapsz a 90perc.hu-n: minden napi AI tippet és kombit látsz, és e-mailben is megkapod őket. Bankkártya nem kell, a próbaidő magától lejár.\n\nAktiválás egy kattintással (a ${days} nap az aktiváláskor indul):\n${url}\n\nMinden tippünk eredménye nyilvános: https://90perc.hu/statisztika.html`,
+    text: `Üdv!\n\nAjándékba ${days} napos VIP próbaidőt kapsz a 90perc.hu-n: minden napi AI tippet és kombit látsz, és e-mailben is megkapod őket. Bankkártya nem kell, a próbaidő magától lejár.\n\nAktiválás egy kattintással (a ${days} nap az aktiváláskor indul, a link ${validDays} napig érvényes):\n${url}\n\nMinden tippünk eredménye nyilvános: https://90perc.hu/statisztika.html`,
     html: shell(`🎁 ${days} nap VIP ajándékba`, `
       <p style="line-height:1.7;margin:0 0 10px">Ajándékba <b>${days} napos VIP próbaidőt</b> kapsz: minden napi AI tippet és kombit látsz, és e-mailben is megkapod őket.</p>
-      <p style="line-height:1.7;margin:0 0 6px;color:#78909c">Bankkártya nem kell, a próbaidő magától lejár. A ${days} nap az aktiváláskor indul.</p>
+      <p style="line-height:1.7;margin:0 0 6px;color:#78909c">Bankkártya nem kell, a próbaidő magától lejár. A ${days} nap az aktiváláskor indul – az aktiváló link ${validDays} napig érvényes.</p>
       ${button(url, `💎 Aktiválom a ${days} napot`)}
       <p style="color:#78909c;font-size:12px;margin:10px 0 0">Minden tippünk eredménye nyilvános, nem törlünk semmit: <a href="https://90perc.hu/statisztika.html" style="color:#80cbc4">track record</a>.</p>
     `),
@@ -317,7 +327,7 @@ async function sendTrialOffer(to, url, days) {
 async function sendTrialReminder(to, endsAt, stats) {
   const until = huLongDate(endsAt);
   return send({
-    to,
+    to, bulk: true,
     subject: "⏳ Holnap lejár a VIP próbaidőd – 90perc.hu",
     text: `Üdv!\n\nA VIP próbaidőd ${until}-ig tart.${trialStatsText(stats)}\nHa továbbra is kérnéd a napi tippeket, itt fizethetsz elő (havonta lemondható):\nhttps://90perc.hu/elofizetes.html`,
     html: shell("⏳ Holnap lejár a VIP próbaidőd", `
@@ -331,7 +341,7 @@ async function sendTrialReminder(to, endsAt, stats) {
 
 async function sendTrialExpired(to, stats) {
   return send({
-    to,
+    to, bulk: true,
     subject: "Lejárt a VIP próbaidőd – 90perc.hu",
     text: `Üdv!\n\nLejárt a VIP próbaidőd.${trialStatsText(stats)}\nAz ingyenes tippeket továbbra is látod. A VIP tippekhez itt fizethetsz elő (havonta lemondható):\nhttps://90perc.hu/elofizetes.html`,
     html: shell("Lejárt a VIP próbaidőd", `

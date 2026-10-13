@@ -75,6 +75,8 @@ könyvtárban (Renderen a `/data` perzisztens lemez).
 | `EXTRA_MARKETS` | Meccsenként lekért extra Odds API piacok az AI-nak küldött (≤15) meccsre (alapértelmezés: `team_totals,totals_h1` – csapat gólszáma, 1. félidő gólszáma; ~1 kredit/piac/meccs). Üresre állítva kikapcsol |
 | `TRIAL_DAYS` | Ingyenes VIP próbaidő új regisztrálóknak, az e-mail megerősítésekor indul (alapértelmezés: `5` nap; csak `PAID_MODE=true` mellett) |
 | `CAMPAIGN_TRIAL_DAYS` | A meglévő tagoknak szóló egyszeri próbaidő-kampány hossza (alapértelmezés: `7` nap; a Tagok oldal „🎁 Próbaidő-kampány” gombjával indul) |
-| `TRIAL_CAMPAIGN_DAILY_LIMIT` | Naponta legfeljebb ennyi kampány-ajánlat megy ki (alapértelmezés: `60` – a Resend ingyenes csomagja napi 100 levelet enged) |
+| `MAIL_DAILY_LIMIT` | Napi e-mail keret (alapértelmezés: `100` – a Resend ingyenes csomagja). A tömeges levelek (tipp-értesítő, próbaidő-ajánlat) csak eddig mennek ki |
+| `MAIL_RESERVE` | Ennyi levelet a napi keretből a fontos levelekre (megerősítés, jelszó, fizetés) tartunk fenn (alapértelmezés: `15`) |
+| `TRIAL_MAX_ACTIVE` | Egyszerre legfeljebb ennyi próbaidős (ha nincs megadva: a napi keretből számolva – (keret − tartalék) / napi tippküldések − fizetők). A kampány-ajánlatok csak a szabad helyekre mennek ki, a többiek várólistán várnak |
 | `DISPOSABLE_DOMAINS` | További eldobható e-mail domainek vesszővel (ezekre nem jár próbaidő) |
 | `META_PURCHASE_VALUE` | A `Purchase` / `InitiateCheckout` esemény értéke forintban (alapértelmezés: `14990`) |

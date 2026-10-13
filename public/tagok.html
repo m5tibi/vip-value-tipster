@@ -131,7 +131,7 @@ nav{background:var(--surf);border-bottom:1px solid var(--border);padding:12px 16
   <div class="stat"><div class="stat-num" style="color:#80d8ff" id="s-trial">–</div><div class="stat-label">Próbaidőn</div></div>
   <div class="stat"><div class="stat-num green" id="s-trialconv">–</div><div class="stat-label">Próbaidőből fizető</div></div>
 </div>
-<div class="page-sub" id="trial-sub" style="padding:0 16px"></div>
+<div class="page-sub" id="trial-sub" style="padding:0 16px;white-space:pre-line"></div>
 
 <!-- Filter + Search -->
 <div class="filter-bar">
@@ -283,7 +283,8 @@ function renderList() {
       const src = { signup: 'regisztráció', campaign: 'kampány', banner: 'sáv' }[u.trialSource] || u.trialSource || '';
       metaItems.push(`<span class="meta-item blue">💎 Próbaidő: ${hd(u.trialStartedAt)} – ${hd(u.trialEndsAt)}${src ? ' (' + src + ')' : ''}${isPro ? ' → előfizetett ✅' : ''}</span>`);
     } else if (u.trialOffer) {
-      metaItems.push(`<span class="meta-item blue">🎁 Ajánlat: ${u.trialOffer.emailedAt ? 'elküldve ' + hd(u.trialOffer.emailedAt) : 'küldésre vár'}</span>`);
+      const expired = u.trialOffer.emailedAt && Date.now() - Date.parse(u.trialOffer.emailedAt) >= 7 * 86400000;
+      metaItems.push(`<span class="meta-item blue">🎁 Ajánlat: ${u.trialOffer.emailedAt ? 'elküldve ' + hd(u.trialOffer.emailedAt) + (expired ? ' (lejárt, nem aktiválta)' : '') : 'várólistán'}</span>`);
     }
     (u.trialFlags || []).forEach(f => metaItems.push(`<span class="meta-item red">⚠️ ${f}</span>`));
 
@@ -398,8 +399,10 @@ async function loadTrialStats() {
     const c = d.campaign;
     document.getElementById('trial-sub').textContent =
       `Próbaidő: ${d.started} indult (új regisztráció ${d.bySource.signup || 0}, kampány ${d.bySource.campaign || 0}, sáv ${d.bySource.banner || 0}) · ${d.active} fut · ${d.ended} lejárt · ${d.converted} előfizetett` +
-      (c.offered ? ` · Kampány: ${c.offered} ajánlat, ${c.emailed} elküldve, ${c.pending} küldésre vár, ${c.activated} aktiválta` : '') +
-      ` · Új regisztrálóknak ${d.trialDays} nap, kampányban ${d.campaignDays} nap`;
+      (c.offered ? ` · Kampány: ${c.offered} ajánlat, ${c.emailed} elküldve, ${c.activated} aktiválta, ${d.capacity.queue} várólistán` : '') +
+      ` · Új regisztrálóknak ${d.trialDays} nap, kampányban ${d.campaignDays} nap` +
+      `\n📧 Mai e-mailek: ${d.mail.used}/${d.mail.limit} (${d.mail.reserve} tartalék a fontos leveleknek) · tippküldés ~${d.mail.sendsPerDay}/nap` +
+      ` · Próbaidős helyek: ${d.capacity.cap} (fut ${d.capacity.active}, élő ajánlat ${d.capacity.outstanding}, szabad ${d.capacity.free})`;
   } catch (e) {}
 }
 async function trialCampaign() {
@@ -408,10 +411,10 @@ async function trialCampaign() {
     const d0 = await r0.json();
     if (!r0.ok) { showStatus('❌ ' + (d0.error || 'Hiba'), true); return; }
     if (!d0.count) { showStatus('Nincs olyan tag, akinek még járna kampány-ajánlat.'); return; }
-    if (!confirm(`${d0.count} tag kap ${d0.days} napos VIP próbaidő-ajánlatot e-mailben (aktiváló linkkel; a napok az aktiváláskor indulnak).\n\nA levelek naponta legfeljebb 60-as adagokban mennek ki (a Resend napi kerete miatt).\n\nIndítod?`)) return;
+    if (!confirm(`${d0.count} tag kerül a próbaidő-várólistára (${d0.days} nap, aktiváló linkkel; a napok az aktiváláskor indulnak).\n\nA napi 100 levél miatt hullámokban mennek ki: egyszerre csak annyian kapnak ajánlatot, ahány próbaidős belefér a napi tipp-e-mailekbe. A többiek várólistán várnak, amíg hely szabadul (lejár egy próbaidő, vagy 7 nap alatt nem aktiválják az ajánlatot) – ez akár több hét is lehet.\n\nIndítod?`)) return;
     const r = await fetch('/api/admin/trial-campaign', { method: 'POST', headers: adminHeaders(true), body: JSON.stringify({}) });
     const d = await r.json();
-    showStatus(d.ok ? `✅ Kampány elindítva: ${d.count} ajánlat küldésre vár (az első adag pár percen belül megy ki)` : '❌ ' + (d.error || 'Hiba'), !d.ok);
+    showStatus(d.ok ? `✅ Kampány elindítva: ${d.count} tag a várólistán – az első hullám pár percen belül megy ki` : '❌ ' + (d.error || 'Hiba'), !d.ok);
     await loadMembers();
   } catch (e) { showStatus('❌ Hiba: ' + e.message, true); }
 }

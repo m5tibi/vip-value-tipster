@@ -6,6 +6,7 @@ const auth    = require("../auth");
 const trial   = require("../lib/trial");
 const { requireAdmin } = require("../lib/admin");
 const { notifyAdmin, esc } = require("../lib/notify");
+const quota   = require("../lib/mailQuota");
 
 const router = express.Router();
 
@@ -21,10 +22,32 @@ const page = (icon, title, msg, color, btn = "⚽ Tovább a tippekhez") => `<!DO
 <a href="/tippek.html" style="display:inline-block;background:#00e676;color:#07111d;font-weight:700;padding:11px 22px;border-radius:8px;text-decoration:none">${btn}</a>
 </div></body></html>`;
 
+// ── Kapacitás: a napi 100 levélbe beleférjünk ──
+// Egyszerre csak annyi próbaidős lehet, amennyinek (a fizetők mellett) minden tippküldés kimegy
+// (lib/mailQuota.js). A kampány-ajánlatok hullámokban mennek: csak a szabad helyekre, és egy kiküldött,
+// még nem aktivált ajánlat OFFER_VALID_DAYS napig foglal helyet (utána a link lejár, a hely felszabadul).
+const OFFER_VALID_DAYS = 7;
+const offerOpen = u => !!(u && u.trialOffer?.emailedAt && !u.trialStartedAt &&
+  Date.now() - Date.parse(u.trialOffer.emailedAt) < OFFER_VALID_DAYS * 86400000);
+function capacityState() {
+  const raw = usersDb.all().map(u => usersDb.findById(u.id)).filter(u => u && !u.disabled && !u.isAdmin);
+  const payers = raw.filter(u => u.plan === "pro").length;
+  const cap = quota.trialCapacity(payers, trial.CAMPAIGN_TRIAL_DAYS);
+  const active = raw.filter(u => trial.isActive(u) && !trial.isPayer(u)).length;
+  const outstanding = raw.filter(offerOpen).length;
+  // Várólista: a legutóbb aktív tagok előre (náluk nagyobb az esély, hogy élnek az ajánlattal)
+  const queue = raw.filter(u => u.trialOffer && !u.trialOffer.emailedAt && !u.trialStartedAt && u.plan !== "pro" && trial.eligibility(u).ok)
+    .sort((a, b) => String(b.lastLoginAt || b.createdAt || "").localeCompare(String(a.lastLoginAt || a.createdAt || "")));
+  return { payers, cap, active, outstanding, free: Math.max(0, cap - active - outstanding), queue };
+}
+
 // Próbaidő indítása egy felhasználónak (közös a link, a sáv és az e-mail megerősítés számára).
 // Visszatér: { ok, user, days } vagy { ok:false, reason }
 function startFor(u, req, source) {
   if (!auth.PAID_MODE) return { ok: false, reason: "Jelenleg minden tipp ingyenesen elérhető – próbaidőre nincs szükség." };
+  // Új regisztrálónak mindig jár; a többieknek csak saját, élő ajánlattal vagy szabad hely esetén
+  if (source !== "signup" && !offerOpen(u) && capacityState().free <= 0)
+    return { ok: false, reason: "A próbaidős helyek most beteltek – egyszerre csak korlátozott számú próbaidő futhat. Pár nap múlva próbáld újra!" };
   const days = u.trialOffer?.days || trial.TRIAL_DAYS;
   const r = trial.start(u, usersDb.update, { days, source: u.trialOffer ? "campaign" : source, deviceId: req.deviceId, ip: req.ip });
   if (r.ok) {
@@ -83,6 +106,7 @@ router.get("/api/admin/trial-stats", (req, res) => {
   const converted = started.filter(u => trial.isPayer(u));
   const decided = started.filter(u => !trial.isActive(u) || trial.isPayer(u));   // lejárt vagy már előfizetett
   const offered = raw.filter(u => u.trialOffer);
+  const cs = capacityState();
   res.json({
     started: started.length, active: started.filter(u => trial.isActive(u)).length,
     bySource: started.reduce((a, u) => (a[u.trialSource || "?"] = (a[u.trialSource || "?"] || 0) + 1, a), {}),
@@ -92,7 +116,9 @@ router.get("/api/admin/trial-stats", (req, res) => {
                 pending: offered.filter(u => !u.trialOffer.emailedAt && !u.trialStartedAt).length,
                 activated: offered.filter(u => u.trialStartedAt).length },
     trialDays: trial.TRIAL_DAYS, campaignDays: trial.CAMPAIGN_TRIAL_DAYS,
+    capacity: { cap: cs.cap, active: cs.active, outstanding: cs.outstanding, free: cs.free, queue: cs.queue.length, payers: cs.payers },
+    mail: { used: quota.used(), limit: quota.LIMIT, reserve: quota.RESERVE, sendsPerDay: quota.sendsPerDay() },
   });
 });
 
-module.exports = { router, startFor };
+module.exports = { router, startFor, capacityState, offerOpen, OFFER_VALID_DAYS };
