@@ -220,6 +220,7 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
 <div class="table-wrap">
   <div class="filter-bar">
     <button class="filter-btn active" onclick="setFilter('all',this)" data-i18n="stat.f_all">Összes</button>
+    <button class="filter-btn" onclick="setFilter('vip',this)" data-i18n="stat.f_vip">💎 VIP</button>
     <button class="filter-btn" onclick="setFilter('free',this)" data-i18n="stat.f_free">🆓 Free</button>
     <button class="filter-btn" onclick="setFilter('won',this)" data-i18n="stat.f_won">✅ Nyert</button>
     <button class="filter-btn" onclick="setFilter('half_won',this)" data-i18n="stat.f_half_won">½✅ Fél nyert</button>
@@ -350,9 +351,9 @@ function updateScoreboard(stats) {
 
 function renderTable(tips) {
   const el = document.getElementById('tips-table');
-  // 'free' a tipp típusára szűr (ingyenes tippek), a többi az eredményre
-  const filtered = currentFilter === 'all'  ? tips
-                 : currentFilter === 'free' ? tips.filter(t => t.type === 'free')
+  // 'free' és 'vip' a tipp típusára szűr, a többi az eredményre
+  const filtered = currentFilter === 'all' ? tips
+                 : isTypeFilter(currentFilter) ? byType(tips, currentFilter)
                  : tips.filter(t => t.result === currentFilter);
   const settled  = filtered.filter(t => t.result && t.result !== 'pending');
 
@@ -393,19 +394,23 @@ function renderTable(tips) {
   </p>`;
 }
 
-// A számláló és a grafikon alapja: a kiválasztott időszak tippjei, a Free gombnál csak a Free
-// tippek (az eredmény-szűrők – Nyert, Veszett… – csak a táblázatot szűrik)
+// Típus-szűrők: Free = ingyenes tippek, VIP = minden más (AI single + kombi)
+const isTypeFilter = f => f === 'free' || f === 'vip';
+const byType = (tips, f) => f === 'free' ? tips.filter(t => t.type === 'free') : tips.filter(t => t.type !== 'free');
+
+// A számláló és a grafikon alapja: a kiválasztott időszak tippjei, a Free / VIP gombnál csak az
+// adott típus (az eredmény-szűrők – Nyert, Veszett… – csak a táblázatot szűrik)
 function scoreTips() {
   const tips = getPeriodTips();
-  return currentFilter === 'free' ? tips.filter(t => t.type === 'free') : tips;
+  return isTypeFilter(currentFilter) ? byType(tips, currentFilter) : tips;
 }
 
 function setFilter(f, btn) {
-  const wasFree = currentFilter === 'free';
+  const wasType = isTypeFilter(currentFilter);
   currentFilter = f;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  if (wasFree || f === 'free') {
+  if (wasType || isTypeFilter(f)) {
     updateScoreboard(calcStats(scoreTips()));
     drawChart(scoreTips().slice().reverse());
   }
