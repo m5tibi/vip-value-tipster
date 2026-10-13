@@ -350,6 +350,7 @@ let authMode = 'login';   // 'login' | 'register'
 // A régi, jelszavas admin mód megszűnt – a böngészőben esetleg eltárolt jelszót töröljük
 try { localStorage.removeItem('vbt_admin'); localStorage.removeItem('vbt_admin_pwd'); } catch(e) {}
 // ?login=1 (pl. az elemző zárolt képernyőjéről): rögtön a belépési ablakkal nyitunk
+// ?reg=1 (főoldal, hirdetés): a regisztrációs ablakkal – lásd az indulásnál, a belépés ellenőrzése után
 window.addEventListener('load', () => {
   if (new URLSearchParams(location.search).get('login') === '1') openAuthModal('login');
 });
@@ -1855,6 +1856,7 @@ async function pushToMondomatutit(tipId) {
   if (pmo) pmo.addEventListener('click', e => { if (e.target === pmo) closePreviewModal(); });
 
   try { await refreshMe(); } catch(e) { console.error('[init] refreshMe:', e); }
+  if (new URLSearchParams(location.search).get('reg') === '1' && !ME.user && !isAdmin()) openAuthModal('register');
   try { await loadTips(); } catch(e) { console.error('[init] loadTips:', e); }
   try { await loadHistory(); } catch(e) { console.error('[init] loadHistory:', e); }
 })();

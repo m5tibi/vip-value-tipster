@@ -317,6 +317,24 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
 </style>
 <script src="/lang.js"></script>
 <script src="/tracking.js" defer></script>
+<script>
+// VIP próbaidő ajánlat a főoldalon: csak ha a szerver fizetős módban van és a látogatónak még nincs hozzáférése
+(async () => {
+  try {
+    const me = await (await fetch('/api/auth/me', { cache: 'no-store' })).json();
+    if (!me.trialDays || me.hasAccess || me.isAdmin) return;
+    if (me.user && !(me.trial && (me.trial.eligible || me.trial.needVerify))) return;
+    const el = document.getElementById('trial-promo');
+    const show = () => {
+      const txt = (window.t && window.t('index.trial_promo')) || '🎁 Regisztrációkor {n} nap VIP próbaidő ajándékba – bankkártya nélkül, magától lejár. →';
+      el.textContent = txt.split('{n}').join(me.trialDays);
+      el.style.display = 'block';
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', show); else show();
+    window.onLangChange = show;
+  } catch (e) {}
+})();
+</script>
 </head>
 <body>
 
@@ -339,8 +357,11 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
     <span data-i18n-html="index.hero_sub">A 90perc.hu mesterséges intelligenciával elemzi a közelgő foci meccseket — valós formát, sérüléseket és statisztikákat figyelembe véve. Nem tipp. <strong>Érvelés.</strong></span>
   </p>
 
+  <!-- VIP próbaidő ajánlat (csak fizetős módban, nem előfizetőnek – lásd a lenti szkriptet) -->
+  <a id="trial-promo" href="/tippek.html?reg=1" style="display:none;margin:0 auto 18px;max-width:520px;background:rgba(64,196,255,.10);border:1px solid #1f5a7a;color:#b3e5fc;border-radius:12px;padding:10px 16px;font-size:14px;font-weight:600;text-decoration:none;line-height:1.5"></a>
+
   <div class="hero-btns">
-    <a class="btn-primary" href="/tippek.html" data-i18n="index.hero_cta1">Regisztrálok</a>
+    <a class="btn-primary" href="/tippek.html?reg=1" data-i18n="index.hero_cta1">Regisztrálok</a>
     <a class="btn-secondary" href="#hogyan-mukodik" data-i18n="index.hero_cta2">Hogyan működik?</a>
   </div>
 
@@ -579,7 +600,7 @@ button.lang-toggle{background:transparent;border:1px solid #1a2f4a;border-radius
   <h2 data-i18n-html="index.cta_h2">Próbáld ki.<br/><em>Nem kerül semmibe.</em></h2>
   <p data-i18n="index.cta_sub">Regisztrálj ingyen, és azonnal hozzáférsz az ingyenes napi tipphez és az elemzőhöz.</p>
   <div class="cta-btns">
-    <a class="btn-primary" href="/tippek.html" data-i18n="index.cta_btn1">Regisztrálok →</a>
+    <a class="btn-primary" href="/tippek.html?reg=1" data-i18n="index.cta_btn1">Regisztrálok →</a>
       <a class="btn-tg tg-channel-link" href="#" target="_blank" rel="noopener">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248l-2.018 9.51c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.881.71z"/></svg>
         <span data-i18n="nav.telegram_ch">Telegram csatorna</span>
