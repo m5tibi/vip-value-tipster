@@ -719,11 +719,20 @@ function comboCardHTML(c, showResult) {
       <span class="bdg" style="background:#3e2723;color:#ffcc80;margin-left:auto">Össz odds: ${c.odds}</span>
     </div>
     <div style="margin:6px 0">${legs}</div>
+    ${comboNoteHTML(c)}
     ${payoutLine}
     ${showResult?`<div class="tip-actions">${resBadge(c.result)}</div>`:""}
     ${adminTipControls(c)}
     ${isAdmin() ? comboResultBtns(c) : ""}
   </div>`;
+}
+
+// A kombi indoklása (az automatikus "N lábas kötés" szöveg nem jelenik meg – azt a fejléc már mutatja)
+function comboNoteHTML(c) {
+  const n = String(c.note || "").trim();
+  if (!n || /^\d+\s*lábas kötés$/i.test(n)) return "";
+  const e = String(n).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+  return `<div class="tip-note" style="font-size:12px;color:#b0bec5;margin-top:6px;white-space:pre-line">💡 ${e}</div>`;
 }
 
 function comboResultBtns(c) {
