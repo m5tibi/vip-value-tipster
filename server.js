@@ -1847,6 +1847,12 @@ function trialTipStats(u) {
     profit: Math.round(tips.reduce((a, t) => a + statProfit(t), 0) * 100) / 100,
   };
 }
+// Hosszú távú (összes publikált, lezárt tipp) eredmény – ugyanaz a szabály, mint a statisztika oldalon
+function overallTipStats() {
+  const tips = history.filter(isStatTip);
+  const profit = Math.round(tips.reduce((a, t) => a + statProfit(t), 0) * 100) / 100;
+  return { settled: tips.length, profit, roi: tips.length ? Math.round(profit / tips.length * 1000) / 10 : 0 };
+}
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let _trialMailRunning = false, _trialQueueLogged = false;
 async function processTrialMail() {
@@ -1861,13 +1867,13 @@ async function processTrialMail() {
       // A napi keretbe nem férő levél nem vész el: a jelző nem áll be, a következő kör újra próbálja
       // (az emlékeztető csak a lejárat előtt, a lejárati levél 3 napig)
       if (!u.trialReminderSent && end > now && end - now <= 24 * 3600e3 && (u.trialDays || 0) >= 2) {
-        const r = await mailer.sendTrialReminder(u.email, u.trialEndsAt, trialTipStats(u));
+        const r = await mailer.sendTrialReminder(u.email, u.trialEndsAt, trialTipStats(u), overallTipStats());
         if (!(r && r.quota)) usersDb.update(u.id, { trialReminderSent: true });
         await sleep(700);
       } else if (!u.trialExpiredSent && end <= now) {
         if (now - end >= 3 * 86400e3) { usersDb.update(u.id, { trialExpiredSent: true }); continue; }   // régen lejártaknak már nem írunk
         const st = trialTipStats(u);
-        const r = await mailer.sendTrialExpired(u.email, st);
+        const r = await mailer.sendTrialExpired(u.email, st, overallTipStats());
         if (r && r.quota) continue;
         usersDb.update(u.id, { trialExpiredSent: true });
         console.log(`VIP próbaidő lejárt: ${u.email} (${st.settled} lezárt tipp, ${st.profit >= 0 ? "+" : ""}${st.profit} egység)`);
