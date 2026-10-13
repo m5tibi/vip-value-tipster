@@ -9,6 +9,8 @@ const usersDb = require("./users");
 const { callClaudeWithSearch } = require("./lib/claude");
 const auth    = require("./auth");
 const mailer  = require("./mailer");
+const trial   = require("./lib/trial");
+const { BASE_URL } = require("./lib/config");
 
 const app = express();
 
@@ -23,6 +25,7 @@ app.set("trust proxy", 1);                   // Render proxy mögött fut → re
 app.use(express.json());
 app.use(cookieParser());
 app.use(auth.attachUser);                    // minden kérésre beteszi a req.user-t
+app.use(trial.deviceMiddleware);             // tartós eszköz-azonosító (VIP próbaidő: eszközönként egy)
 app.use(require("./routes/tracking"));       // /tracking.js – Meta Pixel süti-hozzájárulással
 app.use(express.static(path.join(__dirname, "public")));
 app.use('/api/odds', require('./routes/odds'));
@@ -30,6 +33,7 @@ app.use('/api/odds', require('./routes/odds'));
 app.use("/api", security.safeJson);        // XSS-védelem minden API válaszra (lásd lib/security.js)
 app.use(require("./routes/auth"));
 app.use(require("./routes/adminUsers"));
+app.use(require("./routes/trial").router);
 app.use(stripeRoutes.router);
 app.use(require("./routes/analyzer"));
 const telegramBot = require("./routes/telegram")({ getHistory: () => history, isApproved: t => isApproved(t) });
@@ -1822,6 +1826,72 @@ function checkExpiredSubscriptions() {
 // Indításkor azonnal lefut (startup után fogja az esetleg lejártakat kezelni)
 checkExpiredSubscriptions();
 
+// ── VIP próbaidő e-mailek: kampány-ajánlatok (napi kerettel), lejárat előtti emlékeztető, lejárat ──
+// A Resend ingyenes csomagja napi 100 levelet enged (a tipp-értesítők is ebbe számítanak), ezért
+// a kampány naponta legfeljebb TRIAL_CAMPAIGN_DAILY_LIMIT ajánlatot küld, a többi másnap megy.
+const TRIAL_CAMPAIGN_DAILY_LIMIT = parseInt(process.env.TRIAL_CAMPAIGN_DAILY_LIMIT, 10) || 60;
+const parseHuStamp = s => {
+  const m = String(s || "").match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.?\s+(\d{1,2}):(\d{2})/);
+  return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]).getTime() : NaN;
+};
+// A próbaidő alatt lezárt VIP tippek (single + kombi) eredménye – az emlékeztető / lejárati levélbe
+function trialTipStats(u) {
+  const from = new Date(u.trialStartedAt).getTime();
+  const tips = history.filter(t => t.type !== "free" && isStatTip(t) && parseHuStamp(t.settledAt) >= from);
+  return {
+    settled: tips.length,
+    won:  tips.filter(t => t.result === "won" || t.result === "half_won").length,
+    lost: tips.filter(t => t.result === "lost" || t.result === "half_lost").length,
+    profit: Math.round(tips.reduce((a, t) => a + statProfit(t), 0) * 100) / 100,
+  };
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let _trialMailRunning = false;
+async function processTrialMail() {
+  if (_trialMailRunning || !auth.PAID_MODE) return;
+  _trialMailRunning = true;
+  try {
+    const now = Date.now();
+    const raw = () => usersDb.all().map(u => usersDb.findById(u.id)).filter(u => u && !u.disabled && !u.isAdmin);
+    for (const u of raw()) {
+      if (!u.trialEndsAt || trial.isPayer(u)) continue;
+      const end = new Date(u.trialEndsAt).getTime();
+      if (!u.trialReminderSent && end > now && end - now <= 24 * 3600e3 && (u.trialDays || 0) >= 2) {
+        usersDb.update(u.id, { trialReminderSent: true });
+        await mailer.sendTrialReminder(u.email, u.trialEndsAt, trialTipStats(u));
+        await sleep(700);
+      } else if (!u.trialExpiredSent && end <= now) {
+        usersDb.update(u.id, { trialExpiredSent: true });
+        if (now - end < 3 * 86400e3) {                     // régen lejártaknak már nem írunk
+          const st = trialTipStats(u);
+          await mailer.sendTrialExpired(u.email, st);
+          console.log(`VIP próbaidő lejárt: ${u.email} (${st.settled} lezárt tipp, ${st.profit >= 0 ? "+" : ""}${st.profit} egység)`);
+          await sleep(700);
+        }
+      }
+    }
+    // Kampány-ajánlatok
+    const today = todayHU();
+    let budget = TRIAL_CAMPAIGN_DAILY_LIMIT - raw().filter(u => u.trialOffer?.emailedDay === today).length;
+    const queue = raw().filter(u => u.trialOffer && !u.trialOffer.emailedAt && !u.trialStartedAt && u.plan !== "pro");
+    let sent = 0;
+    for (const u of queue) {
+      if (budget <= 0) break;
+      const token = auth.makePurposeToken("trial", u.id, 30 * 86400e3);
+      const url = `${BASE_URL}/api/trial/activate?token=${encodeURIComponent(token)}`;
+      const r = await mailer.sendTrialOffer(u.email, url, u.trialOffer.days);
+      if (r && r.ok === false) { console.error(`Próbaidő-ajánlat küldése megállt (${r.error}) – a következő körben folytatjuk`); break; }
+      usersDb.update(u.id, { trialOffer: { ...u.trialOffer, emailedAt: new Date().toISOString(), emailedDay: today } });
+      budget--; sent++;
+      await sleep(700);
+    }
+    if (sent) console.log(`Próbaidő-kampány: ${sent} ajánlat elküldve ma · hátra: ${queue.length - sent}`);
+  } catch (e) { console.error("Próbaidő e-mail hiba:", e.message); }
+  finally { _trialMailRunning = false; }
+}
+setInterval(processTrialMail, 10 * 60 * 1000);
+setTimeout(processTrialMail, 60 * 1000);
+
 // ── Napnyitó: 00:03 automatikus eredmény-ellenőrzés, 00:05 napi statisztika Telegramra
 //    (magyar idő). Tipptartalom NEM megy ki automatikusan – az csak jóváhagyás után, kézzel. ──
 let _lastCheckDay = "", _lastStatsDay = "";
@@ -2622,7 +2692,7 @@ app.post("/api/tips/send", async (req, res) => {
   // ── E-mail értesítő az összes aktív előfizetőnek ────────────────
   const recipients = usersDb.all().filter(u =>
     !u.isAdmin && u.emailVerified !== false &&
-    (u.plan === "pro" || !auth.PAID_MODE)
+    (u.plan === "pro" || !auth.PAID_MODE || trial.isActive(u))      // a VIP próbaidősök is megkapják
   );
   console.log(`Tip e-mail küldése ${recipients.length} felhasználónak...`);
   for (const u of recipients) {

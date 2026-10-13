@@ -182,6 +182,9 @@ button.lang-toggle{background:transparent;border:1px solid #1e3a2f;border-radius
     <a href="#" onclick="event.preventDefault();resendVerification()" style="color:#00e676;font-weight:700;text-decoration:none;margin-left:6px" data-i18n="tips.resend">Újraküldés</a>
   </div>
 
+  <!-- VIP próbaidő sáv: futó próbaidő / aktiválható ajánlat -->
+  <div id="trial-banner" style="display:none;background:#0d2033;border:1px solid #1f5a7a;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#b3e5fc;align-items:center;gap:10px;flex-wrap:wrap"></div>
+
   <div class="tabs">
     <button class="tab active" onclick="switchTab('tips')" data-i18n="tips.tab_today">📊 Mai tippek</button>
     <button class="tab" onclick="switchTab('history')" data-i18n="tips.tab_history">📁 Előzmények</button>
@@ -499,7 +502,55 @@ function applyAdminUI() {
   if (lsBarEl) { lsBarEl.style.display = admin ? 'flex' : 'none'; lsBarEl.setAttribute('aria-hidden', admin ? 'false' : 'true'); }
   // Megerősítő sáv: csak belépett, még meg nem erősített e-mailnél
   const vb = document.getElementById('verify-banner');
-  if (vb) vb.style.display = (ME.user && ME.user.emailVerified === false) ? '' : 'none';
+  if (vb) {
+    vb.style.display = (ME.user && ME.user.emailVerified === false) ? '' : 'none';
+    const tr = ME.trial;
+    const span = vb.querySelector('span');
+    if (span && tr && tr.needVerify && tr.eligible) span.textContent = tf('tips.verify_banner_trial', { n: tr.days });
+  }
+  renderTrialBanner();
+}
+
+// i18n szöveg {n}/{date} behelyettesítéssel
+function tf(key, vars) {
+  let s = (window.t && window.t(key)) || key;
+  Object.entries(vars || {}).forEach(([k, v]) => { s = s.split('{' + k + '}').join(v); });
+  return s;
+}
+// VIP próbaidő sáv
+function renderTrialBanner() {
+  const el = document.getElementById('trial-banner');
+  if (!el) return;
+  const tr = ME.trial;
+  const btn = (label, onclick, primary) => `<button onclick="${onclick}" style="cursor:pointer;border-radius:8px;padding:6px 14px;font-weight:700;font-size:13px;${primary ? 'background:#00e676;color:#060e1b;border:0' : 'background:transparent;color:#b3e5fc;border:1px solid #1f5a7a'}">${label}</button>`;
+  if (tr && tr.active && !isAdmin()) {
+    const date = new Date(tr.endsAt).toLocaleDateString(window.getLang && window.getLang() === 'en' ? 'en-GB' : 'hu-HU', { month: 'long', day: 'numeric' });
+    el.innerHTML = `<span style="flex:1 1 220px">${tf('tips.trial_active', { n: tr.daysLeft, date })}</span>` +
+      btn(tf('tips.trial_subscribe'), "location.href='/elofizetes.html'", true);
+    el.style.display = 'flex';
+    // Meta Pixel: StartTrial – próbaidőnként egyszer (csak hozzájárulással megy ki)
+    try {
+      const key = 'trial_tracked_' + tr.endsAt;
+      if (window.track && !localStorage.getItem(key)) { window.track('StartTrial', { value: 0, currency: 'HUF' }); localStorage.setItem(key, '1'); }
+    } catch (e) {}
+    return;
+  }
+  if (tr && !tr.active && !tr.used && tr.eligible && !tr.needVerify && !ME.hasAccess) {
+    el.innerHTML = `<span style="flex:1 1 220px">${tf('tips.trial_offer', { n: tr.days })}</span>` + btn(tf('tips.trial_activate'), 'startTrial()', true);
+    el.style.display = 'flex';
+    return;
+  }
+  el.style.display = 'none';
+}
+async function startTrial() {
+  try {
+    const r = await fetch('/api/trial/start', { method: 'POST' });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { showStatus('⚠️ ' + (d.error || 'Nem sikerült aktiválni'), '#ffcc80'); return; }
+    showStatus(tf('tips.trial_started', { n: d.days }));
+    await refreshMe();
+    await loadTips();
+  } catch (e) { showStatus('⚠️ Hálózati hiba', '#ef9a9a'); }
 }
 
 async function handleAdminResp(r, okMsg) {
@@ -1220,6 +1271,7 @@ function renderLocked(needSubscription, freeTips) {
          <div style="font-weight:700;color:#00e676;font-size:16px;margin-bottom:6px">${window.t('tips.login_cta_title')}</div>
          <div style="color:#78909c;font-size:13px;margin-bottom:14px">${window.t('tips.login_cta_body')}</div>
          <button class="btn-send" style="padding:11px 22px;font-size:14px" onclick="openAuthModal('register')">${window.t('tips.reg_cta')}</button>
+         ${ME.trialDays ? `<div style="margin-top:10px;font-size:12px;color:#80d8ff">${tf('tips.trial_reg_note', { n: ME.trialDays })}</div>` : ''}
          <div style="margin-top:10px;font-size:12px;color:#546e7a">${window.t('tips.has_account')} <a href="#" onclick="event.preventDefault();openAuthModal('login')" style="color:#00e676;font-weight:700;text-decoration:none">${window.t('tips.login_link')}</a></div>
        </div>`;
     return;
@@ -1237,6 +1289,8 @@ function renderLocked(needSubscription, freeTips) {
        <div style="font-weight:700;color:#fff;font-size:15px;margin-bottom:6px">${window.t('tips.free_tip_paywall')}</div>
        <div style="color:#78909c;font-size:13px;margin-bottom:16px">${window.t('tips.free_tip_paywall_body')}</div>
        <a href="/elofizetes.html" style="display:inline-block;background:#00e676;color:#060e1b;font-weight:700;font-size:15px;padding:12px 28px;border-radius:9px;text-decoration:none;box-shadow:0 0 20px rgba(0,230,118,.25)">${window.t('tips.paywall_btn')}</a>
+       ${ME.trial && ME.trial.eligible && !ME.trial.used && !ME.trial.needVerify
+         ? `<div style="margin-top:10px"><button onclick="startTrial()" style="cursor:pointer;background:transparent;color:#80d8ff;border:1px solid #1f5a7a;border-radius:9px;padding:10px 20px;font-weight:700;font-size:14px">${tf('tips.trial_paywall_btn', { n: ME.trial.days })}</button></div>` : ''}
        <div style="margin-top:10px;font-size:11px;color:#37474f">${window.t('tips.cancellable')}</div>
      </div>`;
 
