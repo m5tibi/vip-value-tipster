@@ -45,6 +45,7 @@
         hero_h1:        'Fogadj okosabban.<br/><em>Minden meccsnél.</em>',
         hero_sub:       'A 90perc.hu mesterséges intelligenciával elemzi a közelgő foci meccseket — valós formát, sérüléseket és statisztikákat figyelembe véve. Nem tipp. <strong>Érvelés.</strong>',
         hero_cta1:      'Regisztrálok',
+        trial_promo:    '🎁 Regisztrációkor {n} nap VIP próbaidő ajándékba – bankkártya nélkül, magától lejár. →',
         hero_cta2:      'Hogyan működik?',
         card_time:      'Ma 20:45',
         card_badge:     '✓ NYERT',
@@ -408,6 +409,7 @@
         hero_h1:        'Bet smarter.<br/><em>Every match.</em>',
         hero_sub:       '90perc.hu uses artificial intelligence to analyse upcoming football matches — taking real form, injuries, and statistics into account. Not just a tip. <strong>Reasoning.</strong>',
         hero_cta1:      'Register',
+        trial_promo:    '🎁 Sign up and get a {n}-day VIP trial – no card needed, ends automatically. →',
         hero_cta2:      'How does it work?',
         card_time:      'Today 20:45',
         card_badge:     '✓ WON',
@@ -763,6 +765,7 @@
     applyDOM();
     if (typeof window.R === 'function') { window.R(); applyDOM(); }
     if (typeof window.renderTips === 'function') { window.renderTips(); applyDOM(); }
+    if (typeof window.onLangChange === 'function') window.onLangChange(l);   // JS-ből rajzolt szövegek frissítése
   };
   window.toggleLang = () => window.setLang(lang === 'hu' ? 'en' : 'hu');
 
