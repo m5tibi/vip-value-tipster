@@ -189,6 +189,18 @@ let freeTips = history.filter(t => t.type === "free" && (!t.result || t.result =
 let aiTips     = history.filter(t => t.type === "ai"    && (!t.result || t.result === "pending"));
 let comboTips  = history.filter(t => t.type === "combo" && (!t.result || t.result === "pending"));
 console.log(`Visszaállítva: ${aiTips.length} AI tipp + ${comboTips.length} kombi`);
+// Egyszeri javítás: kézzel nyertesre állított kombi, amelyen az automatikus x0 kifizetés / vesztes láb maradt
+{
+  let fixed = 0;
+  history = history.map(t => {
+    if (t.type !== "combo" || t.result !== "won" || !t.manual ||
+        !(t.comboPayout === 0 || (t.legs || []).some(l => l.result === "lost"))) return t;
+    fixed++;
+    const legs = (t.legs || []).map(l => ({ ...l, result: l.result === "push" ? "push" : "won" }));
+    return { ...t, legs, comboPayout: parseFloat(legs.reduce((p, l) => p * (l.result === "push" ? 1 : (parseFloat(l.odds) || 1)), 1).toFixed(2)) };
+  });
+  if (fixed) { saveHistory(); console.log(`Javítva: ${fixed} kézzel nyertesre állított kombi (kifizetés, lábak)`); }
+}
 
 // ── Magyar idő ────────────────────────────────────────────
 function getHungarianTime() {
@@ -1498,6 +1510,7 @@ function checkPickAgainstOdds(entry, market, pick) {
   };
   if (mk.includes("fogadáskészítő") || mk.includes("fogadaskeszito") || mk.includes("bet builder"))
     return { error: "fogadáskészítő – nem elszámolható" };
+  if (isStatMarket(market, pick)) return { error: "statisztikai piac (szöglet, lap…) – nincs hozzá adat" };
   const sp = specialPick(market, pick);
   if (sp) {
     let o = null;
@@ -1545,7 +1558,13 @@ function checkPickAgainstOdds(entry, market, pick) {
 
 // ht: a félidős eredmény ({ home, away }) – csak az 1. félidős piacokhoz kell; ha nincs, null
 // (a tipp nyitva marad, az admin zárja kézzel).
+// Nem gólalapú statisztikai piacok (szöglet, lapok, les, szabálytalanság, lövések, bedobás…):
+// ezekhez nincs adatunk – a gólszámmal kiértékelni HIBÁS lenne (pl. "Több mint 9,5 szöglet").
+const STAT_MARKET_RE = /szöglet|corner|sárga|piros\s*lap|\blap(ok)?\b|kártya|\bcards?\b|booking|\bles(ek|ről)?\b|offside|szabálytalan|\bfouls?\b|lövés|kapura|\bshots?\b|bedobás|throw.?in|kirúgás|goal.?kick|gólpassz|assist|büntető|penalt/i;
+const isStatMarket = (market, pick) => STAT_MARKET_RE.test(`${market || ""} ${pick || ""}`);
+
 function settleMarket(market, pick, homeTeam, awayTeam, homeScore, awayScore, ht = null) {
+  if (isStatMarket(market, pick)) return null;       // kézi kiértékelés
   // Az AI magyar piac-/kimenetneveket ad ("Több mint 2,5 gól", "Mindkét csapat betalál",
   // "Hazai győzelem"), de angolul is jöhet ("Over 2.5", "BTTS") – mindkettőt felismerjük.
   const txt = x => String(x || "").toLowerCase().replace(/,/g, ".");
@@ -1620,6 +1639,7 @@ async function checkResults() {
   console.log(`Eredmények ellenőrzése (${pendingAi.length} single, ${combosToCheck.length} kombi, ${pendingFree.length} free)...`);
   let changed = false;
   const fdCache = {};
+  const manualNeeded = [];   // lezárt meccs, de automatikusan nem kiértékelhető tipp / kombi láb
 
   // 1. Befejezett meccsek 90 perces eredményének összegyűjtése (meccsnév → eredmény)
   // Csak azokat a sportokat kérdezzük le, amelyekhez ténylegesen van pending tipp → kredit takarékosság
@@ -1678,7 +1698,11 @@ async function checkResults() {
     const g = findGame(tip);
     if (!g) continue;
     const result = settleMarket(tip.market, tip.pick, g.home_team, g.away_team, g.homeScore, g.awayScore, g.ht);
-    if (!result) { console.log(`    ✗ ${tip.market}/${tip.pick} – nem értékelhető`); continue; }
+    if (!result) {
+      console.log(`    ✗ ${tip.market}/${tip.pick} – nem értékelhető`);
+      if (!tip.manualNeeded && (!tip.result || tip.result === "pending")) manualNeeded.push({ kind: "tip", id: tip.id, label: `${tip.match} – ${tip.pick}` });
+      continue;
+    }
     if (tip.result === result && tip.homeScore != null) continue;
     const fix = tip.result && tip.result !== "pending" && tip.result !== result ? " (JAVÍTÁS)" : "";
     console.log(`  ${g.home_team} vs ${g.away_team}: ${g.homeScore}-${g.awayScore} [${g.src}] · ${tip.pick} → ${result}${fix}`);
@@ -1708,7 +1732,9 @@ async function checkResults() {
         }
       }
       const fresh = g ? settleMarket(leg.market, leg.pick, g.home_team, g.away_team, g.homeScore, g.awayScore, g.ht) : null;
-      const res = fresh || leg.result || null;
+      // Statisztikai piac (szöglet, lap…): csak kézzel zárható – a korábbi, gólból számolt eredmény sem számít
+      const res = isStatMarket(leg.market, leg.pick) ? null : (fresh || leg.result || null);
+      if (g && !res && !leg.manualNeeded) manualNeeded.push({ kind: "leg", id: combo.id, idx: i, label: `${leg.match} – ${leg.pick} (kombi láb)` });
       if (res) console.log(`    Láb eredmény: ${leg.match} → ${res} (fresh:${fresh}, g:${!!g}, commence:${leg.commence})`);
       legResFresh.push(fresh);  // aktuális evaluáció eredménye
       return res;
@@ -1765,6 +1791,21 @@ async function checkResults() {
       changed = true;
       console.log(`  KOMBI (${combo.legN} lábas) → ${result} (x${patch.comboPayout})`);
     }
+  }
+
+  // Lezárt meccs, de a tipp/láb nem értékelhető automatikusan (pl. szöglet) → egyszeri admin-értesítés
+  if (manualNeeded.length) {
+    history = history.map(t => {
+      const mine = manualNeeded.filter(m => m.id === t.id);
+      if (!mine.length) return t;
+      if (t.type !== "combo") return { ...t, manualNeeded: true };
+      return { ...t, legs: (t.legs || []).map((l, i) => mine.some(m => m.idx === i) ? { ...l, manualNeeded: true } : l) };
+    });
+    refreshTipLists();
+    changed = true;
+    sendTelegram(`✋ <b>Kézi kiértékelés kell</b> (${manualNeeded.length})\n` +
+      manualNeeded.map(m => "• " + String(m.label).replace(/&/g, "&amp;").replace(/</g, "&lt;")).join("\n") +
+      `\n\nA meccs lezárult, de ezt a piacot (pl. szöglet, lap) a rendszer nem tudja kiértékelni – állítsd be kézzel a tippek oldalon.`).catch(() => {});
   }
 
   if (changed) {
@@ -2266,6 +2307,7 @@ const CLV_MIN_BEFORE = 2, CLV_MAX_BEFORE = 14;   // perc a kezdés előtt (5 per
 function oddsApiMarketFor(market, pick) {
   const sp = specialPick(market, pick);
   if (sp) return sp.kind === "team" ? "team_totals" : sp.kind === "h1" ? "totals_h1" : null;
+  if (isStatMarket(market, pick)) return null;
   const c = canonPick(market, pick);
   return c.kind === "btts" ? null : c.kind === "over" || c.kind === "under" ? "totals" : c.kind === "hcp" ? "spreads" : "h2h";
 }
@@ -2351,6 +2393,7 @@ setInterval(() => { captureClosingOdds(); }, 5 * 60 * 1000);
 function marketGroup(market, pick) {
   const sp = specialPick(market, pick);
   if (sp) return sp.kind === "team" ? "Csapat gólszám" : sp.kind === "h1" ? "1. félidő gólszám" : "Egyéb";
+  if (isStatMarket(market, pick)) return "Egyéb";
   const c = canonPick(market, pick);
   return { over: "Gólszám", under: "Gólszám", hcp: "Hendikep", btts: "BTTS", "1x2": "1X2" }[c.kind] || "Egyéb";
 }
@@ -2484,6 +2527,18 @@ app.patch("/api/history/:id", (req, res) => {
   const validResults = ["won","lost","push","half_won","half_lost","pending"];
   if (!validResults.includes(result)) return res.status(400).json({ error: "Érvénytelen eredmény" });
   const patch = { result, manual: true };
+  const cur = history.find(t => t.id === req.params.id);
+  if (cur && cur.type === "combo") {
+    if (result === "won") {
+      // Nyertes kombiban minden láb nyert vagy visszajárt → a vesztesnek / nyitottnak jelölt lábak nyertek
+      patch.legs = (cur.legs || []).map(l => ({ ...l, result: l.result === "push" ? "push" : "won" }));
+      const calc = parseFloat(patch.legs.reduce((p, l) => p * (l.result === "push" ? 1 : (parseFloat(l.odds) || 1)), 1).toFixed(2));
+      patch.comboPayout = parseFloat(comboPayout) > 1 ? parseFloat(comboPayout) : calc;
+    } else if (result === "lost") patch.comboPayout = 0;
+    else if (result === "push") patch.comboPayout = 1;
+    else if (result === "pending") patch.comboPayout = null;
+    if (result !== "pending") patch.settledAt = cur.settledAt || nowHu();
+  }
   const upd = t => t.id === req.params.id ? { ...t, ...patch } : t;
   history    = history.map(upd);
   latestTips = latestTips.map(upd);
@@ -2537,6 +2592,7 @@ function canonPick(market, pick) {
   const txt = x => String(x || "").toLowerCase().replace(/,/g, ".").replace(/\s+/g, " ").trim();
   const mk = txt(market), pk = txt(pick);
   const num = s => { const m = s.match(/[-+]?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; };
+  if (isStatMarket(market, pick)) return { kind: "stat", raw: `${mk} ${pk}` };
   const sp = specialPick(market, pick);
   if (sp && sp.kind !== "unsupported") return { kind: `${sp.kind}_${sp.side.toLowerCase()}`, line: sp.line, team: sp.team ? normTeam(sp.team) : null };
   if (mk.includes("btts") || mk.includes("mindkét") || pk.includes("mindkét") || pk.includes("nem talál"))
@@ -2561,6 +2617,7 @@ function samePick(a, b) {
   if (a.kind === "btts") return a.side === b.side;
   if (a.kind === "over" || a.kind === "under") return a.line === b.line;
   if (/^(team|h1)_/.test(a.kind)) return a.line === b.line && (!a.team || nameSim(a.team, b.team));
+  if (a.kind === "stat") return a.raw === b.raw;
   if (a.kind === "hcp") return a.line === b.line && nameSim(a.team, b.team);
   return a.team === b.team || (a.team !== "draw" && b.team !== "draw" && nameSim(a.team, b.team));
 }
