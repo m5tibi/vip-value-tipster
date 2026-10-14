@@ -1873,6 +1873,13 @@ checkExpiredSubscriptions();
 // kampány hullámokban megy: csak annyi ajánlat, amennyi próbaidős belefér a napi tipp-e-mailekbe
 // (routes/trial.js capacityState, lib/mailQuota.js) – a többiek várólistán várnak, akár hetekig.
 const trialRoutes = require("./routes/trial");
+// Az ajánlatok csak napközben mennek ki (magyar idő, órától–óráig): az éjjel érkező levél reggelre
+// a többi alá csúszik. TRIAL_OFFER_HOURS env, pl. "8-20" (alapértelmezés).
+const TRIAL_OFFER_HOURS = (() => {
+  const m = String(process.env.TRIAL_OFFER_HOURS || "8-20").match(/^(\d{1,2})\s*-\s*(\d{1,2})$/);
+  return m ? [+m[1], +m[2]] : [8, 20];
+})();
+const inOfferHours = () => { const { hour } = getHungarianTime(); return hour >= TRIAL_OFFER_HOURS[0] && hour < TRIAL_OFFER_HOURS[1]; };
 const parseHuStamp = s => {
   const m = String(s || "").match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.?\s+(\d{1,2}):(\d{2})/);
   return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]).getTime() : NaN;
@@ -1926,7 +1933,7 @@ async function processTrialMail() {
     const cs = trialRoutes.capacityState();
     const sendsLeft = Math.max(0, mailQuota.sendsPerDay() - mailQuota.tipSendsToday());
     const tipNeed = (cs.payers + cs.active + cs.outstanding) * sendsLeft;
-    let slots = Math.min(cs.free, Math.floor((mailQuota.bulkLeft() - tipNeed) / (1 + sendsLeft)));
+    let slots = inOfferHours() ? Math.min(cs.free, Math.floor((mailQuota.bulkLeft() - tipNeed) / (1 + sendsLeft))) : 0;
     let sent = 0;
     for (const u of cs.queue) {
       if (slots <= 0) break;

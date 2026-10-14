@@ -78,5 +78,6 @@ könyvtárban (Renderen a `/data` perzisztens lemez).
 | `MAIL_DAILY_LIMIT` | Napi e-mail keret (alapértelmezés: `100` – a Resend ingyenes csomagja). A tömeges levelek (tipp-értesítő, próbaidő-ajánlat) csak eddig mennek ki |
 | `MAIL_RESERVE` | Ennyi levelet a napi keretből a fontos levelekre (megerősítés, jelszó, fizetés) tartunk fenn (alapértelmezés: `15`) |
 | `TRIAL_MAX_ACTIVE` | Egyszerre legfeljebb ennyi próbaidős (ha nincs megadva: a napi keretből számolva – (keret − tartalék) / napi tippküldések − fizetők). A kampány-ajánlatok csak a szabad helyekre mennek ki, a többiek várólistán várnak |
+| `TRIAL_OFFER_HOURS` | A próbaidő-kampány ajánlatai csak ebben az idősávban mennek ki, magyar idő szerint (alapértelmezés: `8-20`, azaz 8:00–19:59) |
 | `DISPOSABLE_DOMAINS` | További eldobható e-mail domainek vesszővel (ezekre nem jár próbaidő) |
 | `META_PURCHASE_VALUE` | A `Purchase` / `InitiateCheckout` esemény értéke forintban (alapértelmezés: `14990`) |
