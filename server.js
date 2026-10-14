@@ -2063,8 +2063,8 @@ setInterval(async () => {
           return { settled, won: won + halfWon, lost: lost + halfLost, push, decN, profit, wr, roi };
         }
         const all  = dayStats(yestSettled);
-        const vip  = dayStats(yestSettled.filter(t => t.type !== "free"));
-        const free = dayStats(yestSettled.filter(t => t.type === "free"));
+        const vip  = dayStats(yestSettled.filter(t => t.type !== "free" && !t.free));
+        const free = dayStats(yestSettled.filter(t => t.type === "free" || t.free));
         const sign = v => (v >= 0 ? "+" : "") + v.toFixed(2);
         const dateHU = yest.toLocaleDateString("hu-HU", { timeZone: "Europe/Budapest",
           year: "numeric", month: "2-digit", day: "2-digit" });
@@ -2100,6 +2100,7 @@ app.get("/api/tips", (req, res) => {
       aiTips: [], comboTips: [],
       // A free tippek minden látogató számára láthatók.
       freeTips: freeTips.filter(isApproved).map(publicTip),
+      freeCombos: comboTips.filter(c => c.free && isApproved(c)).map(publicTip),
     });
   }
   res.json({
@@ -2664,13 +2665,34 @@ app.post("/api/history/:id/make-free", (req, res) => {
   const tip = history.find(t => t.id === id);
   if (!tip) return res.status(404).json({ ok: false, error: "Tipp nem található" });
   if (tip.type === "free")  return res.status(400).json({ ok: false, error: "Már free tipp" });
-  if (tip.type === "combo") return res.status(400).json({ ok: false, error: "Kombiból nem lehet free tipp" });
+  // Kombi: a típusa marad (elszámolás, kifizetés változatlan), csak "free" jelölést kap. A jóváhagyás
+  // NEM vész el: ha már jóvá van hagyva, azonnal mindenki látja ingyenesként.
+  if (tip.type === "combo") {
+    if (tip.free) return res.status(400).json({ ok: false, error: "Már free kombi" });
+    const set = t => t.id === id ? { ...t, free: true } : t;
+    history = history.map(set); comboTips = comboTips.map(set);
+    saveHistory();
+    console.log(`[make-free] kombi (${(tip.legs || []).length} láb) ingyenessé téve${isApproved(tip) ? " – már jóváhagyott, azonnal publikus" : ""}`);
+    return res.json({ ok: true, approved: isApproved(tip) });
+  }
 
   history  = history.map(t => t.id === id ? { ...t, type: "free", approved: false } : t);
   aiTips   = aiTips.filter(t => t.id !== id);
   freeTips = history.filter(t => t.type === "free" && (!t.result || t.result === "pending"));
   saveHistory();
   console.log(`[make-free] ${tip.match} átalakítva free tippé (jóváhagyásra vár)`);
+  res.json({ ok: true });
+});
+
+// Free kombi vissza VIP-be
+app.post("/api/history/:id/make-vip", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const id = req.params.id;
+  const tip = history.find(t => t.id === id);
+  if (!tip || tip.type !== "combo" || !tip.free) return res.status(400).json({ ok: false, error: "Nem free kombi" });
+  const set = t => t.id === id ? { ...t, free: false } : t;
+  history = history.map(set); comboTips = comboTips.map(set);
+  saveHistory();
   res.json({ ok: true });
 });
 
@@ -2707,21 +2729,28 @@ app.post("/api/tips/send", async (req, res) => {
   const singlesToSend = history.filter(t => t.type === "ai"    && isApproved(t) && !t.sent && (!t.result || t.result === "pending"));
   const combosToSend  = history.filter(t => t.type === "combo" && isApproved(t) && !t.sent && (!t.result || t.result === "pending"));
   const freesToSend   = freeTips.filter(t =>                      isApproved(t) && !t.sent && (!t.result || t.result === "pending"));
+  // Free kombi: a publikus csatornára külön megy (akkor is, ha VIP-ként már kiment) – freeSent jelöli
+  const freeCombosToSend = history.filter(t => t.type === "combo" && t.free && isApproved(t) && !t.freeSent && (!t.result || t.result === "pending"));
 
-  if (!singlesToSend.length && !combosToSend.length && !freesToSend.length) {
+  if (!singlesToSend.length && !combosToSend.length && !freesToSend.length && !freeCombosToSend.length) {
     return res.json({ ok: true, sent: 0, message: "Nincs kiküldendő (jóváhagyott, még el nem küldött) tipp." });
   }
 
   // Sent jelölés minden tömbben
   const sentIds = new Set([...singlesToSend, ...combosToSend, ...freesToSend].map(t => t.id));
-  const mark = t => sentIds.has(t.id) ? { ...t, sent: true } : t;
+  const freeComboIds = new Set(freeCombosToSend.map(t => t.id));
+  const mark = t => {
+    let o = sentIds.has(t.id) ? { ...t, sent: true } : t;
+    if (freeComboIds.has(t.id)) o = { ...o, freeSent: true };
+    return o;
+  };
   history   = history.map(mark);
   aiTips    = aiTips.map(mark);
   comboTips = comboTips.map(mark);
   freeTips  = freeTips.map(mark);
   saveHistory();
 
-  const total = singlesToSend.length + combosToSend.length + freesToSend.length;
+  const total = singlesToSend.length + combosToSend.length + freesToSend.length + freeCombosToSend.length;
   console.log(`Tippek kiküldve: ${total} (${singlesToSend.length} single, ${combosToSend.length} kombi, ${freesToSend.length} free)`);
 
   // ── Telegram értesítők ──────────────────────────────────────────
@@ -2760,6 +2789,16 @@ app.post("/api/tips/send", async (req, res) => {
       sendToChannel(msg).catch(e => console.error("Telegram csatorna hiba:", e.message));
     });
   }
+  // Free kombik → publikus csatorna
+  const tgE = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  freeCombosToSend.forEach(c => {
+    const legs = (c.legs || []).map(l => `– <b>${tgE(l.match)}</b>\n   ${tgE(l.pick)} @${l.odds}${l.commence ? ` | 🕐 ${tgE(l.commence)}` : ""}`).join("\n");
+    const note = String(c.note || "").trim();
+    const noteStr = note && !/^\d+\s*lábas kötés$/i.test(note) ? `\n\n<i>${tgE(note)}</i>` : "";
+    const msg = `🆓 <b>INGYENES KOMBI</b> (${(c.legs || []).length} lábas, össz odds: ${c.odds})\n\n${legs}${noteStr}` +
+      `\n\n🌐 <a href="https://90perc.hu">90perc.hu</a> | 📲 <a href="https://t.me/+DHhLxcVboA8yOTI0">Csatlakozz a csatornához</a>`;
+    sendToChannel(msg).catch(e => console.error("Telegram csatorna hiba:", e.message));
+  });
 
   // ── E-mail értesítő az összes aktív előfizetőnek ────────────────
   const recipients = usersDb.all().filter(u =>

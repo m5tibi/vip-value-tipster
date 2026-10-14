@@ -96,7 +96,7 @@ Ne használj csillagot (*) vagy hashtaget (#). Csak HTML bold (<b>) formázást.
     // /tippek – csak az ingyenes tipp: a fizetős tippek előfizetőknek szólnak, a bot pedig bárkinek válaszol
     if (text === "/tippek") {
       const free = getHistory().filter(t =>
-        t.type === "free" && isApproved(t) && (!t.result || t.result === "pending")
+        (t.type === "free" || (t.type === "combo" && t.free)) && isApproved(t) && (!t.result || t.result === "pending")
       );
       if (!free.length) {
         await tgSend(chatId, "⚽ Ma még nincs ingyenes tipp. Nézz vissza később!");
