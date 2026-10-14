@@ -371,7 +371,7 @@ function renderTable(tips) {
     return `<tr>
       <td class="td-date">${formatDate(t.commence || t.addedAt)}</td>
       <td class="td-match"><span class="td-match-mobile-date">${formatDate(t.commence || t.addedAt)}</span>${t.type==='combo'
-        ? `<span class="badge combo">🎰 Kombi (${t.legN || (t.legs||[]).length} láb)</span><br/><span style="font-size:11px;color:var(--muted)">${(t.legs||[]).map(l=>l.pick).join(' + ')}</span>`
+        ? `${t.free ? '<span class="badge push">🆓</span> ' : ''}<span class="badge combo">🎰 Kombi (${t.legN || (t.legs||[]).length} láb)</span><br/><span style="font-size:11px;color:var(--muted)">${(t.legs||[]).map(l=>l.pick).join(' + ')}</span>`
         : t.type==='free' ? `<span class="badge push">🆓</span> ${t.match||'–'}`
         : t.match||'–'}</td>
       <td class="td-pick">${t.type==='combo'
@@ -396,7 +396,8 @@ function renderTable(tips) {
 
 // Típus-szűrők: Free = ingyenes tippek, VIP = minden más (AI single + kombi)
 const isTypeFilter = f => f === 'free' || f === 'vip';
-const byType = (tips, f) => f === 'free' ? tips.filter(t => t.type === 'free') : tips.filter(t => t.type !== 'free');
+const isFreeTip = t => t.type === 'free' || (t.type === 'combo' && t.free);   // free kombi is ingyenes
+const byType = (tips, f) => f === 'free' ? tips.filter(isFreeTip) : tips.filter(t => !isFreeTip(t));
 
 // A számláló és a grafikon alapja: a kiválasztott időszak tippjei, a Free / VIP gombnál csak az
 // adott típus (az eredmény-szűrők – Nyert, Veszett… – csak a táblázatot szűrik)

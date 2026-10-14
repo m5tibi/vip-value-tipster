@@ -727,7 +727,11 @@ function adminTipControls(t) {
     ? `<span style="color:#69f0ae;font-size:11px;font-weight:700">✅ Jóváhagyva (publikus)</span>`
     : `<span style="color:#ffb74d;font-size:11px;font-weight:700">${"⏳ Jóváhagyásra vár (rejtett)"}</span>`;
   const approveBtn = approved ? "" : `<button class="btn-won" style="font-size:11px;padding:4px 10px" onclick="approveTip('${t.id}')">✅ Jóváhagyás</button>`;
-  const makeFreeBtn = (t.type !== "free" && t.type !== "combo") ? `<button style="background:#00c853;color:#000;border:none;font-size:11px;padding:4px 10px;border-radius:6px;font-weight:700;cursor:pointer" onclick="makeFree('${t.id}')">🆓 Free-nek</button>` : "";
+  const freeBtnCss = "background:#00c853;color:#000;border:none;font-size:11px;padding:4px 10px;border-radius:6px;font-weight:700;cursor:pointer";
+  const makeFreeBtn = t.type === "free" ? ""
+    : t.type === "combo" && t.free
+      ? `<button style="${freeBtnCss};background:#37474f;color:#fff" onclick="makeVip('${t.id}')">↩️ Vissza VIP-be</button>`
+      : `<button style="${freeBtnCss}" onclick="makeFree('${t.id}', ${t.type === "combo"}, ${t.approved !== false})">🆓 Free-nek</button>`;
   const mondomatutitBtn = `<button id="mm-btn-${t.id}" style="background:#6B46C1;color:#fff;border:none;font-size:11px;padding:4px 10px;border-radius:6px;font-weight:700;cursor:pointer" onclick="pushToMondomatutit('${t.id}')">→ Mondomatutit</button>`;
   return `${adminValueBox(t)}<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #2a3550">
     ${badge}${approveBtn}${makeFreeBtn}${mondomatutitBtn}
@@ -768,6 +772,7 @@ function comboCardHTML(c, showResult) {
       ${c.extraSlip
         ? `<span class="bdg" style="background:#b71c1c;color:#fff">🎯 EXTRA SZELVÉNY</span>`
         : `<span class="bdg" style="background:#4e342e;color:#ffcc80">🎰 ${c.legN} LÁBAS KOMBI</span>`}
+      ${c.free ? `<span class="bdg" style="background:rgba(0,230,118,.15);color:#00e676;margin-left:6px">${window.t('tips.free_badge')}</span>` : ""}
       <span class="bdg" style="background:#3e2723;color:#ffcc80;margin-left:auto">Össz odds: ${c.odds}</span>
     </div>
     <div style="margin:6px 0">${legs}</div>
@@ -1259,7 +1264,7 @@ function renderFreeTipCard(t) {
   </div>`;
 }
 
-function renderLocked(needSubscription, freeTips) {
+function renderLocked(needSubscription, freeTips, freeCombos = []) {
   const wrap = document.getElementById("combo-wrap");
   if (wrap) wrap.style.display = "none";
   const lu = document.getElementById("last-update");
@@ -1279,9 +1284,12 @@ function renderLocked(needSubscription, freeTips) {
   }
 
   // Előfizető nélküli, de belépett user → ingyenes tipp + paywall
-  const freePart = freeTips && freeTips.length
+  const freeSingles = freeTips && freeTips.length
     ? [...freeTips].sort((a, b) => parseCommence(a.commence) - parseCommence(b.commence))
-        .map(ft => renderFreeTipCard(ft)).join('<div style="height:8px"></div>')
+        .map(ft => renderFreeTipCard(ft)).join('<div style="height:8px"></div>') : '';
+  const freeComboPart = (freeCombos || []).map(c => comboCardHTML(c, false)).join('');
+  const freePart = (freeSingles || freeComboPart)
+    ? freeSingles + (freeSingles && freeComboPart ? '<div style="height:8px"></div>' : '') + freeComboPart
     : `<div style="color:#5d7a96;font-size:13px;text-align:center;padding:16px 0">${window.t('tips.free_tip_none')}</div>`;
 
   const paywallPart =
@@ -1310,7 +1318,8 @@ async function loadTips() {
       renderFreeTipSection();
       tipsEverLoaded = true;
       const errData = await r.json().catch(() => ({}));
-      renderLocked(r.status === 402, Array.isArray(errData.freeTips) ? errData.freeTips : (errData.freeTip ? [errData.freeTip] : []));
+      renderLocked(r.status === 402, Array.isArray(errData.freeTips) ? errData.freeTips : (errData.freeTip ? [errData.freeTip] : []),
+                   Array.isArray(errData.freeCombos) ? errData.freeCombos : []);
       return;
     }
     if (!r.ok) throw new Error("HTTP "+r.status);
@@ -1659,14 +1668,24 @@ async function deleteTip(id) {
   showStatus("🗑️ Tipp törölve");
 }
 
-async function makeFree(id) {
-  if (!confirm("Free tippé alakítod ezt a tippet? Jóváhagyásig nem lesz publikus.")) return;
+async function makeFree(id, isCombo, approved) {
+  const q = isCombo
+    ? (approved ? "Ingyenessé teszed ezt a kombit? Már jóvá van hagyva, ezért AZONNAL mindenki látja (előfizetés nélkül is), és a következő küldéskor kimegy a publikus csatornára."
+                : "Ingyenessé teszed ezt a kombit? Jóváhagyás után mindenki látja.")
+    : "Free tippé alakítod ezt a tippet? Jóváhagyásig nem lesz publikus.";
+  if (!confirm(q)) return;
   const r = await fetch(`/api/history/${encodeURIComponent(id)}/make-free`, {
     method: "POST", headers: adminHeaders()
   });
   if (!(await handleAdminResp(r))) return;
-  if (r.ok) { showStatus("🆓 Free tippé alakítva – jóváhagyásra vár"); await loadHistory(); await loadTips(); }
+  if (r.ok) { showStatus(isCombo ? (approved ? "🆓 Kombi ingyenessé téve – már publikus" : "🆓 Kombi ingyenessé téve – jóváhagyás után publikus") : "🆓 Free tippé alakítva – jóváhagyásra vár"); await loadHistory(); await loadTips(); }
   else { const d = await r.json().catch(() => ({})); showStatus("❌ Hiba: " + (d.error || r.status), true); }
+}
+
+async function makeVip(id) {
+  const r = await fetch(`/api/history/${encodeURIComponent(id)}/make-vip`, { method: "POST", headers: adminHeaders() });
+  if (!(await handleAdminResp(r))) return;
+  if (r.ok) { showStatus("↩️ Kombi visszaállítva VIP-re"); await loadHistory(); await loadTips(); }
 }
 
 async function approveTip(id) {
