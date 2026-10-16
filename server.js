@@ -2809,7 +2809,7 @@ app.post("/api/tips/send", async (req, res) => {
 
   // ── E-mail értesítő az összes aktív előfizetőnek ────────────────
   const recipients = usersDb.all().filter(u =>
-    !u.isAdmin && u.emailVerified !== false &&
+    !u.isAdmin && u.emailVerified !== false && !(usersDb.findById(u.id) || {}).disabled &&
     (u.plan === "pro" || !auth.PAID_MODE || trial.isActive(u))      // a VIP próbaidősök is megkapják
   );
   // A napi e-mail keret miatt a fizetők kapják elsőként; ha elfogy a keret, a maradék próbaidős
