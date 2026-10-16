@@ -393,8 +393,34 @@ function applyAuthModal() {
   document.getElementById('auth-forgot').style.display  = reg ? 'none' : '';
 }
 
+// ── E-mail elgépelés-figyelő (regisztráció) ──
+// Gyakori szolgáltatók; ha a beírt domain 1-2 betűvel tér el valamelyiktől (gmial.com, gmail.co,
+// freemial.hu…), rákérdezünk. Az itt felsorolt, ismert domaineknél nem kérdezünk.
+const EMAIL_DOMAINS = ['gmail.com', 'freemail.hu', 'citromail.hu', 'hotmail.com', 'hotmail.hu', 'outlook.com', 'outlook.hu',
+  'live.com', 'yahoo.com', 'icloud.com', 't-online.hu', 'upcmail.hu', 'vipmail.hu', 'indamail.hu', 'gmx.net', 'gmx.com',
+  'invitel.hu', 'chello.hu', 'protonmail.com', 'proton.me', 'googlemail.com'];
+const EMAIL_KNOWN = new Set([...EMAIL_DOMAINS, 'mail.com', 'me.com', 'mac.com', 'aol.com', 'gmx.de', 'gmx.at', 'web.de', 'yahoo.de',
+  'yahoo.co.uk', 'hotmail.de', 'hotmail.co.uk', 'live.hu', 'msn.com', 't-online.de', 'digikabel.hu', 'telenor.hu', 'vodafone.hu']);
+function levDist(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+    d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1),
+      i > 1 && j > 1 && a[i-1] === b[j-2] && a[i-2] === b[j-1] ? d[i-2][j-2] + 1 : Infinity);   // betűcsere
+  return d[a.length][b.length];
+}
+function suggestEmail(email) {
+  const at = email.lastIndexOf('@');
+  if (at < 1) return null;
+  const dom = email.slice(at + 1).toLowerCase();
+  if (!dom || EMAIL_KNOWN.has(dom)) return null;
+  let best = null, bd = Infinity;
+  for (const x of EMAIL_DOMAINS) { const k = levDist(dom, x); if (k < bd) { bd = k; best = x; } }
+  return best && bd <= (dom.length < 9 ? 1 : 2) ? email.slice(0, at + 1) + best : null;
+}
+
 async function authSubmit() {
-  const email = document.getElementById('auth-email').value.trim();
+  let email = document.getElementById('auth-email').value.trim();
   const pwd   = document.getElementById('auth-pwd').value;
   const err   = document.getElementById('auth-err');
   const showErr = m => { err.textContent = m; err.style.display = 'block'; };
@@ -409,6 +435,11 @@ async function authSubmit() {
     if (!over18) return showErr(window.t('tips.err_under18'));
     if (!terms)  return showErr(window.t('tips.err_terms'));
     body.over18 = true; body.acceptTerms = true;
+    const sug = suggestEmail(email);
+    if (sug && confirm((window.t('tips.email_typo') || 'Nem erre gondoltál: {email}?').split('{email}').join(sug))) {
+      email = sug; body.email = sug;
+      document.getElementById('auth-email').value = sug;
+    }
   }
   try {
     const r = await fetch(reg ? '/api/auth/register' : '/api/auth/login', {

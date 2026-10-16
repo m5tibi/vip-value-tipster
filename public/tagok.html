@@ -140,6 +140,8 @@ nav{background:var(--surf);border-bottom:1px solid var(--border);padding:12px 16
   <button class="filter-btn" onclick="setFilter('free',this)">🔓 Ingyenes</button>
   <button class="filter-btn" onclick="setFilter('cancelled',this)">❌ Lemondott</button>
   <button class="filter-btn" onclick="setFilter('trial',this)">💎 Próbaidő</button>
+  <button class="filter-btn" onclick="setFilter('unverified',this)">⏳ Nem megerősített</button>
+  <button class="filter-btn" onclick="setFilter('disabled',this)">🚫 Kizárt</button>
 </div>
 
 <div class="search-wrap">
@@ -246,6 +248,9 @@ function setFilter(f, btn) {
 function renderList() {
   const search = document.getElementById('search').value.toLowerCase();
   let list = allMembers.filter(u => !u.isAdmin);
+  // A kizárt tagok csak a "Kizárt" szűrőben látszanak
+  list = currentFilter === 'disabled' ? list.filter(u => u.disabled) : list.filter(u => !u.disabled);
+  if (currentFilter === 'unverified') list = list.filter(u => !u.emailVerified);
   if (currentFilter === 'pro') list = list.filter(u => u.plan === 'pro' && !u.cancelledAt);
   if (currentFilter === 'free') list = list.filter(u => u.plan !== 'pro' && !u.cancelledAt);
   if (currentFilter === 'cancelled') list = list.filter(u => u.cancelledAt);
@@ -263,7 +268,9 @@ function renderList() {
     const cardClass = isActiveButCancelled ? 'cancelled' : isPro ? 'pro' : hasCancelled ? 'cancelled' : 'free';
     const trialOn = u.trialEndsAt && new Date(u.trialEndsAt) > new Date();
     const trialLeft = trialOn ? Math.max(1, Math.ceil((new Date(u.trialEndsAt) - Date.now()) / 86400000)) : 0;
-    const badge = !isPro && trialOn
+    const badge = u.disabled
+      ? '<span class="member-badge badge-cancelled">🚫 Kizárva</span>'
+      : !isPro && trialOn
       ? `<span class="member-badge badge-trial">💎 Próbaidő (még ${trialLeft} nap)</span>`
       : isActiveButCancelled
       ? '<span class="member-badge badge-cancelled">⚠️ Lemondva (még aktív)</span>'
@@ -278,9 +285,10 @@ function renderList() {
     if (u.paidUntil) metaItems.push(`<span class="meta-item highlight">Lejárat: ${new Date(u.paidUntil).toLocaleDateString('hu-HU')}</span>`);
     if (u.cancelledAt) metaItems.push(`<span class="meta-item red">Lemondva: ${new Date(u.cancelledAt).toLocaleDateString('hu-HU')}</span>`);
     if (!u.emailVerified) metaItems.push('⏳ Nem megerősített');
+    if (u.disabled && u.disabledAt) metaItems.push(`<span class="meta-item red">Kizárva: ${new Date(u.disabledAt).toLocaleDateString('hu-HU')}</span>`);
     const hd = d => new Date(d).toLocaleDateString('hu-HU');
     if (u.trialStartedAt) {
-      const src = { signup: 'regisztráció', campaign: 'kampány', banner: 'sáv' }[u.trialSource] || u.trialSource || '';
+      const src = { signup: 'regisztráció', campaign: 'kampány', banner: 'sáv', admin: 'kézi megerősítés' }[u.trialSource] || u.trialSource || '';
       metaItems.push(`<span class="meta-item blue">💎 Próbaidő: ${hd(u.trialStartedAt)} – ${hd(u.trialEndsAt)}${src ? ' (' + src + ')' : ''}${isPro ? ' → előfizetett ✅' : ''}</span>`);
     } else if (u.trialOffer) {
       const expired = u.trialOffer.emailedAt && Date.now() - Date.parse(u.trialOffer.emailedAt) >= 7 * 86400000;
@@ -288,9 +296,13 @@ function renderList() {
     }
     (u.trialFlags || []).forEach(f => metaItems.push(`<span class="meta-item red">⚠️ ${f}</span>`));
 
-    const actions = isPro
-      ? `<button class="btn btn-danger btn-sm" onclick="setFree('${u.id}')">→ Ingyenes</button>`
-      : `<button class="btn btn-primary btn-sm" onclick="openProModal('${u.id}')">→ Fizető</button>`;
+    const actions = u.disabled
+      ? `<button class="btn btn-ghost btn-sm" onclick="enableUser('${u.id}')">↩️ Visszaengedés</button>`
+      : (isPro
+          ? `<button class="btn btn-danger btn-sm" onclick="setFree('${u.id}')">→ Ingyenes</button>`
+          : `<button class="btn btn-primary btn-sm" onclick="openProModal('${u.id}')">→ Fizető</button>`) +
+        (!u.emailVerified ? ` <button class="btn btn-ghost btn-sm" onclick="verifyUser('${u.id}')">✓ Megerősítés</button>` : '') +
+        ` <button class="btn btn-danger btn-sm" style="opacity:.85" onclick="disableUser('${u.id}')">🚫 Kizárás</button>`;
 
     return `<div class="member-card ${cardClass}">
       <div class="member-top">
@@ -306,7 +318,7 @@ function renderList() {
 }
 
 function updateStats() {
-  const members = allMembers.filter(u => !u.isAdmin);
+  const members = allMembers.filter(u => !u.isAdmin && !u.disabled);   // a kizártak nem számítanak
   const pro = members.filter(u => u.plan === 'pro' && !u.cancelledAt).length;
   // Csak valódi Stripe-os előfizetők (kézzel hozzáadottak kizárva)
   const proStripe = members.filter(u => u.plan === 'pro' && !u.cancelledAt && u.stripeCustomerId).length;
@@ -388,6 +400,36 @@ async function syncStripe() {
   } catch(e) { showStatus('❌ Hiba: ' + e.message, true); }
 }
 
+// ── Kézi megerősítés, kizárás, visszaengedés ──
+async function verifyUser(id) {
+  const email = emailOf(id);
+  if (!confirm(`Kézzel megerősíted ezt az e-mail címet?\n\n${email}\n\nCsak akkor tedd, ha biztos vagy benne, hogy a cím valódi (pl. a megerősítő levél megtelt postafiók miatt nem ért célba). Új tagnál ezzel elindul a VIP próbaidő is, ha még jár neki.`)) return;
+  const r = await fetch(`/api/admin/users/${id}/verify`, { method: 'POST', headers: adminHeaders(true) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { showStatus('❌ ' + (d.error || 'Hiba'), true); return; }
+  showStatus(`✅ ${email} megerősítve` + (d.trial ? (d.trial.ok ? ` · ${d.trial.days} napos VIP próbaidő elindult` : ` · próbaidő nem indult: ${d.trial.reason}`) : ''));
+  await loadMembers();
+}
+async function disableUser(id) {
+  const u = allMembers.find(x => x.id === id) || {};
+  const stripeWarn = u.plan === 'pro' && u.stripeCustomerId
+    ? '\n\n⚠️ Stripe-on fizető tag! A kizárás az előfizetését NEM mondja le – azt a Stripe-ban külön kell megtenned, különben továbbra is fizet.' : '';
+  if (!confirm(`Biztosan kizárod ezt a tagot?\n\n${u.email}\n\nNem tud többé belépni (a mostani munkamenete is megszűnik), nem kap tőlünk levelet, és a fizetős hozzáférése megszűnik. Később visszaengedheted.${stripeWarn}`)) return;
+  const r = await fetch(`/api/admin/users/${id}`, { method: 'DELETE', headers: adminHeaders(true) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { showStatus('❌ ' + (d.error || 'Hiba'), true); return; }
+  showStatus(`🚫 ${u.email} kizárva` + (d.hadStripe ? ' – ne felejtsd el a Stripe-előfizetését lemondani!' : ''), !!d.hadStripe);
+  await loadMembers();
+}
+async function enableUser(id) {
+  const email = emailOf(id);
+  if (!confirm(`Visszaengeded ezt a tagot?\n\n${email}\n\nÚjra be tud lépni, és a korábbi csomagja visszaáll.`)) return;
+  const r = await fetch(`/api/admin/users/${id}/enable`, { method: 'POST', headers: adminHeaders(true) });
+  if (!r.ok) { showStatus('❌ Hiba', true); return; }
+  showStatus(`↩️ ${email} visszaengedve`);
+  await loadMembers();
+}
+
 // ── VIP próbaidő ──
 async function loadTrialStats() {
   try {
@@ -398,7 +440,7 @@ async function loadTrialStats() {
     document.getElementById('s-trialconv').textContent = d.conversionPct == null ? '–' : `${d.converted} (${d.conversionPct}%)`;
     const c = d.campaign;
     document.getElementById('trial-sub').textContent =
-      `Próbaidő: ${d.started} indult (új regisztráció ${d.bySource.signup || 0}, kampány ${d.bySource.campaign || 0}, sáv ${d.bySource.banner || 0}) · ${d.active} fut · ${d.ended} lejárt · ${d.converted} előfizetett` +
+      `Próbaidő: ${d.started} indult (új regisztráció ${d.bySource.signup || 0}, kampány ${d.bySource.campaign || 0}, sáv ${d.bySource.banner || 0}, kézi ${d.bySource.admin || 0}) · ${d.active} fut · ${d.ended} lejárt · ${d.converted} előfizetett` +
       (c.offered ? ` · Kampány: ${c.offered} ajánlat, ${c.emailed} elküldve, ${c.activated} aktiválta, ${d.capacity.queue} várólistán` : '') +
       ` · Új regisztrálóknak ${d.trialDays} nap, kampányban ${d.campaignDays} nap` +
       `\n📧 Mai e-mailek: ${d.mail.used}/${d.mail.limit} (${d.mail.reserve} tartalék a fontos leveleknek) · tippküldés ~${d.mail.sendsPerDay}/nap` +
