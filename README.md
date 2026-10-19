@@ -69,6 +69,7 @@ könyvtárban (Renderen a `/data` perzisztens lemez).
 | `ODDS_PROXY_TOKEN` | Az odds proxy külső (nem belépett) hívásaihoz |
 | `MONDOMATUTIT_ADMIN_PASSWORD` | A „→ Mondomatutit” gombhoz: ezzel küldi át a tippet a mondomatutit.hu-ra |
 | `MONDOMATUTIT_URL` | A mondomatutit címe (alapértelmezés: `https://mondomatutit.hu`) |
+| `TG_PUBLIC_LINK` | A publikus Telegram-csatorna meghívó linkje – minden oldal és a csatornaüzenetek ezt használják (alapértelmezés: `https://t.me/+DHhLxcVboA8yOTI0`) |
 | `DATA_DIR` | Adatkönyvtár (alapértelmezés: `/data`) |
 | `META_PIXEL_ID` | Meta (Facebook) Pixel azonosító. Ha be van állítva, az oldal alján süti-hozzájárulási sáv jelenik meg, és a pixel csak elfogadás után töltődik be. Események: `PageView`, `CompleteRegistration`, `StartTrial`, `InitiateCheckout`, `Purchase` |
 | `TMP_FACTOR` | A TippmixPro-odds becsléséhez: piaci legjobb odds × ez (alapértelmezés: `0.95`). Az EV-t ezzel számoljuk, amíg az admin be nem írja a valós oddsot |
