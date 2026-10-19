@@ -1563,6 +1563,41 @@ function checkPickAgainstOdds(entry, market, pick) {
 const STAT_MARKET_RE = /szöglet|corner|sárga|piros\s*lap|\blap(ok)?\b|kártya|\bcards?\b|booking|\bles(ek|ről)?\b|offside|szabálytalan|\bfouls?\b|lövés|kapura|\bshots?\b|bedobás|throw.?in|kirúgás|goal.?kick|gólpassz|assist|büntető|penalt/i;
 const isStatMarket = (market, pick) => STAT_MARKET_RE.test(`${market || ""} ${pick || ""}`);
 
+// Dupla esély és "döntetlen esetén visszajár" (DNB) piac felismerése.
+// Visszatér: { kind: "dc", picks: [tipp-részek] } | { kind: "dnb", team } | null
+const DC_RE  = /dupla esély|kettős esély|double chance/i;
+const DNB_RE = /döntetlen esetén visszajár|draw no bet|\bdnb\b/i;
+function dcDnbPick(market, pick) {
+  const mk = String(market || ""), pk = String(pick || "").trim();
+  if (DNB_RE.test(mk) || DNB_RE.test(pk)) {
+    const team = pk.replace(DNB_RE, "").replace(/[()]/g, "").trim();
+    return team ? { kind: "dnb", team } : null;
+  }
+  if (DC_RE.test(mk) || /^(1x|x2|12)$/i.test(pk)) {
+    if (/^(1x|x2|12)$/i.test(pk)) return { kind: "dc", code: pk.toUpperCase() };
+    const parts = pk.split(/\s+vagy\s+|\s+or\s+|\s*\/\s*/i).map(s => s.trim()).filter(Boolean);
+    return parts.length === 2 ? { kind: "dc", picks: parts } : null;
+  }
+  return null;
+}
+// undefined: nem ilyen piac · null: ilyen, de nem dönthető el (pl. ismeretlen csapatnév) · különben az eredmény
+function settleDcDnb(market, pick, homeTeam, awayTeam, homeScore, awayScore) {
+  const p = dcDnbPick(market, pick);
+  if (!p) return DC_RE.test(String(market || "")) || DNB_RE.test(String(market || "")) ? null : undefined;
+  const sideOf = x => /^(döntetlen|x|draw)$/i.test(String(x).trim()) ? "draw"
+    : nameSim(normTeam(x), normTeam(homeTeam)) ? "home" : nameSim(normTeam(x), normTeam(awayTeam)) ? "away" : null;
+  const outcome = homeScore > awayScore ? "home" : homeScore < awayScore ? "away" : "draw";
+  if (p.kind === "dnb") {
+    const side = sideOf(p.team);
+    if (!side || side === "draw") return null;
+    if (outcome === "draw") return "push";
+    return side === outcome ? "won" : "lost";
+  }
+  const sides = p.code ? { "1X": ["home", "draw"], "X2": ["draw", "away"], "12": ["home", "away"] }[p.code] : p.picks.map(sideOf);
+  if (!sides || sides.includes(null) || sides[0] === sides[1]) return null;
+  return sides.includes(outcome) ? "won" : "lost";
+}
+
 function settleMarket(market, pick, homeTeam, awayTeam, homeScore, awayScore, ht = null) {
   if (isStatMarket(market, pick)) return null;       // kézi kiértékelés
   // Az AI magyar piac-/kimenetneveket ad ("Több mint 2,5 gól", "Mindkét csapat betalál",
@@ -1586,6 +1621,8 @@ function settleMarket(market, pick, homeTeam, awayTeam, homeScore, awayScore, ht
     if (sp.side === "Over") return r;
     return r === "won" ? "lost" : r === "lost" ? "won" : r === "half_won" ? "half_lost" : r === "half_lost" ? "half_won" : r;
   }
+  const res2 = settleDcDnb(market, pick, homeTeam, awayTeam, homeScore, awayScore);
+  if (res2 !== undefined) return res2;
   // A pick csapatneve az AI-tól jön ("Molde"), a valós név az odds API-tól ("Molde FK") –
   // ezért laza (normalizált) névegyezést használunk, nem szigorú ===-t.
   const pickIsHome = () => nameSim(normTeam(pick), normTeam(homeTeam));
@@ -2317,7 +2354,7 @@ function oddsApiMarketFor(market, pick) {
   if (sp) return sp.kind === "team" ? "team_totals" : sp.kind === "h1" ? "totals_h1" : null;
   if (isStatMarket(market, pick)) return null;
   const c = canonPick(market, pick);
-  return c.kind === "btts" ? null : c.kind === "over" || c.kind === "under" ? "totals" : c.kind === "hcp" ? "spreads" : "h2h";
+  return c.kind === "btts" || c.kind === "dc" || c.kind === "dnb" || c.kind === "stat" ? null : c.kind === "over" || c.kind === "under" ? "totals" : c.kind === "hcp" ? "spreads" : "h2h";
 }
 function clvFields(s, closing) {
   if (!closing || closing.odds == null) return { clv: null, closingEv: null };
@@ -2403,7 +2440,7 @@ function marketGroup(market, pick) {
   if (sp) return sp.kind === "team" ? "Csapat gólszám" : sp.kind === "h1" ? "1. félidő gólszám" : "Egyéb";
   if (isStatMarket(market, pick)) return "Egyéb";
   const c = canonPick(market, pick);
-  return { over: "Gólszám", under: "Gólszám", hcp: "Hendikep", btts: "BTTS", "1x2": "1X2" }[c.kind] || "Egyéb";
+  return { over: "Gólszám", under: "Gólszám", hcp: "Hendikep", btts: "BTTS", "1x2": "1X2", dc: "Dupla esély", dnb: "DNB" }[c.kind] || "Egyéb";
 }
 app.get("/api/admin/clv", (req, res) => {
   if (!requireAdmin(req, res)) return;
@@ -2601,6 +2638,9 @@ function canonPick(market, pick) {
   const mk = txt(market), pk = txt(pick);
   const num = s => { const m = s.match(/[-+]?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; };
   if (isStatMarket(market, pick)) return { kind: "stat", raw: `${mk} ${pk}` };
+  const dd = dcDnbPick(market, pick);
+  if (dd) return dd.kind === "dnb" ? { kind: "dnb", team: normTeam(dd.team) }
+    : { kind: "dc", raw: dd.code || dd.picks.map(x => normTeam(x)).sort().join("|") };
   const sp = specialPick(market, pick);
   if (sp && sp.kind !== "unsupported") return { kind: `${sp.kind}_${sp.side.toLowerCase()}`, line: sp.line, team: sp.team ? normTeam(sp.team) : null };
   if (mk.includes("btts") || mk.includes("mindkét") || pk.includes("mindkét") || pk.includes("nem talál"))
@@ -2625,7 +2665,8 @@ function samePick(a, b) {
   if (a.kind === "btts") return a.side === b.side;
   if (a.kind === "over" || a.kind === "under") return a.line === b.line;
   if (/^(team|h1)_/.test(a.kind)) return a.line === b.line && (!a.team || nameSim(a.team, b.team));
-  if (a.kind === "stat") return a.raw === b.raw;
+  if (a.kind === "stat" || a.kind === "dc") return a.raw === b.raw;
+  if (a.kind === "dnb") return nameSim(a.team, b.team);
   if (a.kind === "hcp") return a.line === b.line && nameSim(a.team, b.team);
   return a.team === b.team || (a.team !== "draw" && b.team !== "draw" && nameSim(a.team, b.team));
 }

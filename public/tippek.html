@@ -1488,7 +1488,7 @@ function teInput(value, placeholder, type) {
 // Piac: választómező a négy elszámolható piaccal + "Egyéb" szabad szöveggel. Ha a tipp eredeti
 // piaca nem pontosan ezek egyike (pl. "Over 2.5"), "Egyéb"-ként, változatlan szöveggel jelenik meg,
 // így mentéskor nem íródik át.
-const TE_MARKETS = ["1X2", "Gólszám", "Hendikep", "BTTS", "Csapat gólszám", "1. félidő gólszám"];
+const TE_MARKETS = ["1X2", "Gólszám", "Hendikep", "BTTS", "Csapat gólszám", "1. félidő gólszám", "Dupla esély", "Döntetlen esetén visszajár"];
 function teMarketInput(value) {
   const v = value || "1X2";
   const wrap = document.createElement("div");
@@ -1518,6 +1518,8 @@ function teSuggestions(market, home, away) {
     const t = ["0,5", "1,5", "2,5"];
     return [home, away].flatMap(c => [...t.map(l => `${c} több mint ${l} gól`), ...t.map(l => `${c} kevesebb mint ${l} gól`)]);
   }
+  if (market === "Dupla esély") return [`${home} vagy döntetlen`, `${away} vagy döntetlen`, `${home} vagy ${away}`];
+  if (market === "Döntetlen esetén visszajár") return [home, away];
   if (market === "1. félidő gólszám") return ["0,5", "1,5", "2,5"].flatMap(l => [`Több mint ${l} gól`, `Kevesebb mint ${l} gól`]);
   if (market === "1X2") return [home, "Döntetlen", away];
   return [];
@@ -2123,7 +2125,7 @@ async function syncStripe() {
       <button type="button" class="te-add" onclick="teAddLeg()">➕ Láb hozzáadása</button>
       <div id="te-total" style="font-size:13px;color:#ffcc80;font-weight:700;margin-bottom:10px"></div>
     </div>
-    <div class="te-hint">Az automatikus elszámoláshoz: Piac „1X2” → Tipp: csapatnév vagy „Döntetlen”; gólszám → Tipp: „Több mint 2,5 gól” / „Kevesebb mint 2,5 gól”; „Hendikep” → Tipp: „Csapat -1.5”; „BTTS” → Tipp: „Igen” / „Nem”; „Csapat gólszám” → Tipp: „Csapat több mint 1,5 gól”; „1. félidő gólszám” → Tipp: „Több mint 0,5 gól” (csak football-data ligáknál zárul automatikusan). Más piacot kézzel kell lezárni.</div>
+    <div class="te-hint">Az automatikus elszámoláshoz: Piac „1X2” → Tipp: csapatnév vagy „Döntetlen”; gólszám → Tipp: „Több mint 2,5 gól” / „Kevesebb mint 2,5 gól”; „Hendikep” → Tipp: „Csapat -1.5”; „BTTS” → Tipp: „Igen” / „Nem”; „Csapat gólszám” → Tipp: „Csapat több mint 1,5 gól”; „1. félidő gólszám” → Tipp: „Több mint 0,5 gól” (csak football-data ligáknál zárul automatikusan); „Dupla esély” → Tipp: „Csapat vagy döntetlen” / „Hazai vagy Vendég”; „Döntetlen esetén visszajár” → Tipp: csapatnév. Más piacot kézzel kell lezárni.</div>
     <label class="te-field"><span>Indoklás</span><textarea id="te-note" placeholder="Miért ez a tipp? (eredmények, tabella, H2H, hiányzók)"></textarea></label>
     <label id="te-approved-wrap" style="display:flex;align-items:center;gap:8px;font-size:13px;color:#b0bec5;margin-bottom:12px;cursor:pointer">
       <input type="checkbox" id="te-approved" style="width:auto"> Azonnal jóváhagyva (publikus)
