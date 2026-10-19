@@ -191,7 +191,8 @@ async function sendNewTips(to, tips, combos, frees = [], opts = {}) {
   const comboRows = combos.map(c =>
     `<tr>
       <td colspan="4" style="padding:8px 6px;border-bottom:1px solid #1e3a2f;color:#ffcc80">
-        🎰 Kombi: ${c.legs.map(l => l.pick).join(" + ")} @ <b>${c.odds}</b>
+        🎰 <b>${c.legs.length} lábas kombi</b> @ <b>${c.odds}</b>
+        ${c.legs.map(l => `<div style="color:#cfd8dc;font-size:12px;margin-top:4px">• ${l.sportLabel && l.sportLabel.trim() !== "⚽" ? `<span style="color:#b39ddb">${l.sportLabel}</span> · ` : ""}${l.match}${l.commence ? ` <span style="color:#78909c">(${l.commence})</span>` : ""}<br>&nbsp;&nbsp;${l.market ? `<span style="color:#80cbc4">${l.market}:</span> ` : ""}<b>${l.pick}</b> @ ${l.odds}</div>`).join("")}
       </td>
     </tr>`
   ).join("");
