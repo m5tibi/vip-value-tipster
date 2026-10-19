@@ -791,10 +791,20 @@ function aiTipHTML(t, showResult) {
 
 function comboCardHTML(c, showResult) {
   const legIcon = r => r==="won"?"✅":r==="lost"?"❌":r==="push"?"↩️":r==="half_won"?"½✅":r==="half_lost"?"½❌":"⏳";
-  const legs = (c.legs||[]).map(l =>
-    `<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#cfd8dc;padding:4px 0;border-bottom:1px solid #16223d">
-       <span>${showResult?((l.manualNeeded && !l.result ? "✋" : legIcon(l.result||"pending"))+" "):""}${l.match} — <b>${l.pick}</b>${l.commence?`<br><span style="color:#78909c;font-size:11px">🕐 ${l.commence}</span>`:""}</span><span style="color:#90a4ae;white-space:nowrap">${l.odds}</span>
-     </div>`).join("");
+  // Lábanként ugyanazok az adatok, mint a single tippeknél: bajnokság, meccs, kezdés, piac + tipp, odds
+  const legs = (c.legs||[]).map(l => {
+    const league = l.sportLabel && l.sportLabel.trim() !== "⚽" ? l.sportLabel : "";
+    const icon = showResult ? ((l.manualNeeded && !l.result ? "✋" : legIcon(l.result||"pending")) + " ") : "";
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #16223d">
+       <div style="min-width:0">
+         ${league ? `<div style="font-size:11px;color:#b39ddb;margin-bottom:2px">${league}</div>` : ""}
+         <div style="font-size:13px;color:#e0e0e0;font-weight:600">${icon}${l.match}</div>
+         ${l.commence ? `<div style="color:#78909c;font-size:11px;margin-top:1px">🕐 ${l.commence}</div>` : ""}
+         <div style="margin-top:4px">${l.market ? `<span class="tip-market">${l.market}</span>` : ""}<span class="tip-pick">${l.pick}</span></div>
+       </div>
+       <span style="color:#f59e0b;font-weight:700;font-size:14px;white-space:nowrap">${l.odds}</span>
+     </div>`;
+  }).join("");
   const payoutLine = (showResult && typeof c.comboPayout==="number")
     ? `<div style="font-size:12px;color:#90a4ae;margin-top:4px">Kifizetés: x${c.comboPayout}</div>` : "";
   return `

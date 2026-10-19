@@ -2774,7 +2774,7 @@ app.post("/api/tips/send", async (req, res) => {
     }
     if (combosToSend.length) {
       combosToSend.forEach(c => {
-        const legs = (c.legs || []).map(l => `  – ${l.match} | ${l.pick} @${l.odds}`).join("\n");
+        const legs = (c.legs || []).map(l => `  – ${l.sportLabel && l.sportLabel.trim() !== "⚽" ? l.sportLabel + " | " : ""}${l.match} | ${l.market ? l.market + ": " : ""}${l.pick} @${l.odds}`).join("\n");
         const note = String(c.note || "").trim();
         const noteStr = note && !/^\d+\s*lábas kötés$/i.test(note) ? `\n<i>${note.replace(/[&<>]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch]))}</i>` : "";
         lines.push(`\n🎰 <b>KOMBI</b> (${(c.legs||[]).length} lábas, össz odds: ${c.odds})\n${legs}${noteStr}`);
@@ -2799,7 +2799,7 @@ app.post("/api/tips/send", async (req, res) => {
   // Free kombik → publikus csatorna
   const tgE = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   freeCombosToSend.forEach(c => {
-    const legs = (c.legs || []).map(l => `– <b>${tgE(l.match)}</b>\n   ${tgE(l.pick)} @${l.odds}${l.commence ? ` | 🕐 ${tgE(l.commence)}` : ""}`).join("\n");
+    const legs = (c.legs || []).map(l => `– ${l.sportLabel && l.sportLabel.trim() !== "⚽" ? tgE(l.sportLabel) + "\n   " : ""}<b>${tgE(l.match)}</b>\n   ${l.market ? tgE(l.market) + ": " : ""}${tgE(l.pick)} @${l.odds}${l.commence ? ` | 🕐 ${tgE(l.commence)}` : ""}`).join("\n");
     const note = String(c.note || "").trim();
     const noteStr = note && !/^\d+\s*lábas kötés$/i.test(note) ? `\n\n<i>${tgE(note)}</i>` : "";
     const msg = `🆓 <b>INGYENES KOMBI</b> (${(c.legs || []).length} lábas, össz odds: ${c.odds})\n\n${legs}${noteStr}` +
