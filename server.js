@@ -11,7 +11,7 @@ const auth    = require("./auth");
 const mailer  = require("./mailer");
 const trial   = require("./lib/trial");
 const mailQuota = require("./lib/mailQuota");
-const { BASE_URL } = require("./lib/config");
+const { BASE_URL, TG_PUBLIC_LINK } = require("./lib/config");
 
 const app = express();
 
@@ -32,6 +32,8 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use('/api/odds', require('./routes/odds'));
 
 app.use("/api", security.safeJson);        // XSS-védelem minden API válaszra (lásd lib/security.js)
+// Publikus beállítások a frontendnek (lang.js: a Telegram-linkek a TG_PUBLIC_LINK-re állnak)
+app.get("/api/config", (req, res) => res.json({ tgPublicLink: TG_PUBLIC_LINK }));
 app.use(require("./routes/auth"));
 app.use(require("./routes/adminUsers"));
 app.use(require("./routes/trial").router);
@@ -2833,7 +2835,7 @@ app.post("/api/tips/send", async (req, res) => {
         `${t.pick} @${t.odds} | 🕐 ${t.commence || "–"}`+
         noteStr+
         `\n\n🌐 <a href="https://90perc.hu">90perc.hu</a> | `+
-        `📲 <a href="https://t.me/+DHhLxcVboA8yOTI0">Csatlakozz a csatornához</a>`;
+        `📲 <a href="${TG_PUBLIC_LINK}">Csatlakozz a csatornához</a>`;
       sendToChannel(msg).catch(e => console.error("Telegram csatorna hiba:", e.message));
     });
   }
@@ -2844,7 +2846,7 @@ app.post("/api/tips/send", async (req, res) => {
     const note = String(c.note || "").trim();
     const noteStr = note && !/^\d+\s*lábas kötés$/i.test(note) ? `\n\n<i>${tgE(note)}</i>` : "";
     const msg = `🆓 <b>INGYENES KOMBI</b> (${(c.legs || []).length} lábas, össz odds: ${c.odds})\n\n${legs}${noteStr}` +
-      `\n\n🌐 <a href="https://90perc.hu">90perc.hu</a> | 📲 <a href="https://t.me/+DHhLxcVboA8yOTI0">Csatlakozz a csatornához</a>`;
+      `\n\n🌐 <a href="https://90perc.hu">90perc.hu</a> | 📲 <a href="${TG_PUBLIC_LINK}">Csatlakozz a csatornához</a>`;
     sendToChannel(msg).catch(e => console.error("Telegram csatorna hiba:", e.message));
   });
 

@@ -431,7 +431,7 @@ function rHdr(){
     '<span style="font-size:11px;color:#4ade80;font-weight:600">Claude</span></div>':'';
   return '<div class="hdr">'+
     '<a href="/" style="text-decoration:none;color:inherit"><img src="/logo-horizontal.png" alt="90perc.hu" style="height:32px;width:auto;display:block"/><div class="hsub" style="margin-top:4px">'+window.t('analyzer.nav_sub')+'</div></a>'+
-    '<div class="hright">'+badge+'<a href="https://t.me/+rMoqrue6DBFlZmVk" target="_blank" rel="noopener" style="color:#229ED9;text-decoration:none;font-size:13px;font-weight:700;margin-right:10px">📱 '+window.t('nav.telegram')+'</a><a class="back" href="/">'+window.t('nav.main')+'</a></div>'+
+    '<div class="hright">'+badge+'<a href="'+(window.__TG_LINK||'https://t.me/+DHhLxcVboA8yOTI0')+'" class="tg-channel-link" target="_blank" rel="noopener" style="color:#229ED9;text-decoration:none;font-size:13px;font-weight:700;margin-right:10px">📱 '+window.t('nav.telegram')+'</a><a class="back" href="/">'+window.t('nav.main')+'</a></div>'+
     '</div>';
 }
 
@@ -582,6 +582,14 @@ function pwt(id,btn){
   el.type=(el.type==='password')?'text':'password';
   btn.innerHTML=(el.type==='password')?'&#128065;':'&#128584;';
 }
+</script>
+<script>
+// A Telegram-csatorna linkje a szerver beállításából (TG_PUBLIC_LINK) – a fejléc JS-ből rajzolódik
+fetch('/api/config').then(r => r.json()).then(d => {
+  if (!d.tgPublicLink) return;
+  window.__TG_LINK = d.tgPublicLink;
+  document.querySelectorAll('a.tg-channel-link').forEach(a => { a.href = d.tgPublicLink; });
+}).catch(() => {});
 </script>
 </body>
 </html>
