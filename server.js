@@ -2896,6 +2896,12 @@ app.post("/api/stats/send", async (req, res) => {
 // Egy tippet (single / kombi / free) átküld a mondomatutit.hu /api/receive-tip
 // endpointjára. A tipp a mondomatutit admin panelén "Jóváhagyásra vár" státuszban
 // jelenik meg – Tibi ott dönt, hogy publikálja-e és mikor küldi ki.
+// A láb bajnoksága ("⚽ Olasz A"); az üres "⚽" helykitöltő nem bajnokság
+function legLeague(l) {
+  const v = String(l.sportLabel || "").trim();
+  return v && v !== "⚽" ? v : "";
+}
+
 async function pushTipToMondomatutit(tip) {
   if (!MONDOMATUTIT_PASS) throw new Error("MONDOMATUTIT_ADMIN_PASSWORD nincs beállítva");
 
@@ -2917,7 +2923,8 @@ async function pushTipToMondomatutit(tip) {
       pick:     l.pick     || "",
       odds:     l.odds     || 0,
       market:   l.market   || "1X2",
-      commence: l.commence || ""
+      commence: l.commence || "",
+      sportLabel: legLeague(l)
     })));
   }
 
@@ -2938,9 +2945,14 @@ async function pushTipToMondomatutit(tip) {
   // mert a mondomatutit ai_tips_review.html '\nLábak:\n' szeparátorral jeleníti meg őket.
   let aiNote = tip.note || "";
   if (tip.type === "combo" && Array.isArray(tip.legs) && tip.legs.length) {
-    const legsStr = tip.legs.map(l =>
-      `  • ${l.match}: ${l.pick} @ ${l.odds}` + (l.commence ? ` 🕐 ${l.commence}` : "")
-    ).join("\n");
+    // Sorformátum: "Meccs [Bajnokság]: Piac: Tipp @ odds 🕐 kezdés" – a mondomatutit ezt visszaolvassa
+    const legsStr = tip.legs.map(l => {
+      const league = legLeague(l);
+      const market = l.market || "1X2";
+      return `  • ${l.match}${league ? ` [${league}]` : ""}: `
+        + (market.toLowerCase() !== String(l.pick || "").toLowerCase() ? `${market}: ` : "")
+        + `${l.pick} @ ${l.odds}` + (l.commence ? ` 🕐 ${l.commence}` : "");
+    }).join("\n");
     aiNote = (aiNote ? aiNote + "\n\n" : "") + `Lábak:\n${legsStr}`;
   }
 
