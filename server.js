@@ -1338,10 +1338,23 @@ const huMatch = name => { const p = String(name || "").split(/\s+vs\.?\s+/i); re
   }
   if (n) { saveHistory(); console.log(`Csapatnevek magyarítva ${n} nyitott tippnél`); }
 })();
+// Klubnév-rövidítések ("Paris SG", "Atl. Madrid") → az Odds API teljes neve, hogy a párosítás megtalálja
+const CLUB_ALIASES = {
+  "paris sg": "paris saint germain", "psg": "paris saint germain", "paris st germain": "paris saint germain",
+  "atl madrid": "atletico madrid", "atletico de madrid": "atletico madrid", "atl bilbao": "athletic bilbao",
+  "man utd": "manchester united", "man united": "manchester united", "manchester utd": "manchester united",
+  "man city": "manchester city", "inter milan": "inter", "internazionale": "inter",
+  "nottm forest": "nottingham forest", "wolves": "wolverhampton wanderers", "spurs": "tottenham hotspur",
+  "gladbach": "borussia monchengladbach", "m gladbach": "borussia monchengladbach",
+};
+// Ékezetként nem bontható betűk (Tromsø, Ærø, Łódź, Kasımpaşa) átírása
+const _SPECIAL_LETTERS = { "ø": "o", "Ø": "o", "æ": "ae", "Æ": "ae", "ß": "ss", "ł": "l", "Ł": "l", "đ": "d", "Đ": "d", "ı": "i" };
 function normTeam(s) {
-  let t = (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  let t = (s || "").replace(/[øØæÆßłŁđĐı]/g, c => _SPECIAL_LETTERS[c])
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const key = t.replace(/[^a-z0-9]+/g, " ").trim();
   if (COUNTRY_ALIASES[key]) t = COUNTRY_ALIASES[key];
+  else if (CLUB_ALIASES[key]) t = CLUB_ALIASES[key];
   return t
     .replace(/\b(fc|cf|sc|afc|cd|ac|ss|ssc|as|rc|fk|sk|club|deportivo|united|city)\b/g, "")
     .replace(/[^a-z0-9]/g, "");
@@ -1372,8 +1385,31 @@ function levDist(a, b) {
 }
 function nameSim(a, b) {
   if (!a || !b) return false;
-  if (a === b || a.includes(b) || b.includes(a)) return true;
-  return levDist(a, b) <= Math.max(2, Math.floor(Math.min(a.length, b.length) * 0.25));
+  if (a === b) return true;
+  const short = Math.min(a.length, b.length);
+  if (short >= 3 && (a.includes(b) || b.includes(a))) return true;
+  // Rövid neveknél a betűhiba-tűrés téves párosítást okoz ("roma" ↔ "como"), ezért ott nincs
+  if (short < 5) return false;
+  return levDist(a, b) <= Math.max(1, Math.floor(short * 0.25));
+}
+
+// A tippekben tárolt kezdési idő ("10. 20. 21:00", "10.20 21:00" vagy ISO) → Date (budapesti idő), vagy null
+function parseHuCommence(str) {
+  const v = String(str || "");
+  const iso = v.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  if (iso) return new Date(Date.UTC(+iso[1], iso[2] - 1, +iso[3], iso[4] - 1, +iso[5]));
+  const m = v.match(/(\d{1,2})\.\s*(\d{1,2})\.?\s+(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const now = new Date();
+  // Budapest ≈ UTC+1/+2 – a párosításhoz és a napos határokhoz ez a pontosság elég
+  let d = new Date(Date.UTC(now.getUTCFullYear(), m[1] - 1, +m[2], m[3] - 1, +m[4]));
+  if (d - now > 180 * 864e5) d = new Date(Date.UTC(now.getUTCFullYear() - 1, m[1] - 1, +m[2], m[3] - 1, +m[4]));
+  return isNaN(d) ? null : d;
+}
+// A tipp kezdési ideje és a meccs kezdése (ISO) összeillik-e (±36 óra); ismeretlen időnél igen
+function sameKickoff(tipCommence, gameCommence) {
+  const a = parseHuCommence(tipCommence), b = gameCommence ? new Date(gameCommence) : null;
+  return !a || !b || isNaN(b) || Math.abs(a - b) <= 36 * 3600e3;
 }
 function fdTeamNames(t) {
   return [t?.name, t?.shortName, t?.tla].filter(Boolean).map(normTeam);
@@ -1702,7 +1738,8 @@ async function checkResults() {
         let src = "odds", ht = null;
         const reg = await regulationScore(game, fdCache);
         if (reg) { homeScore = reg.home; awayScore = reg.away; ht = reg.ht; src = `90'(${reg.status})`; }
-        completed[matchName] = { home_team: game.home_team, away_team: game.away_team, homeScore, awayScore, ht, id: game.id, src };
+        completed[matchName] = { home_team: game.home_team, away_team: game.away_team, homeScore, awayScore, ht, id: game.id, src,
+                                 commence: game.commence_time };
       }
     } catch (e) { console.error(`Scores hiba (${sportKey}):`, e.message); }
   }
@@ -1714,15 +1751,17 @@ async function checkResults() {
   // A kiértékelés mindig a valós (odds API-s) hazai/vendég csapatot használja, így a
   // fordított párosítás sem torzítja az eredményt.
   const completedList = Object.entries(completed);
-  const findByName = name => {
-    if (completed[name]) return completed[name];                     // pontos egyezés
+  // A kezdési időnek is egyeznie kell (±36 óra), hogy egy hasonló nevű másik meccs ne párosuljon
+  const findByName = (name, commence) => {
+    if (completed[name] && sameKickoff(commence, completed[name].commence)) return completed[name];  // pontos egyezés
     const parts = String(name || "").split(/\s+vs\.?\s+/i);
     if (parts.length !== 2) return null;
     const nh = normTeam(parts[0]), na = normTeam(parts[1]);
-    for (const [, g] of completedList) {                             // normalizált egyezés
+    const cands = completedList.filter(([, g]) => sameKickoff(commence, g.commence));
+    for (const [, g] of cands) {                                     // normalizált egyezés
       if (nameSim(nh, normTeam(g.home_team)) && nameSim(na, normTeam(g.away_team))) return g;
     }
-    for (const [, g] of completedList) {                             // fordított hazai/vendég
+    for (const [, g] of cands) {                                     // fordított hazai/vendég
       if (nameSim(nh, normTeam(g.away_team)) && nameSim(na, normTeam(g.home_team))) {
         console.log(`    ⇄ Fordított névsorrend: "${name}" → ${g.home_team} vs ${g.away_team}`);
         return g;
@@ -1730,12 +1769,19 @@ async function checkResults() {
     }
     return null;
   };
-  const findGame = tip => findByName(tip.match) || Object.values(completed).find(g => g.id === tip.matchId);
+  const findGame = tip => findByName(tip.match, tip.commence) || Object.values(completed).find(g => g.id === tip.matchId);
+  // Az Odds API csak az utolsó 3 nap eredményeit adja: ami ennél régebbi és még nincs lezárva,
+  // az magától már sosem záródna le → kézi kiértékelésre jelezzük
+  const tooOld = commence => { const d = parseHuCommence(commence); return !!d && Date.now() - d > 4 * 864e5; };
 
   // 2. Single tippek kiértékelése
   for (const tip of pendingSingles) {
     const g = findGame(tip);
-    if (!g) continue;
+    if (!g) {
+      if (tooOld(tip.commence) && !tip.manualNeeded && (!tip.result || tip.result === "pending"))
+        manualNeeded.push({ kind: "tip", id: tip.id, label: `${tip.match} – ${tip.pick} (nincs eredmény, 3 napnál régebbi)` });
+      continue;
+    }
     const result = settleMarket(tip.market, tip.pick, g.home_team, g.away_team, g.homeScore, g.awayScore, g.ht);
     if (!result) {
       console.log(`    ✗ ${tip.market}/${tip.pick} – nem értékelhető`);
@@ -1756,14 +1802,14 @@ async function checkResults() {
   // KORAI VESZTES: ha akár EGY láb már vesztett, a kombi matematikailag nem nyerhet → azonnal
   // "lost" (bekerül a statisztikába), a hátralévő lábakat pedig a későbbi futások töltik ki.
   for (const combo of combosToCheck) {
-    const legGames = combo.legs.map(leg => findByName(leg.match));
+    const legGames = combo.legs.map(leg => findByName(leg.match, leg.commence));
     const legResFresh = [];  // csak az aktuális futás fresh eredményei
     const legRes = combo.legs.map((leg, i) => {
       const g = legGames[i];
       // Ha a meccs kezdési ideje még nem jött el (>0 óra van hátra), ne értékeljük ki
-      if (leg.commence) {
-        const commenceHu = leg.commence.replace(/^(\d{2})\.(\d{2})\s+(\d{2}):(\d{2})$/, "2026-$1-$2T$3:$4:00");
-        const hoursUntil = (new Date(commenceHu) - Date.now()) / 3600000;
+      const kickoff = parseHuCommence(leg.commence);
+      if (kickoff) {
+        const hoursUntil = (kickoff - Date.now()) / 3600000;
         if (hoursUntil > 0.5) {
           console.log(`    Láb kihagyva (jövőbeli, ${hoursUntil.toFixed(1)}h): ${leg.match}`);
           legResFresh.push(null);
@@ -1774,14 +1820,17 @@ async function checkResults() {
       // Statisztikai piac (szöglet, lap…): csak kézzel zárható – a korábbi, gólból számolt eredmény sem számít
       const res = isStatMarket(leg.market, leg.pick) ? null : (fresh || leg.result || null);
       if (g && !res && !leg.manualNeeded) manualNeeded.push({ kind: "leg", id: combo.id, idx: i, label: `${leg.match} – ${leg.pick} (kombi láb)` });
+      if (!g && !res && !leg.manualNeeded && tooOld(leg.commence))
+        manualNeeded.push({ kind: "leg", id: combo.id, idx: i, label: `${leg.match} – ${leg.pick} (kombi láb, nincs eredmény, 3 napnál régebbi)` });
       if (res) console.log(`    Láb eredmény: ${leg.match} → ${res} (fresh:${fresh}, g:${!!g}, commence:${leg.commence})`);
       legResFresh.push(fresh);  // aktuális evaluáció eredménye
       return res;
     });
     const legs      = combo.legs.map((l, i) => ({ ...l, result: legRes[i] }));
     const legsFilled = JSON.stringify(legs) !== JSON.stringify(combo.legs);
-    // Csak akkor lost, ha az aktuális futásban megtalált meccset értékeltük ki vesztesnek
-    const anyLost   = legRes.some((r, i) => r === "lost" && legGames[i] !== null);
+    // Egy korábbi futásban már vesztesnek értékelt láb is bukott kombit jelent: az Odds API
+    // 3 nap után már nem adja vissza a meccset, de a láb eredménye ettől még érvényes
+    const anyLost   = legRes.some(r => r === "lost");
     const allKnown  = legRes.every(r => !!r);
 
     if (anyLost) {
@@ -1844,7 +1893,7 @@ async function checkResults() {
     changed = true;
     sendTelegram(`✋ <b>Kézi kiértékelés kell</b> (${manualNeeded.length})\n` +
       manualNeeded.map(m => "• " + String(m.label).replace(/&/g, "&amp;").replace(/</g, "&lt;")).join("\n") +
-      `\n\nA meccs lezárult, de ezt a piacot (pl. szöglet, lap) a rendszer nem tudja kiértékelni – állítsd be kézzel a tippek oldalon.`).catch(() => {});
+      `\n\nEzeket a rendszer nem tudja automatikusan kiértékelni (pl. szöglet/lap piac, vagy 3 napnál régebbi meccs, aminek nem jött eredmény) – állítsd be kézzel a tippek oldalon.`).catch(() => {});
   }
 
   if (changed) {
