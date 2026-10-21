@@ -1821,7 +1821,7 @@ async function checkResults() {
       }
       const fresh = g ? settleMarket(leg.market, leg.pick, g.home_team, g.away_team, g.homeScore, g.awayScore, g.ht) : null;
       // Statisztikai piac (szöglet, lap…): csak kézzel zárható – a korábbi, gólból számolt eredmény sem számít
-      const res = isStatMarket(leg.market, leg.pick) ? null : (fresh || leg.result || null);
+      const res = leg.manual ? leg.result : isStatMarket(leg.market, leg.pick) ? null : (fresh || leg.result || null);
       if (g && !res && !leg.manualNeeded) manualNeeded.push({ kind: "leg", id: combo.id, idx: i, label: `${leg.match}${when(leg, combo)} – ${leg.pick}${comboInfo(combo)}` });
       if (!g && !res && !leg.manualNeeded && tooOld(leg.commence))
         manualNeeded.push({ kind: "leg", id: combo.id, idx: i, label: `${leg.match}${when(leg, combo)} – ${leg.pick}${comboInfo(combo)} (nincs eredmény, 3 napnál régebbi)` });
@@ -2376,6 +2376,7 @@ function cleanLegs(legs, oldLegs = []) {
       sportLabel: cleanStr(l.sportLabel, 60) || "⚽",
       commence:   cleanStr(l.commence, 40) || null,
       result:     old ? (old.result ?? null) : null,
+      manual:     old ? !!old.manual : false,
       sportKey:   old ? (old.sportKey || null) : null,
       eventId:    old ? (old.eventId || null) : null,
       commenceTime: old ? (old.commenceTime || null) : null,
@@ -2388,6 +2389,17 @@ function cleanLegs(legs, oldLegs = []) {
   return out.length ? out : null;
 }
 const comboOdds = legs => parseFloat(legs.reduce((p, l) => p * l.odds, 1).toFixed(2));
+// Kombi eredménye a lábakból: bármely vesztes láb → lost; minden láb ismert → a tényleges
+// szorzó dönt (fél nyert/vesztett, visszajáró láb is); különben még nyitott (pending)
+function comboOutcome(legs) {
+  if (legs.some(l => l.result === "lost")) return { result: "lost", comboPayout: 0 };
+  if (!legs.every(l => l.result && l.result !== "pending")) return { result: "pending", comboPayout: null };
+  const payout = legs.reduce((p, l) => {
+    const o = parseFloat(l.odds) || 0;
+    return p * ({ won: o, half_won: (1 + o) / 2, push: 1, half_lost: 0.5 }[l.result] ?? 0);
+  }, 1);
+  return { result: payout > 1.0001 ? "won" : payout < 0.9999 ? "lost" : "push", comboPayout: parseFloat(payout.toFixed(2)) };
+}
 function refreshTipLists() {
   const open = t => !t.result || t.result === "pending";
   aiTips    = history.filter(t => t.type === "ai"    && open(t));
@@ -2577,6 +2589,29 @@ app.post("/api/history", (req, res) => {
   refreshTipLists();
   console.log(`[kézi tipp] ${tip.type}: ${tip.match || tip.legs.map(l => l.match).join(" + ")} @ ${tip.odds}`);
   res.json({ ok: true, tip });
+});
+
+// Egy kombi láb eredményének kézi beállítása (✅/❌/↩️/½), utána a kombi újraszámolása.
+// A kézzel beállított lábat az automatikus ellenőrzés nem írja felül.
+app.patch("/api/history/:id/legs/:idx", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const cur = history.find(t => t.id === req.params.id);
+  const idx = parseInt(req.params.idx, 10);
+  if (!cur || cur.type !== "combo" || !(cur.legs || [])[idx]) return res.status(404).json({ error: "Nincs ilyen kombi láb" });
+  const { result } = req.body || {};
+  if (!["won", "lost", "push", "half_won", "half_lost", "pending"].includes(result))
+    return res.status(400).json({ error: "Érvénytelen eredmény" });
+  const legs = cur.legs.map((l, i) => i !== idx ? l : result === "pending"
+    ? { ...l, result: null, manual: false, manualNeeded: false }
+    : { ...l, result, manual: true, manualNeeded: false });
+  const out = comboOutcome(legs);
+  const patch = { legs, ...out, settledAt: out.result === "pending" ? null : (cur.settledAt || nowHu()) };
+  const upd = t => t.id === cur.id ? { ...t, ...patch } : t;
+  history = history.map(upd); latestTips = latestTips.map(upd);
+  refreshTipLists();
+  saveHistory();
+  console.log(`Kézi láb eredmény: ${cur.id} #${idx + 1} ${legs[idx].match} → ${result} · kombi: ${out.result}${out.comboPayout != null ? ` (x${out.comboPayout})` : ""}`);
+  res.json({ ok: true, result: out.result, comboPayout: out.comboPayout });
 });
 
 app.patch("/api/history/:id", (req, res) => {

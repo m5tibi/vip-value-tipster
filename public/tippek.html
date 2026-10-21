@@ -792,7 +792,7 @@ function aiTipHTML(t, showResult) {
 function comboCardHTML(c, showResult) {
   const legIcon = r => r==="won"?"✅":r==="lost"?"❌":r==="push"?"↩️":r==="half_won"?"½✅":r==="half_lost"?"½❌":"⏳";
   // Lábanként ugyanazok az adatok, mint a single tippeknél: bajnokság, meccs, kezdés, piac + tipp, odds
-  const legs = (c.legs||[]).map(l => {
+  const legs = (c.legs||[]).map((l, i) => {
     const league = l.sportLabel && l.sportLabel.trim() !== "⚽" ? l.sportLabel : "";
     const icon = showResult ? ((l.manualNeeded && !l.result ? "✋" : legIcon(l.result||"pending")) + " ") : "";
     return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #16223d">
@@ -802,7 +802,10 @@ function comboCardHTML(c, showResult) {
          ${l.commence ? `<div style="color:#78909c;font-size:11px;margin-top:1px">🕐 ${l.commence}</div>` : ""}
          <div style="margin-top:4px">${l.market ? `<span class="tip-market">${l.market}</span>` : ""}<span class="tip-pick">${l.pick}</span></div>
        </div>
-       <span style="color:#f59e0b;font-weight:700;font-size:14px;white-space:nowrap">${l.odds}</span>
+       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+         <span style="color:#f59e0b;font-weight:700;font-size:14px;white-space:nowrap">${l.odds}</span>
+         ${isAdmin() ? legResultSelect(c.id, i, l) : ""}
+       </div>
      </div>`;
   }).join("");
   const payoutLine = (showResult && typeof c.comboPayout==="number")
@@ -831,6 +834,32 @@ function comboNoteHTML(c) {
   if (!n || /^\d+\s*lábas kötés$/i.test(n)) return "";
   const e = String(n).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
   return `<div class="tip-note" style="font-size:12px;color:#b0bec5;margin-top:6px;white-space:pre-line">💡 ${e}</div>`;
+}
+
+// Admin: egy kombi láb eredményének kézi beállítása (a kombi eredményét a szerver újraszámolja)
+const LEG_RESULTS = [["pending", "⏳ Nyitott"], ["won", "✅ Nyert"], ["lost", "❌ Vesztett"], ["push", "↩️ Visszajár"],
+                     ["half_won", "½✅ Fél nyert"], ["half_lost", "½❌ Fél vesztett"]];
+function legResultSelect(comboId, idx, leg) {
+  const cur = leg.result || "pending";
+  const opts = LEG_RESULTS.map(([v, t]) => `<option value="${v}"${v === cur ? " selected" : ""}>${t}</option>`).join("");
+  return `<select title="Láb eredménye${leg.manual ? " (kézzel beállítva)" : ""}" onchange="setLegResult('${comboId}',${idx},this.value)"
+    style="background:#0d1626;color:#cfd8dc;border:1px solid ${leg.manual ? "#f59e0b" : "#37474f"};border-radius:5px;font-size:11px;padding:2px 4px">${opts}</select>`;
+}
+async function setLegResult(id, idx, result) {
+  const r = await fetch(`/api/history/${id}/legs/${idx}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...adminHeaders() },
+    body: JSON.stringify({ result })
+  });
+  const d = await r.json().catch(() => ({}));
+  if (r.ok) {
+    const names = { won: "nyert", lost: "vesztett", push: "visszajár", pending: "nyitott" };
+    showStatus(`Láb beállítva · kombi: ${names[d.result] || d.result}${d.comboPayout ? ` (x${d.comboPayout})` : ""}`);
+    await loadHistory();
+    renderTips();
+  } else {
+    showStatus(d.error || "Hiba!", true);
+  }
 }
 
 function comboResultBtns(c) {
