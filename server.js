@@ -1773,19 +1773,22 @@ async function checkResults() {
   // Az Odds API csak az utolsó 3 nap eredményeit adja: ami ennél régebbi és még nincs lezárva,
   // az magától már sosem záródna le → kézi kiértékelésre jelezzük
   const tooOld = commence => { const d = parseHuCommence(commence); return !!d && Date.now() - d > 4 * 864e5; };
+  // A kézi értesítőben a meccs kezdése (vagy ha nincs, a tipp felvétele) – így könnyű megtalálni a tippek oldalon
+  const when = (t, fallback) => t.commence ? ` 🕐 ${t.commence}` : (fallback && fallback.addedAt ? ` (felvéve: ${fallback.addedAt})` : "");
+  const comboInfo = c => ` – ${c.legN || (c.legs || []).length} lábas kombi, össz odds ${c.odds}`;
 
   // 2. Single tippek kiértékelése
   for (const tip of pendingSingles) {
     const g = findGame(tip);
     if (!g) {
       if (tooOld(tip.commence) && !tip.manualNeeded && (!tip.result || tip.result === "pending"))
-        manualNeeded.push({ kind: "tip", id: tip.id, label: `${tip.match} – ${tip.pick} (nincs eredmény, 3 napnál régebbi)` });
+        manualNeeded.push({ kind: "tip", id: tip.id, label: `${tip.match}${when(tip, tip)} – ${tip.pick} (nincs eredmény, 3 napnál régebbi)` });
       continue;
     }
     const result = settleMarket(tip.market, tip.pick, g.home_team, g.away_team, g.homeScore, g.awayScore, g.ht);
     if (!result) {
       console.log(`    ✗ ${tip.market}/${tip.pick} – nem értékelhető`);
-      if (!tip.manualNeeded && (!tip.result || tip.result === "pending")) manualNeeded.push({ kind: "tip", id: tip.id, label: `${tip.match} – ${tip.pick}` });
+      if (!tip.manualNeeded && (!tip.result || tip.result === "pending")) manualNeeded.push({ kind: "tip", id: tip.id, label: `${tip.match}${when(tip, tip)} – ${tip.pick}` });
       continue;
     }
     if (tip.result === result && tip.homeScore != null) continue;
@@ -1819,9 +1822,9 @@ async function checkResults() {
       const fresh = g ? settleMarket(leg.market, leg.pick, g.home_team, g.away_team, g.homeScore, g.awayScore, g.ht) : null;
       // Statisztikai piac (szöglet, lap…): csak kézzel zárható – a korábbi, gólból számolt eredmény sem számít
       const res = isStatMarket(leg.market, leg.pick) ? null : (fresh || leg.result || null);
-      if (g && !res && !leg.manualNeeded) manualNeeded.push({ kind: "leg", id: combo.id, idx: i, label: `${leg.match} – ${leg.pick} (kombi láb)` });
+      if (g && !res && !leg.manualNeeded) manualNeeded.push({ kind: "leg", id: combo.id, idx: i, label: `${leg.match}${when(leg, combo)} – ${leg.pick}${comboInfo(combo)}` });
       if (!g && !res && !leg.manualNeeded && tooOld(leg.commence))
-        manualNeeded.push({ kind: "leg", id: combo.id, idx: i, label: `${leg.match} – ${leg.pick} (kombi láb, nincs eredmény, 3 napnál régebbi)` });
+        manualNeeded.push({ kind: "leg", id: combo.id, idx: i, label: `${leg.match}${when(leg, combo)} – ${leg.pick}${comboInfo(combo)} (nincs eredmény, 3 napnál régebbi)` });
       if (res) console.log(`    Láb eredmény: ${leg.match} → ${res} (fresh:${fresh}, g:${!!g}, commence:${leg.commence})`);
       legResFresh.push(fresh);  // aktuális evaluáció eredménye
       return res;
