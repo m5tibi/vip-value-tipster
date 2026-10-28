@@ -11,6 +11,7 @@ const auth    = require("./auth");
 const mailer  = require("./mailer");
 const trial   = require("./lib/trial");
 const mailQuota = require("./lib/mailQuota");
+const { parseLenient } = require("./lib/jsonRepair");
 const { BASE_URL, TG_PUBLIC_LINK } = require("./lib/config");
 
 const app = express();
@@ -831,6 +832,7 @@ NYELV – MINDEN MEZŐT MAGYARUL ADJ MEG:
   * "Handicap" → "Hendikep"
   * "Home Win" → "Hazai győzelem" | "Away Win" → "Vendég győzelem" | "Draw" → "Döntetlen"
 - A "note" indoklást természetesen magyarul írd.
+- A szöveges mezőkben (note, kockazat) NE használj egyenes idézőjelet ("), mert az elrontja a JSON-t – ha idézni vagy becenevet írni szeretnél, használj „magyar” idézőjelet.
 
 KÉT dolgot adj – MINDKETTŐ KÖTELEZŐ:
 
@@ -911,11 +913,15 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       console.log("AI: nem sikerült JSON-t kinyerni. Válasz eleje:\n" + text.slice(0, 500));
       return { singles: [], comboLegs: [], error: "az AI válaszából nem sikerült tippeket kiolvasni" };
     }
-    let obj;
-    try { obj = JSON.parse(jsonStr); } catch(e) {
-      console.log("AI: JSON parse hiba –", e.message, "\nPróbált JSON eleje:\n" + jsonStr.slice(0, 400));
+    // Szabálytalan JSON (pl. idézőjel az indoklásban) → javítás, mielőtt a teljes futást eldobnánk
+    const parsed = parseLenient(jsonStr);
+    if (parsed.error) {
+      console.log("AI: JSON parse hiba (javítás után is) –", parsed.error, "\nPróbált JSON eleje:\n" + jsonStr.slice(0, 400));
+      try { fs.writeFileSync(path.join(DATA_DIR, "ai_last_bad_response.txt"), text); console.log("AI: a nyers válasz mentve: ai_last_bad_response.txt"); } catch (e) {}
       return { singles: [], comboLegs: [], error: "az AI válasza hibás JSON volt" };
     }
+    if (parsed.repaired) console.log("AI: a válasz JSON-ja szabálytalan volt (pl. idézőjel a szövegben) – automatikusan javítva");
+    const obj = parsed.obj;
     // A valós kezdési idő a meccslistából (odds API), nem az AI adatából
     const realCommence = name => findMatchEntry(matchList, name)?.commence || null;
     // Market mező automatikus kitöltése ha az AI kihagyta
