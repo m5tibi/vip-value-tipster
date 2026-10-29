@@ -1734,7 +1734,11 @@ async function checkResults() {
   for (const sportKey of sportsToCheck) {
     try {
       const r = await fetch(`https://api.the-odds-api.com/v4/sports/${sportKey}/scores/?apiKey=${ODDS_API_KEY}&daysFrom=3`);
-      if (!r.ok) continue;
+      if (!r.ok) {
+        // Pl. ismeretlen ligakulcs: enélkül a liga tippjei csendben sosem záródnának le
+        console.log(`  Scores API hiba (${sportKey}): HTTP ${r.status} ${(await r.text().catch(() => "")).slice(0, 120)}`);
+        continue;
+      }
       const games = await r.json();
       for (const game of games) {
         if (!game.completed || !game.scores) continue;
