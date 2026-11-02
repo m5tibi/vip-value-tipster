@@ -2058,40 +2058,20 @@ setTimeout(processTrialMail, 60 * 1000);
 
 // ── Napnyitó: 00:03 automatikus eredmény-ellenőrzés, 00:05 napi statisztika Telegramra
 //    (magyar idő). Tipptartalom NEM megy ki automatikusan – az csak jóváhagyás után, kézzel. ──
-let _lastCheckDay = "", _lastStatsDay = "";
+let _lastCheckDay = "", _lastStatsDay = "", _lastWeeklyDay = "";
 setInterval(async () => {
   const { hour, minute } = getHungarianTime();
   const dayKey = todayHU();                       // naponta egyszer, dupla lefutás ellen
   if (hour === 0 && minute === 1 && _lastCheckDay !== dayKey) {
     checkExpiredSubscriptions();
   }
-  // Heti összefoglaló: minden hétfőn 08:00-kor
-  if (hour === 8 && minute === 0 && new Date().getDay() === 1) {
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const weekTips = history.filter(t =>
-      t.type !== "combo" && t.result && t.result !== "pending" &&
-      t.settledAt && new Date(t.settledAt) >= weekAgo
-    );
-    if (weekTips.length) {
-      const won = weekTips.filter(t => t.result === "won").length;
-      const lost = weekTips.filter(t => t.result === "lost").length;
-      const halfWon = weekTips.filter(t => t.result === "half_won").length;
-      const halfLost = weekTips.filter(t => t.result === "half_lost").length;
-      const push = weekTips.filter(t => t.result === "push").length;
-      const decN = won + lost + halfWon + halfLost;
-      const winRate = decN ? (((won + halfWon * 0.5) / decN) * 100).toFixed(1) : "0";
-      const profit = weekTips.reduce((s, t) => {
-        const o = parseFloat(t.odds) || 1;
-        if (t.result === "won") return s + (o - 1);
-        if (t.result === "lost") return s - 1;
-        if (t.result === "half_won") return s + (o - 1) / 2;
-        if (t.result === "half_lost") return s - 0.5;
-        return s;
-      }, 0);
-      const roi = weekTips.length ? ((profit / weekTips.length) * 100).toFixed(1) : "0";
-      const stats = { won, lost, push, halfWon, halfLost, profit, roi, winRate, settled: weekTips.length };
+  // Heti összefoglaló: minden hétfőn 08:00-kor (az előző hétfő–vasárnap meccsei, lásd weeklyStats)
+  if (hour === 8 && minute === 0 && new Date().getDay() === 1 && _lastWeeklyDay !== dayKey) {
+    _lastWeeklyDay = dayKey;
+    const stats = weeklyStats();
+    if (stats.total.settled) {
       const adminUsers = usersDb.all().filter(u => u.isAdmin && u.emailVerified !== false);
-      console.log(`Heti összefoglaló e-mail: ${adminUsers.length} admin felhasználónak`);
+      console.log(`Heti összefoglaló e-mail (${stats.from} – ${stats.to}, ${stats.total.settled} tipp): ${adminUsers.length} admin felhasználónak`);
       for (const u of adminUsers) {
         mailer.sendWeeklySummary(u.email, stats).catch(e => console.error(`Heti email hiba (${u.email}):`, e.message));
       }
@@ -2339,6 +2319,62 @@ function statProfit(t) {
   if (t.result === "half_lost") return -0.5;
   return 0;
 }
+
+// ── Statisztika a statisztika oldal szabályaival (stats-common.js) ──
+// A tipp napja a MECCS dátuma (kombinál az utolsó lábé); a "commence" év nélküli (HH. NN. óó:pp),
+// az évet a felvétel dátumából vesszük (évfordulón átnyúló meccsnél korrigálva).
+function statAddedDayS(t) {
+  const s = String(t.addedAt || ""), p = n => String(n).padStart(2, "0");
+  const hu = s.match(/^(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/);
+  if (hu) return `${hu[1]}-${p(hu[2])}-${p(hu[3])}`;
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const d = new Date(s);
+  return s && !isNaN(d) ? `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` : null;
+}
+function statCommenceDayS(commence, addedDay) {
+  const cm = String(commence || "").match(/^(\d{1,2})\.\s*(\d{1,2})/);
+  if (!cm) return null;
+  const mo = +cm[1], dy = +cm[2];
+  if (mo < 1 || mo > 12 || dy < 1 || dy > 31) return null;
+  let year = addedDay ? +addedDay.slice(0, 4) : new Date().getFullYear();
+  const addedMo = addedDay ? +addedDay.slice(5, 7) : mo;
+  if (mo < addedMo - 6) year++; else if (mo > addedMo + 6) year--;
+  return `${year}-${String(mo).padStart(2, "0")}-${String(dy).padStart(2, "0")}`;
+}
+function statTipDayS(t) {
+  const added = statAddedDayS(t);
+  let day = null;
+  if (t.type === "combo" && Array.isArray(t.legs)) t.legs.forEach(l => { const d = statCommenceDayS(l.commence, added); if (d && (!day || d > day)) day = d; });
+  return day || statCommenceDayS(t.commence, added) || added;
+}
+const isFreeStatTip = t => t.type === "free" || (t.type === "combo" && !!t.free);
+// Összesítés pontosan úgy, mint a /api/public-stats és a statisztika oldal
+function summarizeTips(H) {
+  const won = H.filter(t => t.result === "won").length, lost = H.filter(t => t.result === "lost").length;
+  const halfWon = H.filter(t => t.result === "half_won").length, halfLost = H.filter(t => t.result === "half_lost").length;
+  const push = H.filter(t => t.result === "push").length, settled = H.length;
+  const decN = won + lost + halfWon + halfLost;
+  const profit = Math.round(H.reduce((a, t) => a + statProfit(t), 0) * 100) / 100;
+  return { settled, won, lost, halfWon, halfLost, push, profit,
+           winRate: decN ? +(((won + halfWon * 0.5) / decN) * 100).toFixed(1) : null,
+           roi: settled ? +((profit / settled) * 100).toFixed(1) : null };
+}
+// Heti összefoglaló: az előző 7 nap (pl. hétfőn: előző hétfő–vasárnap) MECCSEI, csak publikált,
+// lezárt tippek (isStatTip) – összesen, VIP és Free bontásban. A még nyitott tippek száma külön.
+function weeklyStats(now = new Date()) {
+  const huDay = d => d.toLocaleDateString("sv-SE", { timeZone: "Europe/Budapest" });
+  const from = huDay(new Date(now.getTime() - 7 * 86400000)), to = huDay(new Date(now.getTime() - 86400000));
+  const inWeek = t => { const d = statTipDayS(t); return d && d >= from && d <= to; };
+  const H = history.filter(t => isStatTip(t) && inWeek(t));
+  const open = history.filter(t => isApproved(t) && t.type !== "value" && (!t.result || t.result === "pending") && inWeek(t)).length;
+  return { from, to, total: summarizeTips(H), vip: summarizeTips(H.filter(t => !isFreeStatTip(t))),
+           free: summarizeTips(H.filter(isFreeStatTip)), open };
+}
+app.get("/api/admin/weekly-summary", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json(weeklyStats());
+});
 
 app.get("/api/public-stats", (req, res) => {
   const H = history.filter(isStatTip);

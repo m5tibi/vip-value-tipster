@@ -228,35 +228,44 @@ async function sendNewTips(to, tips, combos, frees = [], opts = {}) {
 }
 
 // ── Heti összefoglaló ─────────────────────────────────────────
+// stats: weeklyStats() (server.js) – { from, to, total, vip, free, open }; mindegyik a statisztika
+// oldal szabályaival (publikált, lezárt tippek, a meccs dátuma szerint).
 async function sendWeeklySummary(to, stats) {
-  const { won, lost, push, halfWon, halfLost, profit, roi, winRate, settled } = stats;
-  const profitStr = (profit >= 0 ? "+" : "") + profit.toFixed(2);
-  const profitColor = profit >= 0 ? "#00e676" : "#ef4444";
+  const { total: T, vip, free } = stats;
+  const sg = x => (x >= 0 ? "+" : "") + x.toFixed(2);
+  const col = x => x >= 0 ? "#00e676" : "#ef4444";
+  const hd = d => new Date(d + "T12:00:00Z").toLocaleDateString("hu-HU", { month: "short", day: "numeric" });
+  const range = `${hd(stats.from)} – ${hd(stats.to)}`;
+  const tile = (val, label, color = "#fff") => `<div style="background:#07111d;border-radius:8px;padding:14px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:${color}">${val}</div>
+          <div style="font-size:11px;color:#546e7a;margin-top:4px">${label}</div></div>`;
+  const row = (name, x) => x.settled
+    ? `<tr><td style="padding:6px 8px;color:#cfd8dc">${name}</td><td style="padding:6px 8px;text-align:center">${x.settled}</td>
+         <td style="padding:6px 8px;text-align:center">${x.won} / ${x.lost}</td>
+         <td style="padding:6px 8px;text-align:right;color:${col(x.profit)};font-weight:700">${sg(x.profit)}</td>
+         <td style="padding:6px 8px;text-align:right;color:${col(x.profit)}">${x.roi >= 0 ? "+" : ""}${x.roi}%</td></tr>`
+    : `<tr><td style="padding:6px 8px;color:#cfd8dc">${name}</td><td colspan="4" style="padding:6px 8px;color:#546e7a">nem volt lezárt tipp</td></tr>`;
   return send({
     to,
-    subject: `📊 Heti összefoglaló – 90perc.hu`,
-    text: `Heti eredmények:\nLezárt tippek: ${settled}\nNyert: ${won} | Vesztett: ${lost}\nProfit: ${profitStr} egység | ROI: ${roi}%`,
+    subject: `📊 Heti összefoglaló (${range}) – 90perc.hu`,
+    text: `Heti eredmények (${range}, a meccsek dátuma szerint):\nLezárt tippek: ${T.settled} (${T.won} nyert, ${T.lost} vesztett)\n` +
+      `Profit: ${sg(T.profit)} egység | ROI: ${T.roi}% | Nyerési arány: ${T.winRate ?? "–"}%\n` +
+      `VIP: ${vip.settled} tipp, ${sg(vip.profit)} egység · Free: ${free.settled} tipp, ${sg(free.profit)} egység`,
     html: shell("Heti összefoglaló", `
-      <p style="color:#78909c;margin:0 0 14px">Az elmúlt 7 nap tippjeinek összesítése:</p>
+      <p style="color:#78909c;margin:0 0 14px">${range} meccsei – a publikált, lezárt tippek (single, kombi és free), ugyanazzal a számítással, mint a <a href="https://90perc.hu/statisztika.html" style="color:#80cbc4">statisztika oldalon</a>:</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0">
-        <div style="background:#07111d;border-radius:8px;padding:14px;text-align:center">
-          <div style="font-size:28px;font-weight:700;color:#fff">${settled}</div>
-          <div style="font-size:11px;color:#546e7a;margin-top:4px">Lezárt tipp</div>
-        </div>
-        <div style="background:#07111d;border-radius:8px;padding:14px;text-align:center">
-          <div style="font-size:28px;font-weight:700;color:#00e676">${winRate}%</div>
-          <div style="font-size:11px;color:#546e7a;margin-top:4px">Nyerési arány</div>
-        </div>
-        <div style="background:#07111d;border-radius:8px;padding:14px;text-align:center">
-          <div style="font-size:28px;font-weight:700;color:${profitColor}">${profitStr}</div>
-          <div style="font-size:11px;color:#546e7a;margin-top:4px">Egységnyi profit</div>
-        </div>
-        <div style="background:#07111d;border-radius:8px;padding:14px;text-align:center">
-          <div style="font-size:28px;font-weight:700;color:${profitColor}">${(roi >= 0 ? "+" : "") + roi}%</div>
-          <div style="font-size:11px;color:#546e7a;margin-top:4px">ROI</div>
-        </div>
+        ${tile(T.settled, "Lezárt tipp")}
+        ${tile((T.winRate ?? "–") + "%", "Nyerési arány", "#00e676")}
+        ${tile(sg(T.profit), "Egységnyi profit", col(T.profit))}
+        ${tile((T.roi >= 0 ? "+" : "") + T.roi + "%", "ROI", col(T.profit))}
       </div>
-      <p style="color:#546e7a;font-size:12px;margin:8px 0">${won} nyert · ${lost} vesztett · ${(halfWon||0)+(halfLost||0)} fél · ${push||0} visszajár</p>
+      <p style="color:#546e7a;font-size:12px;margin:8px 0">${T.won} nyert · ${T.lost} vesztett · ${T.halfWon + T.halfLost} fél · ${T.push} visszajár${stats.open ? ` · ${stats.open} tipp még nyitott (nincs benne)` : ""}</p>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;color:#b0bec5;margin:10px 0">
+        <tr style="color:#546e7a;font-size:11px"><td style="padding:4px 8px"></td><td style="padding:4px 8px;text-align:center">Tipp</td>
+          <td style="padding:4px 8px;text-align:center">Nyert / veszt.</td><td style="padding:4px 8px;text-align:right">Profit</td><td style="padding:4px 8px;text-align:right">ROI</td></tr>
+        ${row("💎 VIP", vip)}
+        ${row("🆓 Free", free)}
+      </table>
       ${button("https://90perc.hu/statisztika.html", "📊 Teljes track record")}
     `),
   });
