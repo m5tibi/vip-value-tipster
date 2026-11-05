@@ -729,7 +729,9 @@ function adminValueBox(t) {
       ? chip(`piaci EV: +${e(v.marketEv)}%`, "#123a24", "#69f0ae")
       : `<span>piaci EV: ${e(v.marketEv)}%</span>`);
     if (v.modelProb  != null) parts.push(`<span>modell: ${e(v.modelProb)}%</span>`);
+    if (v.minOdds != null) parts.push(`<span>min. TMP odds: <b>${e(v.minOdds)}</b></span>`);
     if (v.freeOnly) parts.push(chip(`FREE-only (eltérés ${e(v.gap)} pp)`, "#4a3a12", "#ffcc80"));
+    else if (v.cupFavBlock) parts.push(chip("kupás hazai favorit 1,90 alatt – nem VIP", "#4a3a12", "#ffcc80"));
     else if (v.vipOk) parts.push(chip("VIP-ok", "#123a24", "#69f0ae"));
     // Az AI saját becslése – tájékoztató, a VIP-ok címke nem épül rá
     if (v.aiProb != null) parts.push(`<span>AI-becslés: ${e(v.aiProb)}% (EV ${v.aiEv > 0 ? "+" : ""}${e(v.aiEv)}%)</span>`);
