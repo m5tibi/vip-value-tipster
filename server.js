@@ -630,6 +630,18 @@ const FREE_ONLY_GAP   = 10;  // modell és piac eltérése (százalékpont), e f
 const MODEL_WEIGHT    = 0.5; // az EV-hez a modell és a piac keveréke (a modell kis mintán túl magabiztos)
 const AI_SUSPECT_GAP  = 10;  // az AI saját esélybecslése ennyi százalékpontnál jobban eltér a piactól → gyanús
 const VIP_MIN_EV      = 3;   // legalább ennyi % EV kell a VIP-hez
+// Kupameccsen (BL/EL/KL, nemzeti kupák) a hazai favorit győzelme a tapasztalatok szerint
+// rendszeresen elbukott 1,90 alatti oddson (Porto–PSV, Fener–Slavia, Bodø–Lille) – ott nem VIP.
+const CUP_HOME_FAV_MIN_ODDS = 1.90;
+const CUP_RE = /(^|[^a-z])(BL|EL|KL)([^a-z]|$)|bajnokok lig|európa-lig|europa lig|konferencia|champions|conference|selejtező|kupa|pokal|\bcup\b|copa|coupe|coppa|taça|taca|beker|libertadores|sudamericana/i;
+function isCupLabel(label) { return CUP_RE.test(String(label || "").replace(/^⚽\s*/, "")); }
+// Hazai 1X2 győzelemre szól-e a tipp
+function isHomeWinPick(t) {
+  const c = canonPick(t.market, t.pick);
+  if (c.kind !== "1x2" || c.team === "draw") return false;
+  const home = normTeam(String(t.match || "").split(/\s+vs\.?\s+/i)[0]);
+  return !!home && nameSim(c.team, home);
+}
 function tipValuation(t) {
   if (t.type === "combo") return null;
   const odds = parseFloat(t.odds);
@@ -647,11 +659,16 @@ function tipValuation(t) {
   // Az AI saját becslése: csak tájékoztató (a VIP-ok címke nem épül rá), de a nagy piaci eltérés gyanús
   const ai       = t.aiProb != null ? t.aiProb : null;
   const aiGap    = ai != null && market != null ? pct(Math.abs(ai - market)) : null;
+  // Kupás hazai favorit 1,90 alatt: nem lehet VIP (lásd CUP_HOME_FAV_MIN_ODDS)
+  const cupFavBlock = isCupLabel(t.sportLabel) && isHomeWinPick(t) && tmpOdds < CUP_HOME_FAV_MIN_ODDS;
+  // Minimális elfogadható TippmixPro-odds: ennél kevesebb oddson a tipp negatív várható értékű
+  const refProb  = blend != null ? blend : market;
+  const minOdds  = refProb > 0 ? Math.round(100 / refProb) / 100 : null;
   return {
     tmpOdds, estimated: !t.oddsManual,
     marketProb: market != null ? pct(market) : null, modelProb: model != null ? pct(model) : null,
-    blendProb: blend != null ? pct(blend) : null,
-    ev, marketEv, gap, freeOnly, vipOk: ev == null ? null : (ev >= VIP_MIN_EV && !freeOnly),
+    blendProb: blend != null ? pct(blend) : null, minOdds, cupFavBlock,
+    ev, marketEv, gap, freeOnly, vipOk: ev == null ? null : (ev >= VIP_MIN_EV && !freeOnly && !cupFavBlock),
     aiProb: ai != null ? pct(ai) : null, aiEv: ai != null ? pct(ai * tmpOdds - 1) : null,
     aiGap, aiSuspicious: aiGap != null && aiGap > AI_SUSPECT_GAP,
   };
@@ -683,6 +700,25 @@ function noteWarnings(note, now = new Date()) {
   }
   return out;
 }
+// Az indoklás valóban erről a meccsről szól-e: legalább az egyik csapat neve szerepeljen benne,
+// és ne egy másik meccs mindkét csapata (másolt indoklás, pl. Levante–Athletic adat a Lille-tippben).
+// Visszatér: { ownMentioned, otherMatch }
+function noteMatchCheck(note, match, matchList = []) {
+  const txt = " " + teamTokens(note).join(" ") + " ";
+  const toksOf = name => teamTokens(name).filter(x => x.length >= 4);
+  const has = name => { const toks = toksOf(name); return toks.length > 0 && toks.some(x => txt.includes(" " + x)); };
+  const [h, a] = String(match || "").split(/\s+vs\.?\s+/i);
+  // Ha a csapatnevekből nincs értelmezhető (4+ betűs) szó (pl. "PSV"), nem tudjuk ellenőrizni → elfogadjuk
+  const checkable = toksOf(h).length + toksOf(a).length > 0;
+  const ownMentioned = !checkable || has(h) || has(a) || has(huTeam(h || "")) || has(huTeam(a || ""));
+  let otherMatch = null;
+  for (const m of matchList) {
+    if (!m.match || findMatchEntry([{ match: m.match }], match)) continue;
+    const [oh, oa] = String(m.match).split(/\s+vs\.?\s+/i);
+    if (has(oh) && has(oa) && !has(h) && !has(a)) { otherMatch = m.match; break; }
+  }
+  return { ownMentioned, otherMatch };
+}
 function publicTip(t) {
   const out = { ...t };
   INTERNAL_TIP_FIELDS.forEach(k => delete out[k]);
@@ -711,6 +747,7 @@ function compactOdds(odds) {
       if (![1.5, 2.5, 3.5].includes(line)) continue;
       key = "Gólszám";
     } else if (/^Hendikep /.test(o.market)) {
+      if (!ALLOW_HANDICAP) continue;                  // hendikepet nem adunk ki → az AI nem is látja
       const pt = parseFloat(o.market.replace("Hendikep ", ""));
       if (Math.abs(pt) > 2.5 || Math.round(pt * 2) !== pt * 2) continue;
       key = "Hendikep";
@@ -770,6 +807,20 @@ async function addExtraMarkets(list) {
     (out.quotaLeft != null ? ` · Odds API maradék kredit: ${out.quotaLeft}` : "") +
     (out.errors.length ? ` · hibák: ${out.errors.slice(0, 3).join(" | ")}` : ""));
   return out;
+}
+
+// A tapasztalatok alapján kiszűrt single piacok (2026 ősz, ~75 single kiértékelése):
+// hendikep 1/5, csapat gólszáma 0/2 – és döntetlent nem adunk ki. ALLOW_HANDICAP=true visszakapcsolja a hendikepet.
+const ALLOW_HANDICAP  = /^(1|true|igen)$/i.test(process.env.ALLOW_HANDICAP || "");
+const DROP_AI_SUSPECT = !/^(0|false|nem)$/i.test(process.env.DROP_AI_SUSPECT || "");
+function singleMarketOk(t) {
+  const c = canonPick(t.market, t.pick);
+  let why = null;
+  if (c.kind === "hcp" && !ALLOW_HANDICAP) why = "hendikep";
+  else if (/^team_/.test(c.kind)) why = "csapat gólszáma";
+  else if (c.kind === "1x2" && c.team === "draw") why = "döntetlen";
+  if (why) console.log(`Single kiszűrve (${why} – a tapasztalatok alapján nem adunk ki ilyet): ${t.match} – ${t.market} ${t.pick}`);
+  return !why;
 }
 
 async function fetchAiTips(matchList, alreadyTipped = [], poissonEdge = new Map(), rejected = []) {
@@ -836,22 +887,24 @@ NYELV – MINDEN MEZŐT MAGYARUL ADJ MEG:
 
 KÉT dolgot adj – MINDKETTŐ KÖTELEZŐ:
 
-1) "tippek": 6-8 ERŐS single tipp (két platform számára – minimum 6, ha van elég meccs!).
+1) "tippek": 4-6 ERŐS single tipp (minimum 4, ha van elég meccs – inkább kevesebb, de megalapozott tipp, mint erőltetett).
    - MECCSENKÉNT LEGFELJEBB 1 single tipp – a legerősebb piacot válaszd az adott meccsre.
    - CSAK olyan single tippet adj, amelynek a fenti listában szereplő oddsa legalább ${(MIN_SINGLE_ODDS / TMP_FACTOR).toFixed(2)} (a TippmixPro kb. ${Math.round((1 - TMP_FACTOR) * 100)}%-kal kevesebbet fizet, így ott is meglegyen a ${MIN_SINGLE_ODDS}) – az ennél alacsonyabb oddsú kimenetet NE tedd single tippnek (a nagyon alacsony oddsúak a kombi lábak közé valók).
    - Lehetőleg KÜLÖNBÖZŐ meccsekről legyenek – minél több meccs, annál jobb.
-   - PIACVÁLTOZATOSSÁG: ne csak győzelmet adj! Választhatsz: 1X2, hendikep, Over, BTTS-Igen (mindkét csapat szerez gólt), és ahol a "Valós odds" sorban szerepel: csapat gólszáma ("Csapat gól"), 1. félidő gólszáma ("1. félidő gól"). A legértékesebb piacot válaszd az adott meccsre.
-   - Csapat gólszámánál a csapat támadójátékát és az ellenfél védekezését (lőtt/kapott gólok, gól nélküli meccsek aránya) támaszd alá; 1. félidős gólszámnál a félidős eredményeket / az első félidei gólok arányát.
-   - PIACI SORREND (a tapasztalatok alapján): előnyben a győzelem (1X2), a hendikep, az Over és a BTTS-Igen.
-   - KERÜLD: a döntetlent (1X2 "Döntetlen" – túl nagy a szórás), és az ázsiai -0.5 hendikepet, ha ugyanaz a kimenet 1X2-ben is elérhető (az ugyanaz a fogadás).
-   - FAVORIT GYŐZELMÉRE (1X2 vagy mínuszos hendikep) csak akkor tippelj, ha az ellenfél az utolsó 5 meccséből LEGFELJEBB 1-et nyert. Jó formában lévő ellenfél ellen inkább más piacot válassz, vagy hagyd ki a meccset.
+   - PIACVÁLTOZATOSSÁG: ne csak győzelmet adj! Választhatsz: 1X2 (hazai vagy vendég győzelem), Over (gólszám) és BTTS-Igen (mindkét csapat szerez gólt), ahol szerepel, 1. félidő gólszáma ("1. félidő gól"). A legértékesebb piacot válaszd az adott meccsre.
+   - TILOS single tippnek (a tapasztalatok alapján rendre veszítettek, a rendszer eldobja): HENDIKEP (sima és ázsiai, mínuszos és pluszos is), CSAPAT GÓLSZÁMA ("Csapat gól"), DÖNTETLEN.
+   - 1. félidős gólszámnál a félidős eredményeket / az első félidei gólok arányát támaszd alá.
+   - PIACI SORREND (a tapasztalatok alapján): előnyben a HAZAI favorit győzelme bajnokiban, az Over és a BTTS-Igen.
+   - OVER 2,5 / 3,5 és BTTS-Igen CSAK akkor, ha MINDKÉT csapat gólveszélyes: mindkettő legalább ~1 gólt szerez meccsenként (lásd a Tabella/Forma sor Lőtt adatát). Ha az egyik csapat meccsenként 1 gól alatt szerez, ne adj rá Overt/BTTS-t.
+   - FAVORIT GYŐZELMÉRE (1X2) csak akkor tippelj, ha az ellenfél az utolsó 5 meccséből LEGFELJEBB 1-et nyert. Jó formában lévő ellenfél ellen inkább más piacot válassz, vagy hagyd ki a meccset.
+   - KUPAMECCSEN (BL, EL, KL, nemzeti kupák) a hazai favorit győzelmét csak akkor válaszd, ha az oddsa legalább ${(CUP_HOME_FAV_MIN_ODDS / TMP_FACTOR).toFixed(2)} – az ennél rövidebb kupás hazai favoritok a tapasztalat szerint gyakran nem nyertek (rotáció, döntetlen). Idegenbeli kupafavoritot 1,90 alatti oddson ne adj.
 
 2) "kombi_labak": 4-8 BIZTONSÁGOS, alacsony kockázatú láb kombi szelvényekhez.
    - MINDEGYIK láb MÁS meccsről legyen – használj annyi különböző meccset, amennyi elérhető (legalább 2, hogy összeálljon egy kötés; ha van elég meccs, adj 6-8 lábat, hogy több, NEM átfedő kötés is kijöjjön).
    - Ezek külön-külön NEM elég értékesek single tippnek, de kombinálva értékes össz oddsot adnak.
-   - Magas valószínűségű kimenetelek: erős favorit győzelme, Over 1.5, Over 0.5 (1. félidő), hendikep -1 / -1.5 nagy favoritnál stb.
-   - PIACVÁLTOZATOSSÁG: kombi lábak lehetnek Over 1.5, BTTS, hendikep – ne csak győzelmek!
-   - +1 / +1.5 hendikep lábat csak kivételesen adj (ezek ára jellemzően nem éri meg).
+   - Magas valószínűségű kimenetelek: ELSŐSORBAN GÓLOS LÁBAK (Over 1.5 / Over 2.5 két gólerős csapat meccsén, BTTS-Igen, Over 0.5 az 1. félidőben), MÁSODSORBAN erős HAZAI favorit győzelme bajnokiban, gyenge formájú ellenféllel szemben.
+   - TILOS kombi lábnak: bármilyen hendikep (ázsiai 0, +0.5, -1 stb.) – a rendszer eldobja. Idegenbeli favorit győzelmét és kupameccs favoritját csak kivételesen add.
+   - Kerüld a késő éjszakai (budapesti idő szerint 00:00–06:00 között kezdődő) meccseket, ha van más választás.
    - A kombi lábak ne a "tippek" (single) között szereplő meccsekről legyenek.
    - KÖTELEZŐ ODDS SZABÁLYOK – ezeket a rendszer szerver oldalon is ellenőrzi:
      * Egy láb odds: MINIMUM 1.20, MAXIMUM 1.60 – ezen kívüli lábak automatikusan kiszűrődnek!
@@ -990,7 +1043,21 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
     const singles = singlesAll
       .filter(t => inList(t.match, "Single tipp"))
       .filter(t => pickOk(t, "Single tipp"))
+      .filter(t => singleMarketOk(t))
+      .filter(t => {
+        const chk = noteMatchCheck(t.note, t.match, matchList);
+        // Becenevek ("a Viola", "a Gunners") miatt ez csak figyelmeztetés, nem kiszűrés
+        if (!chk.ownMentioned) t.warnings = [...(t.warnings || []), "az indoklásban egyik csapat neve sem szerepel – ellenőrizd, hogy erről a meccsről szól-e"];
+        if (chk.otherMatch) { console.log(`Single kiszűrve (az indoklás egy másik meccs adatait tartalmazza: ${chk.otherMatch}): ${t.match}`); return false; }
+        return true;
+      })
       .map(t => ({ ...t, valuation: tipValuation(t) }))
+      // Az AI saját esélye nagyon eltér a piactól → a tapasztalat szerint ezek a tippek megbízhatatlanok
+      .filter(t => {
+        if (!DROP_AI_SUSPECT || !t.valuation?.aiSuspicious) return true;
+        console.log(`Single kiszűrve (gyanús: AI vs piac ${t.valuation.aiGap} pp): ${t.match} – ${t.pick}`);
+        return false;
+      })
       // Minimum odds a becsült TippmixPro-oddsra (piaci legjobb × TMP_FACTOR) – ott fogadunk
       .filter(t => {
         const tmp = Math.round((parseFloat(t.odds) || 0) * TMP_FACTOR * 100) / 100;
@@ -1007,6 +1074,7 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
       if (!l.match || !l.market || !l.pick || l.odds <= 1) return false;
       if (!inList(l.match, "Kombi láb")) return false;
       if (!pickOk(l, "Kombi láb")) return false;
+      if (!ALLOW_HANDICAP && canonPick(l.market, l.pick).kind === "hcp") { console.log(`Kombi láb kiszűrve (hendikep): ${l.match} – ${l.pick}`); return false; }
       // Hiányos meccs név kiszűrése
       const hasVs = /\svs\.?\s|\s@\s/i.test(l.match);
       if (!hasVs) { console.log(`Kombi láb kiszűrve (hiányos meccs név): "${l.match}"`); return false; }
