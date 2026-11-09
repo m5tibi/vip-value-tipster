@@ -2306,6 +2306,11 @@ app.get("/api/tips", (req, res) => {
       // A free tippek minden látogató számára láthatók.
       freeTips: freeTips.filter(isApproved).map(publicTip),
       freeCombos: comboTips.filter(c => c.free && isApproved(c)).map(publicTip),
+      // A zárolt VIP blokkhoz csak a DARABSZÁM (a tippek tartalma nem szivárog ki)
+      vipCounts: {
+        singles: aiTips.filter(t => isApproved(t) && (!t.result || t.result === "pending")).length,
+        combos:  comboTips.filter(c => !c.free && isApproved(c) && (!c.result || c.result === "pending")).length,
+      },
     });
   }
   res.json({
