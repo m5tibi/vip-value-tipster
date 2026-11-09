@@ -184,6 +184,41 @@ console.log(`History betöltve: ${history.length} tipp`);
   }
 })();
 
+// Single tippek duplikáció-szűrése: kiesik, ha ugyanarra a meccsre (laza névegyezés:
+// magyar/angol név, fordított sorrend) már van függő single/free tipp a history-ban,
+// vagy az új tippek között már szerepelt.
+function dedupeSingles(tips, hist = []) {
+  const isOpenT = t => !t.result || t.result === "pending";
+  const taken = hist.filter(t => (t.type === "ai" || t.type === "free") && isOpenT(t) && t.match).map(t => ({ match: t.match }));
+  const out = [];
+  for (const t of tips) {
+    if (findMatchEntry(taken, t.match)) { console.log(`Single kiszűrve (duplikátum – erre a meccsre már van függő tipp): ${t.match} – ${t.pick}`); continue; }
+    taken.push({ match: t.match });
+    out.push(t);
+  }
+  return out;
+}
+
+// Meglévő duplikált FÜGGŐ single tippek eltávolítása (ugyanaz a meccs). Induláskor fut (app.listen),
+// mert a névegyeztető segédfüggvények konstansai csak lejjebb jönnek létre. Csak a még
+// jóvá nem hagyott, ki nem küldött példányt töröljük; ha mind jóváhagyott/kiküldött, nem nyúlunk hozzá.
+function dedupeExistingSingles() {
+  const isOpenT = t => !t.result || t.result === "pending";
+  const singles = history.filter(t => (t.type === "ai" || t.type === "free") && isOpenT(t) && t.match)
+    .sort((a, b) => (isApproved(b) - isApproved(a)) || (!!b.sent - !!a.sent) || (a.addedAt || "").localeCompare(b.addedAt || ""));
+  const kept = [], remove = new Set();
+  for (const t of singles) {
+    if (findMatchEntry(kept, t.match) && t.type === "ai" && !t.custom && t.approved === false && !t.sent) remove.add(t.id);
+    else kept.push({ match: t.match });
+  }
+  if (remove.size) {
+    history = history.filter(t => !remove.has(t.id));
+    saveHistory();
+    aiTips = history.filter(t => t.type === "ai" && (!t.result || t.result === "pending"));
+    console.log(`Duplikált függő single tippek eltávolítva: ${remove.size}`);
+  }
+}
+
 // Pending (még le nem zárt) AI tippek visszaállítása szerver-újraindítás után.
 // FONTOS: dátumtól függetlenül minden pending tipp visszakerül, mert egy tipp
 // gyakran az előző napon lett felvéve a mai/esti meccsre – ezeknek is látszaniuk kell.
@@ -1143,7 +1178,19 @@ const isApproved = t => t.approved !== false;
 // ── Fő frissítő ───────────────────────────────────────────
 const huDateTime = d => d.toLocaleString("hu-HU", { timeZone: "Europe/Budapest", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 
-async function fetchAndProcess(fromTs = null, toTs = null) {
+// Egyszerre csak EGY generálás futhat. Ha az ütemezett és a kézi (admin) futás átfedett,
+// mindkettő a futás eleji history-t látta, így ugyanarra a meccsre két single is bekerülhetett.
+let runningFetch = null;
+function fetchAndProcess(fromTs = null, toTs = null) {
+  if (runningFetch) {
+    console.log("Generálás már fut – az új kérés megvárja és annak eredményét kapja (nincs párhuzamos futás).");
+    return runningFetch;
+  }
+  runningFetch = fetchAndProcessInner(fromTs, toTs).finally(() => { runningFetch = null; });
+  return runningFetch;
+}
+
+async function fetchAndProcessInner(fromTs = null, toTs = null) {
   const now   = new Date();
   // Időablak: ha a frontend küldött fromTs/toTs-t, azt használjuk; egyébként a default ±24h
   const windowFrom = fromTs ? new Date(fromTs) : now;
@@ -1234,9 +1281,11 @@ async function fetchAndProcess(fromTs = null, toTs = null) {
     return false;
   });
 
-  // Új single tippek hozzáadása a history-hoz (a meglévők megtartásával)
+  // Új single tippek hozzáadása a history-hoz (a meglévők megtartásával).
+  // Duplikáció-védelem a mentés pillanatában: a JELENLEGI history pending single/free tippjei
+  // (laza névegyezéssel), és az új tippek egymás közt is – meccsenként legfeljebb 1 single.
   const existingIds = new Set(history.map(t => t.id));
-  const fresh = newAiTips.filter(t => !existingIds.has(t.id));
+  const fresh = dedupeSingles(newAiTips.filter(t => !existingIds.has(t.id)), history);
   if (fresh.length) { history = [...fresh, ...history]; saveHistory(); }
   saveLastRun();
 
@@ -3247,6 +3296,7 @@ process.on("unhandledRejection", (reason, promise) => {
 
 
 app.listen(PORT, () => {
+  try { dedupeExistingSingles(); } catch (e) { console.error("[dedupe] Hiba:", e.message); }
   console.log(`90perc.hu fut: http://localhost:${PORT}`);
   telegramBot.registerWebhook();
 });
