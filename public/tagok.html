@@ -198,7 +198,14 @@ nav{background:var(--surf);border-bottom:1px solid var(--border);padding:12px 16
     <label class="modal-label">Indoklás a levélbe (nem kötelező)</label>
     <input class="modal-input" type="text" id="ext-reason" maxlength="200" placeholder="pl. 2 napig nem volt tipp"/>
     <label class="modal-check"><input type="checkbox" id="ext-notify" checked/> <span>Értesítő e-mail a tagnak (csak hosszabbításnál; a napi keretbe számít)</span></label>
-    <label class="modal-check" id="ext-trials-wrap"><input type="checkbox" id="ext-trials" onchange="extDryRun()"/> <span>A futó próbaidősök is kapják meg</span></label>
+    <div id="ext-trials-wrap">
+      <label class="modal-label">Kik kapják meg?</label>
+      <select class="modal-input" id="ext-target" onchange="extDryRun()">
+        <option value="payers">Csak az előfizetők</option>
+        <option value="all">Előfizetők + futó próbaidősök</option>
+        <option value="trials">Csak a futó próbaidősök</option>
+      </select>
+    </div>
     <div class="page-sub" style="margin-bottom:14px;line-height:1.5">Stripe-on megújuló előfizetésnél a Stripe-ban is ennyivel később lesz a következő terhelés (felár nélkül). Lemondott előfizetésnél csak nálunk nő a lejárat, a Stripe nem terhel újra.</div>
     <div class="modal-actions">
       <button class="btn btn-primary" style="flex:1" id="ext-go" onclick="confirmExt()">📅 Mentés</button>
@@ -507,13 +514,13 @@ function openExtModal(id) {
   const u = id ? allMembers.find(x => x.id === id) : null;
   const isTrialUser = u && u.plan !== 'pro';
   extBase = u ? new Date(Math.max(Date.now(), Date.parse(isTrialUser ? u.trialEndsAt : u.paidUntil) || Date.now())) : null;
-  document.getElementById('ext-title').textContent = u ? (isTrialUser ? 'Próbaidő módosítása' : 'Lejárat módosítása') : '📅 Minden előfizető meghosszabbítása';
+  document.getElementById('ext-title').textContent = u ? (isTrialUser ? 'Próbaidő módosítása' : 'Lejárat módosítása') : '📅 Tömeges hosszabbítás';
   document.getElementById('ext-sub').textContent = u
     ? `${u.email} · jelenlegi lejárat: ${extBase.toLocaleDateString('hu-HU')}${u.stripeCustomerId && !isTrialUser ? ' · Stripe' : ''}`
     : 'Számolás...';
   document.getElementById('ext-date-wrap').style.display = u ? '' : 'none';
   document.getElementById('ext-trials-wrap').style.display = u ? 'none' : '';
-  document.getElementById('ext-trials').checked = false;
+  document.getElementById('ext-target').value = 'payers';
   document.getElementById('ext-reason').value = '';
   document.getElementById('ext-go').disabled = false;
   setExtDays(2);
@@ -548,12 +555,13 @@ async function extDryRun() {
   extCount = null;
   try {
     const r = await fetch('/api/admin/extend-subscriptions', { method: 'POST', headers: adminHeaders(true),
-      body: JSON.stringify({ days: 1, dryRun: true, includeTrials: document.getElementById('ext-trials').checked }) });
+      body: JSON.stringify({ days: 1, dryRun: true, target: document.getElementById('ext-target').value }) });
     const d = await r.json();
     if (!r.ok) { document.getElementById('ext-sub').textContent = '❌ ' + (d.error || 'Hiba'); return; }
     extCount = d.count;
     document.getElementById('ext-sub').textContent =
-      `${d.count} tag: ${d.payers} aktív előfizető (${d.stripe} Stripe-on)` + (d.trials ? ` + ${d.trials} próbaidős` : '');
+      [d.payers ? `${d.payers} aktív előfizető (${d.stripe} Stripe-on)` : '', d.trials ? `${d.trials} futó próbaidős` : '']
+        .filter(Boolean).join(' + ').replace(/^/, `${d.count} tag: `).replace(/: $/, ': senki');
   } catch (e) { document.getElementById('ext-sub').textContent = '❌ ' + e.message; }
 }
 async function confirmExt() {
@@ -566,7 +574,7 @@ async function confirmExt() {
   showStatus('Mentés...');
   try {
     const r = await fetch('/api/admin/extend-subscriptions', { method: 'POST', headers: adminHeaders(true), body: JSON.stringify({
-      days, userId: extUserId || undefined, includeTrials: !extUserId && document.getElementById('ext-trials').checked,
+      days, userId: extUserId || undefined, target: extUserId ? undefined : document.getElementById('ext-target').value,
       notify: document.getElementById('ext-notify').checked, reason: document.getElementById('ext-reason').value.trim(),
     }) });
     const d = await r.json();
