@@ -282,7 +282,7 @@ async function extendOne(u, days) {
   return { ok: true, email: u.email, kind, newEnd: iso, note: stripeNote };
 }
 
-// body: { days, userId? (egy tag; nélküle minden aktív előfizető), includeTrials?, notify?, reason?, dryRun? }
+// body: { days, userId? (egy tag), target? ("payers" | "all" | "trials"; régi: includeTrials), notify?, reason?, dryRun? }
 router.post("/api/admin/extend-subscriptions", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const days = parseInt(req.body?.days, 10);
@@ -300,7 +300,9 @@ router.post("/api/admin/extend-subscriptions", async (req, res) => {
     if (!isPayer(u) && !isTrial(u)) return res.status(400).json({ error: "Ennek a tagnak nincs futó előfizetése vagy próbaideje." });
     targets = [u];
   } else {
-    targets = all.filter(u => isPayer(u) || (req.body?.includeTrials && isTrial(u)));
+    const target = ["payers", "all", "trials"].includes(req.body?.target) ? req.body.target
+      : (req.body?.includeTrials ? "all" : "payers");
+    targets = all.filter(u => (target !== "trials" && isPayer(u)) || (target !== "payers" && isTrial(u)));
   }
   if (req.body?.dryRun) return res.json({ ok: true, dryRun: true, count: targets.length,
     payers: targets.filter(isPayer).length, trials: targets.filter(isTrial).length,
