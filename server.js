@@ -2068,7 +2068,7 @@ function checkExpiredSubscriptions() {
   if (!expired.length) return;
   expired.forEach(u => {
     const expiredAt = new Date().toISOString();
-    usersDb.update(u.id, { plan: "free", subscriptionStatus: "cancelled", cancelledAt: expiredAt });
+    usersDb.update(u.id, { plan: "free", subscriptionStatus: "cancelled", cancelledAt: expiredAt, extendedUntil: null });
     console.log(`Előfizetés lejárt, visszaminősítve: ${u.email} (lejárt: ${u.paidUntil})`);
     sendTelegram(`⏰ <b>Előfizetés lejárt</b>\n${String(u.email).replace(/&/g, "&amp;").replace(/</g, "&lt;")}\nLejárt: ${new Date(u.paidUntil).toLocaleDateString("hu-HU")}`).catch(() => {});
     mailer.sendSubscriptionExpired(u.email).catch(e => console.error("Email hiba:", e.message));

@@ -97,9 +97,13 @@ nav{background:var(--surf);border-bottom:1px solid var(--border);padding:12px 16
              padding:10px 12px;color:var(--text);font-size:14px;outline:none;margin-bottom:12px}
 .modal-input:focus{border-color:var(--green)}
 .modal-actions{display:flex;gap:8px}
+.modal-check{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--text);margin-bottom:10px;cursor:pointer}
+.modal-check input{margin-top:3px}
+.quick-days{display:flex;gap:6px;margin:-4px 0 12px;flex-wrap:wrap}
+.ext-preview{font-size:13px;color:var(--gold);margin-bottom:12px;min-height:18px}
 
 /* STATUS */
-#status-msg{padding:10px 16px;font-size:13px;text-align:center;min-height:36px;color:var(--green)}
+#status-msg{padding:10px 16px;font-size:13px;text-align:center;min-height:36px;color:var(--green);white-space:pre-line}
 
 /* EMPTY */
 .empty{text-align:center;padding:40px 16px;color:var(--muted);font-size:14px}
@@ -112,6 +116,7 @@ nav{background:var(--surf);border-bottom:1px solid var(--border);padding:12px 16
   <a class="nav-logo" href="/tippek.html"><img src="/logo-horizontal.png" alt="90perc.hu"/></a>
   <div class="nav-actions">
     <button class="btn btn-ghost btn-sm" onclick="trialCampaign()" title="Egyszeri VIP próbaidő-ajánlat e-mailben a nem előfizető tagoknak">🎁 Próbaidő-kampány</button>
+    <button class="btn btn-ghost btn-sm" onclick="openExtModal(null)" title="Minden aktív előfizető lejáratának meghosszabbítása (pl. tippmentes napok kompenzálása)">📅 +nap előfizetőknek</button>
     <button class="btn btn-ghost btn-sm" onclick="syncStripe()">🔄 Stripe</button>
     <button class="btn btn-primary btn-sm" onclick="loadMembers()">↺ Frissít</button>
   </div>
@@ -168,6 +173,36 @@ nav{background:var(--surf);border-bottom:1px solid var(--border);padding:12px 16
     <div class="modal-actions">
       <button class="btn btn-primary" style="flex:1" onclick="confirmSetPro()">✅ Fizető beállítása</button>
       <button class="btn btn-ghost" onclick="document.getElementById('plan-modal').classList.remove('open')">Mégse</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lejárat módosítása modal (egy tag vagy minden előfizető) -->
+<div class="modal-overlay" id="ext-modal" onclick="if(event.target.id==='ext-modal')closeExt()">
+  <div class="modal">
+    <div class="modal-title" id="ext-title">Lejárat módosítása</div>
+    <div class="modal-sub" id="ext-sub"></div>
+    <label class="modal-label">Hány nappal? (negatív szám = rövidítés)</label>
+    <input class="modal-input" type="number" id="ext-days" value="2" min="-90" max="90" oninput="extDaysChanged()"/>
+    <div class="quick-days">
+      <button class="btn btn-ghost btn-sm" onclick="setExtDays(1)">+1</button>
+      <button class="btn btn-ghost btn-sm" onclick="setExtDays(2)">+2</button>
+      <button class="btn btn-ghost btn-sm" onclick="setExtDays(3)">+3</button>
+      <button class="btn btn-ghost btn-sm" onclick="setExtDays(7)">+7</button>
+    </div>
+    <div id="ext-date-wrap">
+      <label class="modal-label">…vagy az új lejárat napja</label>
+      <input class="modal-input" type="date" id="ext-date" oninput="extDateChanged()"/>
+    </div>
+    <div class="ext-preview" id="ext-preview"></div>
+    <label class="modal-label">Indoklás a levélbe (nem kötelező)</label>
+    <input class="modal-input" type="text" id="ext-reason" maxlength="200" placeholder="pl. 2 napig nem volt tipp"/>
+    <label class="modal-check"><input type="checkbox" id="ext-notify" checked/> <span>Értesítő e-mail a tagnak (csak hosszabbításnál; a napi keretbe számít)</span></label>
+    <label class="modal-check" id="ext-trials-wrap"><input type="checkbox" id="ext-trials" onchange="extDryRun()"/> <span>A futó próbaidősök is kapják meg</span></label>
+    <div class="page-sub" style="margin-bottom:14px;line-height:1.5">Stripe-on megújuló előfizetésnél a Stripe-ban is ennyivel később lesz a következő terhelés (felár nélkül). Lemondott előfizetésnél csak nálunk nő a lejárat, a Stripe nem terhel újra.</div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" style="flex:1" id="ext-go" onclick="confirmExt()">📅 Mentés</button>
+      <button class="btn btn-ghost" onclick="closeExt()">Mégse</button>
     </div>
   </div>
 </div>
@@ -282,7 +317,7 @@ function renderList() {
 
     const metaItems = [];
     metaItems.push(`Csatlakozott: ${u.createdAt ? new Date(u.createdAt).toLocaleDateString('hu-HU') : '–'}`);
-    if (u.paidUntil) metaItems.push(`<span class="meta-item highlight">Lejárat: ${new Date(u.paidUntil).toLocaleDateString('hu-HU')}</span>`);
+    if (u.paidUntil) metaItems.push(`<span class="meta-item highlight">Lejárat: ${new Date(u.paidUntil).toLocaleDateString('hu-HU')}${u.extendedUntil ? ' (kézzel hosszabbítva)' : ''}</span>`);
     if (u.cancelledAt) metaItems.push(`<span class="meta-item red">Lemondva: ${new Date(u.cancelledAt).toLocaleDateString('hu-HU')}</span>`);
     if (!u.emailVerified) metaItems.push('⏳ Nem megerősített');
     if (u.disabled && u.disabledAt) metaItems.push(`<span class="meta-item red">Kizárva: ${new Date(u.disabledAt).toLocaleDateString('hu-HU')}</span>`);
@@ -298,7 +333,9 @@ function renderList() {
 
     const actions = u.disabled
       ? `<button class="btn btn-ghost btn-sm" onclick="enableUser('${u.id}')">↩️ Visszaengedés</button>`
-      : (isPro
+      : ((isPro && (!u.paidUntil || new Date(u.paidUntil) > new Date())) || (!isPro && trialOn)
+          ? `<button class="btn btn-ghost btn-sm" onclick="openExtModal('${u.id}')">📅 Lejárat</button> ` : '') +
+        (isPro
           ? `<button class="btn btn-danger btn-sm" onclick="setFree('${u.id}')">→ Ingyenes</button>`
           : `<button class="btn btn-primary btn-sm" onclick="openProModal('${u.id}')">→ Fizető</button>`) +
         (!u.emailVerified ? ` <button class="btn btn-ghost btn-sm" onclick="verifyUser('${u.id}')">✓ Megerősítés</button>` : '') +
@@ -459,6 +496,90 @@ async function trialCampaign() {
     showStatus(d.ok ? `✅ Kampány elindítva: ${d.count} tag a várólistán – az első hullám pár percen belül megy ki` : '❌ ' + (d.error || 'Hiba'), !d.ok);
     await loadMembers();
   } catch (e) { showStatus('❌ Hiba: ' + e.message, true); }
+}
+
+// ── Lejárat módosítása ──
+let extUserId = null, extBase = null;     // extBase: a jelenlegi lejárat (egy tagnál), ehhez képest számolunk
+const DAY_MS = 86400000;
+const ymd = d => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; };
+function openExtModal(id) {
+  extUserId = id;
+  const u = id ? allMembers.find(x => x.id === id) : null;
+  const isTrialUser = u && u.plan !== 'pro';
+  extBase = u ? new Date(Math.max(Date.now(), Date.parse(isTrialUser ? u.trialEndsAt : u.paidUntil) || Date.now())) : null;
+  document.getElementById('ext-title').textContent = u ? (isTrialUser ? 'Próbaidő módosítása' : 'Lejárat módosítása') : '📅 Minden előfizető meghosszabbítása';
+  document.getElementById('ext-sub').textContent = u
+    ? `${u.email} · jelenlegi lejárat: ${extBase.toLocaleDateString('hu-HU')}${u.stripeCustomerId && !isTrialUser ? ' · Stripe' : ''}`
+    : 'Számolás...';
+  document.getElementById('ext-date-wrap').style.display = u ? '' : 'none';
+  document.getElementById('ext-trials-wrap').style.display = u ? 'none' : '';
+  document.getElementById('ext-trials').checked = false;
+  document.getElementById('ext-reason').value = '';
+  document.getElementById('ext-go').disabled = false;
+  setExtDays(2);
+  document.getElementById('ext-modal').classList.add('open');
+  if (!u) extDryRun();
+}
+function closeExt() { document.getElementById('ext-modal').classList.remove('open'); }
+function setExtDays(n) { document.getElementById('ext-days').value = n; extDaysChanged(); }
+function extDaysChanged() {
+  const n = parseInt(document.getElementById('ext-days').value, 10) || 0;
+  if (extBase) document.getElementById('ext-date').value = ymd(extBase.getTime() + n * DAY_MS);
+  extPreview();
+}
+function extDateChanged() {
+  const v = document.getElementById('ext-date').value;
+  if (!v || !extBase) return;
+  const [y, m, d] = v.split('-').map(Number);
+  const target = new Date(y, m - 1, d, extBase.getHours(), extBase.getMinutes());
+  document.getElementById('ext-days').value = Math.round((target - extBase) / DAY_MS);
+  extPreview();
+}
+function extPreview() {
+  const n = parseInt(document.getElementById('ext-days').value, 10) || 0;
+  const el = document.getElementById('ext-preview');
+  if (!n) { el.textContent = 'Adj meg egy napszámot.'; return; }
+  el.textContent = extBase
+    ? `Új lejárat: ${new Date(extBase.getTime() + n * DAY_MS).toLocaleDateString('hu-HU')} (${n > 0 ? '+' : ''}${n} nap)`
+    : `Mindenki lejárata ${n > 0 ? '+' : ''}${n} nappal ${n > 0 ? 'nő' : 'csökken'}.`;
+}
+let extCount = null;
+async function extDryRun() {
+  extCount = null;
+  try {
+    const r = await fetch('/api/admin/extend-subscriptions', { method: 'POST', headers: adminHeaders(true),
+      body: JSON.stringify({ days: 1, dryRun: true, includeTrials: document.getElementById('ext-trials').checked }) });
+    const d = await r.json();
+    if (!r.ok) { document.getElementById('ext-sub').textContent = '❌ ' + (d.error || 'Hiba'); return; }
+    extCount = d.count;
+    document.getElementById('ext-sub').textContent =
+      `${d.count} tag: ${d.payers} aktív előfizető (${d.stripe} Stripe-on)` + (d.trials ? ` + ${d.trials} próbaidős` : '');
+  } catch (e) { document.getElementById('ext-sub').textContent = '❌ ' + e.message; }
+}
+async function confirmExt() {
+  const days = parseInt(document.getElementById('ext-days').value, 10);
+  if (!days || Math.abs(days) > 90) { alert('A napok száma -90 és 90 között legyen (0 nem lehet).'); return; }
+  const u = extUserId ? allMembers.find(x => x.id === extUserId) : null;
+  const who = u ? u.email : `${extCount ?? '?'} tag`;
+  if (!confirm(`${who} lejárata ${days > 0 ? '+' : ''}${days} nappal módosul.\n\nBiztosan mented?`)) return;
+  const btn = document.getElementById('ext-go'); btn.disabled = true;
+  showStatus('Mentés...');
+  try {
+    const r = await fetch('/api/admin/extend-subscriptions', { method: 'POST', headers: adminHeaders(true), body: JSON.stringify({
+      days, userId: extUserId || undefined, includeTrials: !extUserId && document.getElementById('ext-trials').checked,
+      notify: document.getElementById('ext-notify').checked, reason: document.getElementById('ext-reason').value.trim(),
+    }) });
+    const d = await r.json();
+    if (!r.ok) { showStatus('❌ ' + (d.error || 'Hiba'), true); btn.disabled = false; return; }
+    closeExt();
+    const extra = [];
+    if (d.stripe) extra.push(`${d.stripe} Stripe-ban is eltolva`);
+    if (d.mailed || d.mailSkipped) extra.push(`e-mail: ${d.mailed}` + (d.mailSkipped ? ` (${d.mailSkipped} nem ment ki – napi keret?)` : ''));
+    const probs = [...d.failed.map(f => `${f.email}: ${f.error}`), ...d.notes.map(f => `${f.email}: ${f.note}`)];
+    showStatus(`✅ ${d.count} tag lejárata ${days > 0 ? '+' : ''}${days} nap` + (extra.length ? ' · ' + extra.join(' · ') : '') +
+      (probs.length ? '\n⚠️ ' + probs.join('\n⚠️ ') : ''), d.failed.length > 0);
+    await loadMembers();
+  } catch (e) { showStatus('❌ Hiba: ' + e.message, true); btn.disabled = false; }
 }
 
 loadMembers();
