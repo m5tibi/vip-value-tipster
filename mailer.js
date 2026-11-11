@@ -293,6 +293,27 @@ async function sendSubscriptionCancelled(to, activeUntil) {
   });
 }
 
+const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+// ── Előfizetés meghosszabbítva (kompenzáció, pl. tippmentes napok miatt) ──
+// kind: "renewing" (Stripe-os, megújuló: a terhelés is később lesz) | "ending" (lemondott vagy kézi) | "trial"
+async function sendSubscriptionExtended(to, days, newEnd, reason, kind = "ending") {
+  const isTrial = kind === "trial";
+  const dateStr = new Date(newEnd).toLocaleDateString("hu-HU", { timeZone: "Europe/Budapest", year:"numeric", month:"long", day:"numeric" });
+  const what = isTrial ? "VIP próbaidődet" : "VIP előfizetésedet";
+  const why  = reason ? `${reason.replace(/[.!\s]+$/, "")} – ezért ` : "";
+  return send({
+    to, bulk: true,
+    subject: `🎁 +${days} nap VIP ajándékba – 90perc.hu`,
+    text: `Üdv!\n\n${why}${days} nappal meghosszabbítottuk a ${what}, ajándékba.\nÚj lejárat: ${dateStr}.${kind !== "renewing" ? "" : "\nA következő terhelés is ennyivel később lesz, többet nem fizetsz érte."}\n\nhttps://90perc.hu/tippek.html`,
+    html: shell(`+${days} nap VIP ajándékba 🎁`, `
+      <p style="line-height:1.7;margin:0 0 10px">${reason ? esc(reason.replace(/[.!\s]+$/, "")) + " – ezért " : ""}<b>${days} nappal</b> meghosszabbítottuk a ${what}, ajándékba.</p>
+      <p style="line-height:1.7;margin:0 0 14px">Új lejárat: <b style="color:#00e676">${dateStr}</b>${kind !== "renewing" ? "" : "<br><span style=\"color:#78909c;font-size:13px\">A következő terhelés is ennyivel később lesz – többet nem fizetsz érte.</span>"}</p>
+      ${button("https://90perc.hu/tippek.html", "⚽ Megnézem a tippeket")}
+    `),
+  });
+}
+
 // ── Előfizetés lejárt (időszak vége, hozzáférés megszűnt) ────
 async function sendSubscriptionExpired(to) {
   return send({
@@ -374,4 +395,4 @@ async function sendTrialExpired(to, stats, overall) {
   });
 }
 
-module.exports = { send, sendTrialOffer, sendTrialReminder, sendTrialExpired, sendVerification, sendPasswordReset, sendPlanActivated, sendPlanCancelled, sendSubscriptionCancelled, sendSubscriptionExpired, sendNewTips, sendWeeklySummary, configured };
+module.exports = { send, sendTrialOffer, sendTrialReminder, sendTrialExpired, sendVerification, sendPasswordReset, sendPlanActivated, sendPlanCancelled, sendSubscriptionCancelled, sendSubscriptionExpired, sendSubscriptionExtended, sendNewTips, sendWeeklySummary, configured };

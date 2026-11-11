@@ -21,6 +21,7 @@ router.get("/api/admin/users", (req, res) => {
     createdAt: u.createdAt || null,
     paidUntil: u.paidUntil || null,
     cancelledAt: u.cancelledAt || null,
+    extendedUntil: (usersDb.findById(u.id) || {}).extendedUntil || null,
     subscriptionStatus: u.subscriptionStatus || null,
     stripeCustomerId: u.stripeCustomerId || null,
     trialStartedAt: u.trialStartedAt || null,
@@ -41,7 +42,7 @@ router.patch("/api/admin/users/:id", (req, res) => {
   const targetUser = usersDb.findById(req.params.id);
   const subStatus = validPlan === "pro" ? "active" : "cancelled";
   const cancelledAt = validPlan === "free" ? new Date().toISOString() : null;
-  usersDb.update(req.params.id, { plan: validPlan, paidUntil, subscriptionStatus: subStatus, currentPeriodEnd: paidUntil || null, ...(cancelledAt ? { cancelledAt } : {}) });
+  usersDb.update(req.params.id, { plan: validPlan, paidUntil, subscriptionStatus: subStatus, currentPeriodEnd: paidUntil || null, extendedUntil: null, ...(cancelledAt ? { cancelledAt } : {}) });
   console.log(`Felhasználó frissítve: ${req.params.id} → plan:${validPlan}`);
   if (targetUser) {
     if (validPlan === "pro") {

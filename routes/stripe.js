@@ -12,6 +12,10 @@ const STRIPE_WEBHOOK = process.env.STRIPE_WEBHOOK_SECRET;
 const STRIPE_PRICE   = process.env.STRIPE_PRICE_ID;
 const stripe = STRIPE_SECRET ? require("stripe")(STRIPE_SECRET) : null;
 
+// Kézi hosszabbítás (admin): ha a Stripe-ban nem tudtuk eltolni (pl. lemondott előfizetés), a saját
+// adatbázisunkban él (extendedUntil). Ilyenkor a Stripe-ból jövő dátum nem írhatja felül a későbbit.
+const keepExt = (u, iso) => (u && u.extendedUntil && iso && u.extendedUntil > iso ? u.extendedUntil : iso);
+
 // Webhook – a server.js express.raw-val, a json middleware ELŐTT köti be
 async function webhook(req, res) {
   if (!stripe) return res.status(500).json({ error: "Stripe nincs konfigurálva" });
@@ -87,10 +91,12 @@ async function webhook(req, res) {
       const cancelledAt  = new Date().toISOString();
       const periodEndTs  = sub.cancel_at || sub.current_period_end;
       const periodEnd    = periodEndTs ? new Date(periodEndTs * 1000).toISOString() : null;
-      const patch        = { cancelledAt, ...(periodEnd ? { paidUntil: periodEnd } : {}) };
+      const cur          = usersDb.findByStripeCustomer(sub.customer);
+      const endIso       = keepExt(cur, periodEnd);
+      const patch        = { cancelledAt, ...(endIso ? { paidUntil: endIso, currentPeriodEnd: endIso } : {}) };
       const u = updateUser(sub.customer, null, patch);
       if (u) {
-        const endStr = periodEnd ? new Date(periodEnd).toLocaleDateString("hu-HU") : (u.paidUntil ? new Date(u.paidUntil).toLocaleDateString("hu-HU") : "–");
+        const endStr = endIso ? new Date(endIso).toLocaleDateString("hu-HU") : (u.paidUntil ? new Date(u.paidUntil).toLocaleDateString("hu-HU") : "–");
         console.log(`Stripe: lemondva (időszak végéig aktív) – ${u.email}, lejár: ${endStr}`);
         const adminEmail = process.env.ADMIN_EMAIL;
         if (adminEmail) mailer.send({
@@ -99,7 +105,7 @@ async function webhook(req, res) {
           text: `${u.email} lemondta előfizetését. Aktív marad: ${endStr}`,
           html: `<p>A <b>${u.email}</b> lemondta a 90perc.hu előfizetését.</p><p>Aktív marad: <b>${endStr}</b></p>`,
         }).catch(e => console.error("Admin email hiba:", e.message));
-        mailer.sendSubscriptionCancelled(u.email, periodEnd || u.paidUntil).catch(e => console.error("Email hiba:", e.message));
+        mailer.sendSubscriptionCancelled(u.email, endIso || u.paidUntil).catch(e => console.error("Email hiba:", e.message));
         notifyAdmin(`❌ <b>Előfizetés lemondva</b>\n${esc(u.email)}\nAktív marad: ${esc(endStr)}`);
       }
     }
@@ -108,6 +114,15 @@ async function webhook(req, res) {
   if (event.type === "customer.subscription.deleted") {
     const sub = event.data.object;
     const cancelledAt = new Date().toISOString();
+    const ext = usersDb.findByStripeCustomer(sub.customer);
+    if (ext && ext.extendedUntil && new Date(ext.extendedUntil) > new Date()) {
+      // A Stripe-előfizetés véget ért, de kézi hosszabbítást kapott: addig marad VIP, utána a napi
+      // lejárat-ellenőrzés (server.js checkExpiredSubscriptions) minősíti vissza és küldi a levelet.
+      usersDb.update(ext.id, { paidUntil: ext.extendedUntil, currentPeriodEnd: ext.extendedUntil, subscriptionStatus: "active",
+        cancelledAt: ext.cancelledAt || cancelledAt, stripeSubscriptionId: null });
+      console.log(`Stripe: előfizetés vége, de kézi hosszabbítás miatt ${ext.extendedUntil}-ig aktív – ${ext.email}`);
+      return;
+    }
     const u = updateUser(sub.customer, null, { plan: "free", paidUntil: null, subscriptionStatus: "cancelled", currentPeriodEnd: null, cancelledAt });
     if (u) {
       console.log(`Stripe: lemondva – ${u.email}`);
@@ -192,25 +207,23 @@ router.post("/api/admin/sync-stripe", async (req, res) => {
       let sub = null;
       // 1. Ha van stripeCustomerId, azzal keresünk
       if (u.stripeCustomerId) {
-        const subs = await stripe.subscriptions.list({ customer: u.stripeCustomerId, status: "active", limit: 1 });
-        if (subs.data.length) sub = subs.data[0];
+        sub = await liveSub(u.stripeCustomerId);
       }
       // 2. Ha nincs vagy nem találtuk, email alapján keresünk
       if (!sub) {
         const customers = await stripe.customers.list({ email: u.email, limit: 1 });
         if (customers.data.length) {
           const cust = customers.data[0];
-          const subs = await stripe.subscriptions.list({ customer: cust.id, status: "active", limit: 1 });
-          if (subs.data.length) {
-            sub = subs.data[0];
+          sub = await liveSub(cust.id);
+          if (sub) {
             usersDb.update(u.id, { stripeCustomerId: cust.id });
             console.log(`  Stripe customer ID beállítva: ${u.email} → ${cust.id}`);
           }
         }
       }
       if (sub) {
-        const paidUntil = new Date(sub.current_period_end * 1000).toISOString();
-        usersDb.update(u.id, { paidUntil, subscriptionStatus: "active", currentPeriodEnd: paidUntil });
+        const paidUntil = keepExt(u, new Date(sub.current_period_end * 1000).toISOString());
+        usersDb.update(u.id, { paidUntil, subscriptionStatus: "active", currentPeriodEnd: paidUntil, stripeSubscriptionId: sub.id });
         console.log(`  Stripe sync OK: ${u.email} → lejár: ${paidUntil}`);
         updated++;
       } else {
@@ -219,6 +232,100 @@ router.post("/api/admin/sync-stripe", async (req, res) => {
     } catch(e) { console.error(`Stripe sync hiba (${u.email}):`, e.message); }
   }
   res.json({ ok: true, updated, total: proUsers.length });
+});
+
+// ── Admin: lejárat kézi módosítása (pl. tippmentes napok kompenzálása) ──
+// A Stripe-on megújuló előfizetésnél a Stripe-ban is eltoljuk a következő terhelést (trial_end, arányosítás
+// nélkül): a tag ennyi napot ingyen kap, és a terhelés is ennyivel később jön. Lemondott (időszak végén
+// megszűnő) vagy kézzel beállított előfizetésnél csak nálunk nő a lejárat (extendedUntil).
+const DAY = 86400000;
+
+// Élő (aktív vagy próbaidős) Stripe-előfizetés egy ügyfélhez
+async function liveSub(customerId) {
+  const subs = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 10 });
+  return subs.data.find(s => ["active", "trialing"].includes(s.status)) || null;
+}
+
+async function extendOne(u, days) {
+  const now = Date.now();
+  // Próbaidős (nem fizető) tag: a próbaidő vége tolódik
+  if (u.plan !== "pro") {
+    const base = Math.max(now, Date.parse(u.trialEndsAt) || now);
+    const end = new Date(base + days * DAY);
+    if (end.getTime() <= now + 3600000) return { ok: false, email: u.email, error: "a próbaidő a múltba kerülne" };
+    usersDb.update(u.id, { trialEndsAt: end.toISOString(), trialReminderSent: false });
+    return { ok: true, email: u.email, kind: "trial", newEnd: end.toISOString() };
+  }
+  const base = Math.max(now, Date.parse(u.paidUntil) || now);
+  const end = new Date(base + days * DAY);
+  if (end.getTime() <= now + 3600000) return { ok: false, email: u.email, error: "a lejárat a múltba kerülne" };
+  let kind = "ending", stripeNote = null;
+  if (stripe && u.stripeCustomerId) {
+    try {
+      const sub = await liveSub(u.stripeCustomerId);
+      if (sub && !sub.cancel_at_period_end && !sub.cancel_at) {
+        const ts = Math.floor(end.getTime() / 1000);
+        const upd = await stripe.subscriptions.update(sub.id, { trial_end: ts, proration_behavior: "none" });
+        const stripeEnd = new Date((upd.trial_end || upd.current_period_end || ts) * 1000).toISOString();
+        usersDb.update(u.id, { paidUntil: stripeEnd, currentPeriodEnd: stripeEnd, subscriptionStatus: "active",
+          stripeSubscriptionId: sub.id, extendedUntil: null });
+        return { ok: true, email: u.email, kind: "renewing", newEnd: stripeEnd, stripe: true };
+      }
+      stripeNote = sub ? "lemondott – csak nálunk hosszabbítva, a Stripe nem terhel újra" : "nincs élő Stripe-előfizetés – csak nálunk hosszabbítva";
+    } catch (e) {
+      console.error(`Stripe hosszabbítási hiba (${u.email}):`, e.message);
+      stripeNote = `Stripe hiba (${e.message}) – csak nálunk hosszabbítva, a terhelés NEM tolódott el`;
+    }
+  }
+  const iso = end.toISOString();
+  usersDb.update(u.id, { paidUntil: iso, currentPeriodEnd: iso, subscriptionStatus: "active", extendedUntil: u.stripeCustomerId ? iso : null });
+  return { ok: true, email: u.email, kind, newEnd: iso, note: stripeNote };
+}
+
+// body: { days, userId? (egy tag; nélküle minden aktív előfizető), includeTrials?, notify?, reason?, dryRun? }
+router.post("/api/admin/extend-subscriptions", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const days = parseInt(req.body?.days, 10);
+  if (!days || Math.abs(days) > 90) return res.status(400).json({ error: "A napok száma -90 és 90 között legyen (0 nem lehet)." });
+  const reason = String(req.body?.reason || "").trim().slice(0, 200);
+  const notify = !!req.body?.notify && days > 0;
+  const now = new Date();
+  const all = usersDb.all().map(u => usersDb.findById(u.id)).filter(u => u && !u.isAdmin && !u.disabled);
+  const isPayer = u => u.plan === "pro" && (!u.paidUntil || new Date(u.paidUntil) > now);
+  const isTrial = u => u.plan !== "pro" && u.trialEndsAt && new Date(u.trialEndsAt) > now;
+  let targets;
+  if (req.body?.userId) {
+    const u = all.find(x => x.id === req.body.userId);
+    if (!u) return res.status(404).json({ error: "Nincs ilyen (aktív) tag." });
+    if (!isPayer(u) && !isTrial(u)) return res.status(400).json({ error: "Ennek a tagnak nincs futó előfizetése vagy próbaideje." });
+    targets = [u];
+  } else {
+    targets = all.filter(u => isPayer(u) || (req.body?.includeTrials && isTrial(u)));
+  }
+  if (req.body?.dryRun) return res.json({ ok: true, dryRun: true, count: targets.length,
+    payers: targets.filter(isPayer).length, trials: targets.filter(isTrial).length,
+    stripe: targets.filter(u => isPayer(u) && u.stripeCustomerId).length });
+
+  const results = [];
+  for (const u of targets) results.push(await extendOne(u, days));
+  const ok = results.filter(r => r.ok);
+  let mailed = 0, mailSkipped = 0;
+  if (notify) {
+    for (const r of ok) {
+      const m = await mailer.sendSubscriptionExtended(r.email, days, r.newEnd, reason, r.kind).catch(() => ({ ok: false }));
+      if (m && m.ok) mailed++; else mailSkipped++;
+    }
+  }
+  const sign = days > 0 ? "+" : "";
+  console.log(`Kézi lejárat-módosítás: ${sign}${days} nap, ${ok.length}/${results.length} tag (${ok.filter(r => r.stripe).length} Stripe-ban is)`);
+  results.filter(r => !r.ok || r.note).forEach(r => console.log(`  ${r.email}: ${r.error || r.note}`));
+  notifyAdmin(`📅 <b>Lejárat módosítva: ${sign}${days} nap</b>\n${ok.length} tag` +
+    (targets.length === 1 ? ` (${esc(targets[0].email)})` : "") +
+    (ok.some(r => r.stripe) ? ` · ${ok.filter(r => r.stripe).length} Stripe-ban is eltolva` : "") +
+    (notify ? ` · e-mail: ${mailed}${mailSkipped ? ` (${mailSkipped} nem ment ki)` : ""}` : "") +
+    (reason ? `\nOk: ${esc(reason)}` : ""));
+  res.json({ ok: true, days, count: ok.length, failed: results.filter(r => !r.ok), notes: results.filter(r => r.ok && r.note),
+    stripe: ok.filter(r => r.stripe).length, mailed, mailSkipped, results });
 });
 
 module.exports = { webhook, router };
