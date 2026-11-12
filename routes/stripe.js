@@ -141,14 +141,58 @@ async function webhook(req, res) {
 
 }
 
+// ── Akció (Black November) ───────────────────────────────────
+// Időszakos kedvezmény: a Checkout automatikusan rárakja a kupont (nem kell kódot beírni).
+// A kupont a Stripe-ban magától létrehozzuk (idempotens azonosítóval), ha még nincs.
+// Felülírható env-ből: PROMO_END (ISO), PROMO_OFF=0 (kikapcsolás).
+const PROMO = {
+  couponId:   "BLACKNOV2026",
+  name:       "Black November",
+  percentOff: 30,
+  months:     3,
+  basePrice:  14990,
+  endsAt:     process.env.PROMO_END || "2026-11-30T23:59:59+01:00",
+};
+const promoActive = () => process.env.PROMO_OFF !== "0" && Date.now() <= new Date(PROMO.endsAt).getTime();
+let promoCouponReady = null;
+function ensurePromoCoupon() {
+  if (!stripe) return Promise.resolve(false);
+  if (!promoCouponReady) {
+    promoCouponReady = stripe.coupons.retrieve(PROMO.couponId)
+      .then(() => true)
+      .catch(err => {
+        if (err?.code !== "resource_missing" && err?.statusCode !== 404) throw err;
+        return stripe.coupons.create({
+          id: PROMO.couponId, name: PROMO.name, percent_off: PROMO.percentOff,
+          duration: "repeating", duration_in_months: PROMO.months,
+        }).then(() => { console.log(`Stripe kupon létrehozva: ${PROMO.couponId}`); return true; });
+      })
+      .catch(err => { console.error("Akciós kupon hiba:", err.message); promoCouponReady = null; return false; });
+  }
+  return promoCouponReady;
+}
+
 const router = express.Router();
+
+// Az akció adatai a frontendnek (banner, áthúzott ár, visszaszámláló)
+router.get("/api/promo", (req, res) => {
+  if (!promoActive()) return res.json({ active: false });
+  const promoPrice = Math.round(PROMO.basePrice * (100 - PROMO.percentOff) / 100 / 10) * 10;
+  res.json({ active: true, name: PROMO.name, percentOff: PROMO.percentOff, months: PROMO.months,
+             basePrice: PROMO.basePrice, promoPrice, endsAt: PROMO.endsAt });
+});
 
 // ── Stripe: Checkout Session létrehozása ─────────────────────
 router.post("/api/stripe/checkout", auth.requireLogin, async (req, res) => {
   if (!stripe)       return res.status(500).json({ error: "Stripe nincs konfigurálva" });
   if (!STRIPE_PRICE) return res.status(500).json({ error: "STRIPE_PRICE_ID nincs beállítva" });
   try {
+    // Akció idején a kupon automatikusan rákerül. (A Stripe-ban a discounts és az
+    // allow_promotion_codes egyszerre nem adható meg – akció alatt a kódmező nem kell.)
+    const usePromo = promoActive() && await ensurePromoCoupon();
+    const discountOpts = usePromo ? { discounts: [{ coupon: PROMO.couponId }] } : { allow_promotion_codes: true };
     const session = await stripe.checkout.sessions.create({
+      ...discountOpts,
       mode: "subscription",
       payment_method_types: ["card"],
       customer_email: req.user.email,
@@ -157,7 +201,6 @@ router.post("/api/stripe/checkout", auth.requireLogin, async (req, res) => {
       cancel_url:  `${BASE_URL}/elofizetes.html`,
       metadata:    { userId: req.user.id },
       locale:                   "hu",
-      allow_promotion_codes:    true,
       billing_address_collection: "required",
     });
     res.json({ url: session.url });
