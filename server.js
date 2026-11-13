@@ -665,6 +665,14 @@ const FREE_ONLY_GAP   = 10;  // modell és piac eltérése (százalékpont), e f
 const MODEL_WEIGHT    = 0.5; // az EV-hez a modell és a piac keveréke (a modell kis mintán túl magabiztos)
 const AI_SUSPECT_GAP  = 10;  // az AI saját esélybecslése ennyi százalékpontnál jobban eltér a piactól → gyanús
 const VIP_MIN_EV      = 3;   // legalább ennyi % EV kell a VIP-hez
+// A 472 lezárt tipp elemzése (2026. júl.–nov.) alapján:
+// - BTTS-Igen: 16 tippből 10 vesztes (−28% ROI) → csak 1,80+ TMP-oddson, és VIP-hez szigorúbb EV kell
+// - 2,10–2,50 közötti TMP-oddsú single: −7% ROI (az 1,50–1,90-es sáv +10–12%) → VIP-hez szigorúbb EV kell
+// - kombi: a 3 lábas −10%, a 2,5 feletti eredő odds veszteséges, a 2,0–2,5-ös sáv +12% → csak 2 láb, 2,00–2,50
+const VIP_STRICT_EV     = 5;      // ennyi % EV kell a "kockázatos" kategóriákban a VIP-hez
+const BTTS_MIN_TMP_ODDS = 1.80;   // ez alatti BTTS-Igen single nem kerül be
+const RISKY_ODDS_BAND   = [2.10, 2.50];   // ebben a TMP-odds sávban szigorúbb EV kell
+const COMBO_MIN_ODDS    = 2.00, COMBO_MAX_ODDS = 2.50;   // 2 lábas kombi eredő odds-sávja
 // Kupameccsen (BL/EL/KL, nemzeti kupák) a hazai favorit győzelme a tapasztalatok szerint
 // rendszeresen elbukott 1,90 alatti oddson (Porto–PSV, Fener–Slavia, Bodø–Lille) – ott nem VIP.
 const CUP_HOME_FAV_MIN_ODDS = 1.90;
@@ -676,6 +684,11 @@ function isHomeWinPick(t) {
   if (c.kind !== "1x2" || c.team === "draw") return false;
   const home = normTeam(String(t.match || "").split(/\s+vs\.?\s+/i)[0]);
   return !!home && nameSim(c.team, home);
+}
+function strictEvReason(t, tmpOdds) {
+  if (canonPick(t.market, t.pick).kind === "btts") return "BTTS";
+  if (tmpOdds >= RISKY_ODDS_BAND[0] && tmpOdds < RISKY_ODDS_BAND[1]) return `${RISKY_ODDS_BAND[0].toFixed(2)}–${RISKY_ODDS_BAND[1].toFixed(2)} odds-sáv`;
+  return null;
 }
 function tipValuation(t) {
   if (t.type === "combo") return null;
@@ -696,14 +709,17 @@ function tipValuation(t) {
   const aiGap    = ai != null && market != null ? pct(Math.abs(ai - market)) : null;
   // Kupás hazai favorit 1,90 alatt: nem lehet VIP (lásd CUP_HOME_FAV_MIN_ODDS)
   const cupFavBlock = isCupLabel(t.sportLabel) && isHomeWinPick(t) && tmpOdds < CUP_HOME_FAV_MIN_ODDS;
+  // Szigorúbb EV-küszöb a tapasztalat szerint gyengén teljesítő kategóriákban (BTTS, 2,10–2,50 sáv)
+  const strictReason = strictEvReason(t, tmpOdds);
+  const evNeeded = strictReason ? VIP_STRICT_EV : VIP_MIN_EV;
   // Minimális elfogadható TippmixPro-odds: ennél kevesebb oddson a tipp negatív várható értékű
   const refProb  = blend != null ? blend : market;
   const minOdds  = refProb > 0 ? Math.round(100 / refProb) / 100 : null;
   return {
     tmpOdds, estimated: !t.oddsManual,
     marketProb: market != null ? pct(market) : null, modelProb: model != null ? pct(model) : null,
-    blendProb: blend != null ? pct(blend) : null, minOdds, cupFavBlock,
-    ev, marketEv, gap, freeOnly, vipOk: ev == null ? null : (ev >= VIP_MIN_EV && !freeOnly && !cupFavBlock),
+    blendProb: blend != null ? pct(blend) : null, minOdds, cupFavBlock, evNeeded, strictReason,
+    ev, marketEv, gap, freeOnly, vipOk: ev == null ? null : (ev >= evNeeded && !freeOnly && !cupFavBlock),
     aiProb: ai != null ? pct(ai) : null, aiEv: ai != null ? pct(ai * tmpOdds - 1) : null,
     aiGap, aiSuspicious: aiGap != null && aiGap > AI_SUSPECT_GAP,
   };
@@ -930,6 +946,8 @@ KÉT dolgot adj – MINDKETTŐ KÖTELEZŐ:
    - TILOS single tippnek (a tapasztalatok alapján rendre veszítettek, a rendszer eldobja): HENDIKEP (sima és ázsiai, mínuszos és pluszos is), CSAPAT GÓLSZÁMA ("Csapat gól"), DÖNTETLEN.
    - 1. félidős gólszámnál a félidős eredményeket / az első félidei gólok arányát támaszd alá.
    - PIACI SORREND (a tapasztalatok alapján): előnyben a HAZAI favorit győzelme bajnokiban, az Over és a BTTS-Igen.
+   - BTTS-Igen a tapasztalat szerint a leggyengébb piacunk: CSAK kivételesen, ha mindkét csapat az utolsó meccsei nagy többségén betalált ÉS a BTTS oddsa legalább ${(BTTS_MIN_TMP_ODDS / TMP_FACTOR).toFixed(2)} – egyébként válassz Overt vagy győzelmet.
+   - ODDS-SÁV: a legjobb eredményt az 1,55–2,05 közötti oddsú tippek hozták; ${(RISKY_ODDS_BAND[0] / TMP_FACTOR).toFixed(2)}–${(RISKY_ODDS_BAND[1] / TMP_FACTOR).toFixed(2)} közötti oddsú singlét csak nagyon erős, adatokkal alátámasztott esetben adj.
    - OVER 2,5 / 3,5 és BTTS-Igen CSAK akkor, ha MINDKÉT csapat gólveszélyes: mindkettő legalább ~1 gólt szerez meccsenként (lásd a Tabella/Forma sor Lőtt adatát). Ha az egyik csapat meccsenként 1 gól alatt szerez, ne adj rá Overt/BTTS-t.
    - FAVORIT GYŐZELMÉRE (1X2) csak akkor tippelj, ha az ellenfél az utolsó 5 meccséből LEGFELJEBB 1-et nyert. Jó formában lévő ellenfél ellen inkább más piacot válassz, vagy hagyd ki a meccset.
    - KUPAMECCSEN (BL, EL, KL, nemzeti kupák) a hazai favorit győzelmét csak akkor válaszd, ha az oddsa legalább ${(CUP_HOME_FAV_MIN_ODDS / TMP_FACTOR).toFixed(2)} – az ennél rövidebb kupás hazai favoritok a tapasztalat szerint gyakran nem nyertek (rotáció, döntetlen). Idegenbeli kupafavoritot 1,90 alatti oddson ne adj.
@@ -943,10 +961,8 @@ KÉT dolgot adj – MINDKETTŐ KÖTELEZŐ:
    - A kombi lábak ne a "tippek" (single) között szereplő meccsekről legyenek.
    - KÖTELEZŐ ODDS SZABÁLYOK – ezeket a rendszer szerver oldalon is ellenőrzi:
      * Egy láb odds: MINIMUM 1.20, MAXIMUM 1.60 – ezen kívüli lábak automatikusan kiszűrődnek!
-     * 2 lábas kombi össz odds: MINIMUM 2.00
-     * 3 lábas kombi össz odds: MINIMUM 2.80 – 3 × 1.26-os láb (= 2.02) NEM FOGADHATÓ EL!
-     * 4+ lábas kombi össz odds: MINIMUM 3.50
-   - Ha egy kombi nem érné el a minimumot, válassz magasabb oddsú lábakat vagy ne generáld!
+     * A rendszer CSAK 2 lábas kombikat állít össze, ${COMBO_MIN_ODDS.toFixed(2)}–${COMBO_MAX_ODDS.toFixed(2)} közötti össz oddsszal – ezért olyan lábakat adj (jellemzően 1.35–1.60 között), amelyek párban ebbe a sávba esnek.
+   - Ha nincs elég jó láb, inkább adj kevesebbet – kombi nélkül is rendben van a nap.
 
 KÖZÖS szabályok:
 - TILOS az UNDER (kevesebb mint X gól – meccsre, csapatra és félidőre is) és a "Nem talál be mindkét csapat" (BTTS-Nem) tipp – sem single, sem kombi láb. Ezeket a rendszer eldobja. Csak gólokra / győzelemre fogadunk.
@@ -1100,6 +1116,14 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
         console.log(`Single kiszűrve (becsült TippmixPro-odds ${tmp} < ${MIN_SINGLE_ODDS}): ${t.match} – ${t.pick} @ ${t.odds}`);
         return false;
       })
+      // BTTS-Igen csak 1,80+ becsült TMP-oddson (alatta a tapasztalat szerint veszteséges)
+      .filter(t => {
+        if (canonPick(t.market, t.pick).kind !== "btts") return true;
+        const tmp = Math.round((parseFloat(t.odds) || 0) * TMP_FACTOR * 100) / 100;
+        if (tmp >= BTTS_MIN_TMP_ODDS) return true;
+        console.log(`Single kiszűrve (BTTS ${tmp} < ${BTTS_MIN_TMP_ODDS} TMP-odds): ${t.match}`);
+        return false;
+      })
       .filter(t => { if (seenMatch.has(t.match)) return false; seenMatch.add(t.match); return true; });
     const comboLegs = (Array.isArray(obj.kombi_labak) ? obj.kombi_labak : []).map(l => ({
       match: huMatch(l.match), sportLabel: findMatchEntry(matchList, l.match)?.sport || l.sportLabel || "⚽",
@@ -1140,14 +1164,19 @@ function buildCombos(legs, matchList = []) {
   }
   const pool = Object.values(byMatch).sort((a, b) => a.odds - b.odds);   // legbiztosabb elöl
 
-  // A poolt diszjunkt darabokra bontjuk (2-3 láb/darab), egy-1-leftover nélkül.
-  const chunks = [];
-  let i = 0, remaining = pool.length;
-  while (remaining >= 2) {
-    const size = remaining === 4 ? 2 : (remaining >= 3 ? 3 : 2);   // 4 → 2+2 (ne maradjon 1 árván)
-    chunks.push(pool.slice(i, i + size));
-    i += size; remaining -= size;
-    if (chunks.length >= 3) break;   // legfeljebb 3 kombi egy futásból
+  // Csak 2 lábas kombik, eredő odds COMBO_MIN_ODDS–COMBO_MAX_ODDS között. Mohó párosítás a
+  // legbiztosabb lábtól: mindegyikhez azt a még szabad lábat keressük, amellyel a legkisebb, de
+  // a sávba eső eredő odds jön ki. Legfeljebb 3 kombi egy futásból, lábátfedés nélkül.
+  const chunks = [], used = new Set();
+  for (let a = 0; a < pool.length && chunks.length < 3; a++) {
+    if (used.has(a)) continue;
+    let best = -1, bestOdds = Infinity;
+    for (let b = a + 1; b < pool.length; b++) {
+      if (used.has(b)) continue;
+      const o = pool[a].odds * pool[b].odds;
+      if (o >= COMBO_MIN_ODDS && o <= COMBO_MAX_ODDS && o < bestOdds) { best = b; bestOdds = o; }
+    }
+    if (best >= 0) { used.add(a); used.add(best); chunks.push([pool[a], pool[best]]); }
   }
 
   const mk = items => {
@@ -1351,9 +1380,8 @@ async function fetchAndProcessInner(fromTs = null, toTs = null) {
       const legs = c.legs || [];
       const totalOdds = legs.reduce((p, l) => p * parseFloat(l.odds || 1), 1);
       // Minimális össz odds lábak számától függően
-      const minTotal = legs.length <= 2 ? 2.00 : legs.length === 3 ? 2.80 : 3.50;
-      if (totalOdds < minTotal) {
-        console.log(`Kombi kiszűrve (össz odds ${totalOdds.toFixed(2)} < ${minTotal} [${legs.length} láb]): ${legs.map(l=>l.match).join(", ")}`);
+      if (legs.length !== 2 || totalOdds < COMBO_MIN_ODDS || totalOdds > COMBO_MAX_ODDS) {
+        console.log(`Kombi kiszűrve (${legs.length} láb, össz odds ${totalOdds.toFixed(2)} – csak 2 láb, ${COMBO_MIN_ODDS}–${COMBO_MAX_ODDS}): ${legs.map(l=>l.match).join(", ")}`);
         return false;
       }
       return true;
