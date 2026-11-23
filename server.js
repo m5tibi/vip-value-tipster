@@ -1020,7 +1020,8 @@ Válaszolj KIZÁRÓLAG egy JSON OBJEKTUMMAL, semmi más szöveg nélkül:
     // Szabálytalan JSON (pl. idézőjel az indoklásban) → javítás, mielőtt a teljes futást eldobnánk
     const parsed = parseLenient(jsonStr);
     if (parsed.error) {
-      console.log("AI: JSON parse hiba (javítás után is) –", parsed.error, "\nPróbált JSON eleje:\n" + jsonStr.slice(0, 400));
+      console.log("AI: JSON parse hiba (javítás után is) –", parsed.error, "\n  javítás után:", parsed.repairError,
+        parsed.context ? "\n  a hiba helye: …" + parsed.context.replace(/\n/g, " ") + "…" : "");
       try { fs.writeFileSync(path.join(DATA_DIR, "ai_last_bad_response.txt"), text); console.log("AI: a nyers válasz mentve: ai_last_bad_response.txt"); } catch (e) {}
       return { singles: [], comboLegs: [], error: "az AI válasza hibás JSON volt" };
     }
@@ -3156,6 +3157,14 @@ app.post("/api/tips/send", async (req, res) => {
   })();
 
   res.json({ ok: true, sent: total });
+});
+
+// Az utolsó hibás (nem értelmezhető) AI válasz letöltése – hibakereséshez (admin)
+app.get("/api/admin/ai-last-bad-response", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const f = path.join(DATA_DIR, "ai_last_bad_response.txt");
+  if (!fs.existsSync(f)) return res.status(404).type("text/plain; charset=utf-8").send("Nincs mentett hibás AI válasz.");
+  res.type("text/plain; charset=utf-8").send(fs.readFileSync(f, "utf8"));
 });
 
 app.post("/api/check-results", async (req, res) => {
