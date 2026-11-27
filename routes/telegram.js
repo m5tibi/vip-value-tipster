@@ -104,7 +104,7 @@ Ne használj csillagot (*) vagy hashtaget (#). Csak HTML bold (<b>) formázást.
       }
       const lines = free.slice(0, 3).map(t => t.legs?.length
         ? `• <b>Kombi</b> @ ${tgEsc(t.odds)}\n` + t.legs.map(l => `  – ${tgEsc(l.match)}: <b>${tgEsc(l.pick)}</b> @ ${tgEsc(l.odds)}`).join("\n")
-        : `• <b>${tgEsc(t.match)}</b>\n  ${tgEsc(t.market)}: <b>${tgEsc(t.pick)}</b> @ ${tgEsc(t.odds)}`
+        : `• ${t.sportLabel && t.sportLabel.trim() !== "⚽" ? tgEsc(t.sportLabel) + " · " : ""}<b>${tgEsc(t.match)}</b>\n  ${tgEsc(t.market)}: <b>${tgEsc(t.pick)}</b> @ ${tgEsc(t.odds)}`
       ).join("\n\n");
       await tgSend(chatId,
         `🆓 <b>Mai ingyenes tipp</b>\n\n${lines}\n\n` +
