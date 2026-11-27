@@ -164,6 +164,7 @@ async function sendNewTips(to, tips, combos, frees = [], opts = {}) {
     return `<tr>
       <td colspan="4" style="padding:8px 6px 2px;border-bottom:none;background:rgba(139,92,246,.08)">
         <span style="color:#c084fc;font-weight:700;font-size:12px">🆓 INGYENES TIPP</span>
+        ${t.sportLabel && t.sportLabel.trim() !== "⚽" ? `<span style="color:#b39ddb;font-size:12px;margin-left:8px">${t.sportLabel}</span>` : ""}
         <span style="color:#e0e0e0;font-weight:600;margin-left:8px">${t.match}</span>
         <span style="color:#80cbc4;font-size:12px;margin-left:8px">${t.market || ''}</span>
         <span style="color:#e0e0e0;margin-left:8px">${t.pick}</span>

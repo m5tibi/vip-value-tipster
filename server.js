@@ -3110,13 +3110,16 @@ app.post("/api/tips/send", async (req, res) => {
     sendTelegram(lines.join("\n")).catch(e => console.error("Telegram privát hiba:", e.message));
   }
 
+  const tgE = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   // Free tippek → publikus csatorna
   if (freesToSend.length) {
     freesToSend.forEach(t => {
       const noteStr = t.note ? `\n\n<i>${t.note}</i>` : "";
+      const league = t.sportLabel && t.sportLabel.trim() !== "⚽" ? `${tgE(t.sportLabel)}\n` : "";
       const msg = `🆓 <b>INGYENES TIPP</b>\n\n`+
-        `<b>${t.match}</b>\n`+
-        `${t.pick} @${t.odds} | 🕐 ${t.commence || "–"}`+
+        league +
+        `<b>${tgE(t.match)}</b>\n`+
+        `${t.market ? tgE(t.market) + ": " : ""}<b>${tgE(t.pick)}</b> @${t.odds} | 🕐 ${t.commence || "–"}`+
         noteStr+
         `\n\n🌐 <a href="https://90perc.hu">90perc.hu</a> | `+
         `📲 <a href="${TG_PUBLIC_LINK}">Csatlakozz a csatornához</a>`;
@@ -3124,7 +3127,6 @@ app.post("/api/tips/send", async (req, res) => {
     });
   }
   // Free kombik → publikus csatorna
-  const tgE = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   freeCombosToSend.forEach(c => {
     const legs = (c.legs || []).map(l => `– ${l.sportLabel && l.sportLabel.trim() !== "⚽" ? tgE(l.sportLabel) + "\n   " : ""}<b>${tgE(l.match)}</b>\n   ${l.market ? tgE(l.market) + ": " : ""}${tgE(l.pick)} @${l.odds}${l.commence ? ` | 🕐 ${tgE(l.commence)}` : ""}`).join("\n");
     const note = String(c.note || "").trim();
